@@ -2,7 +2,7 @@
 
 在 DeepSeek Harness 的对话里显示可交互的卡片。模型写一段小小的界面程序，对话把它画成原生卡片：滑块、输入框、下拉选择、指标、表格、图表、进度条和作答按钮。拖动任何控件，数字都在你的浏览器里即时重算，不会再调用模型。
 
-[English](README.md) · [Español](README-es.md) · [Português](README-pt.md) · [हिन्दी](README-hi.md)
+[English](README.md)
 
 ## 功能
 

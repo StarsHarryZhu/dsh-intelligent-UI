@@ -109,8 +109,8 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
 - `tsconfig.client.json` — the browser-half compile (`src` → `.client-build`, no
   Node types).
 - `vitest.config.ts` — the test runner configuration.
-- `README.md` and `README-zh.md`, `README-es.md`, `README-pt.md`, `README-hi.md` —
-  the package documentation in five languages.
+- `README.md` and `README-zh.md` — the package documentation in English and
+  Chinese.
 - `locale/zh.json`, `locale/en.json` — the display metadata the Plugin Manager
   reads (`meta.title`, `meta.description`).
 - `icon.svg` — the plugin's icon, exported under `./icon`.

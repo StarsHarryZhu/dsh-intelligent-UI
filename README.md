@@ -2,7 +2,7 @@
 
 Interactive cards in DeepSeek Harness chats. The model writes a small interface program; the chat draws it as a native card — sliders, inputs, choices, metrics, tables, charts, progress bars, and answer buttons — and every control recomputes in your browser without another model call.
 
-[中文](README-zh.md) · [Español](README-es.md) · [Português](README-pt.md) · [हिन्दी](README-hi.md)
+[中文](README-zh.md)
 
 ## What it does
 
