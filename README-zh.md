@@ -53,4 +53,4 @@ node node_modules/vitest/vitest.mjs run
 
 ## 许可证
 
-[Apache License 2.0](LICENSE) © 2026 dsh-intelligent-ui contributors.
+[MIT License](LICENSE) © 2026 dsh-intelligent-ui contributors.

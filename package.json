@@ -72,5 +72,5 @@
     "node": "^22.19.0 || >=24.0.0"
   },
   "packageManager": "pnpm@11.7.0",
-  "license": "Apache-2.0"
+  "license": "MIT"
 }

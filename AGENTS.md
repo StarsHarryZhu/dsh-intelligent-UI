@@ -114,7 +114,7 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
 - `locale/zh.json`, `locale/en.json` — the display metadata the Plugin Manager
   reads (`meta.title`, `meta.description`).
 - `icon.svg` — the plugin's icon, exported under `./icon`.
-- `LICENSE` — the Apache 2.0 license text.
+- `LICENSE` — the MIT license text.
 - `lib/` — generated host and browser artifacts. Never edited by hand.
 - `src/` — all source. See `src/AGENTS.md`.
 - `tests/` — the unit, contract, and isolation suite. See `tests/AGENTS.md`.

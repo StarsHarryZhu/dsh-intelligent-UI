@@ -53,4 +53,4 @@ See `AGENTS.md` for the rules of the tree and `docs/VERIFY.md` for the live chec
 
 ## License
 
-[Apache License 2.0](LICENSE) © 2026 dsh-intelligent-ui contributors.
+[MIT License](LICENSE) © 2026 dsh-intelligent-ui contributors.
