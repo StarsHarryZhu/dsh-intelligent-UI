@@ -46,7 +46,7 @@ the maintainer's actions; nothing in this repository automates them.
 **Done.**
 
 - The entry parses as YAML, names category `ui`, and its claims match the code as
-  of version 0.1.1, including the required harness version (`engines.dsh`
+  of version 0.1.2, including the required harness version (`engines.dsh`
   `>=0.2.1-alpha.1 <0.3.0-0`) and that the desktop apps are not supported yet.
 - The repository carries the `dsh-plugin` topic and a `screenshots.json`.
 
