@@ -4,29 +4,47 @@
 
 The language layer: the one place that decides what a model-authored interface is
 allowed to say. It holds the component catalog, the DIL grammar, the readable
-expression syntax and its evaluator, text interpolation, the compiler that turns
-model text into a program, the vocabulary limits, and the names every half agrees
-on.
+expression syntax and its evaluator, the math engine, text interpolation, the
+compiler that turns model text into a program, the vocabulary limits, and the
+names every half agrees on.
 
 Both halves run this layer. The host compiles; the browser compiles a streaming
 preview and evaluates expressions against local state on every control change.
 One evaluator means a program cannot mean one thing on the host and another in
-the browser.
+the browser — the figures the model reads in its tool result are the figures the
+reader sees.
 
 ## 2. Constraints
 
-**The expression union is the sandbox.** No member access, no call form beyond the
-named functions, no string indexing, and no dynamic evaluation. The readable
+**The expression union is the sandbox.** No member access, no function value, no
+string indexing, and no dynamic evaluation. A call names an entry of the fixed
+function table in `math.ts`, looked up with an own-property check; a calculus
+operator binds one variable name, visible only inside its body. The readable
 syntax in `infix.ts` only lowers to operators `checkExpr` already accepts, so it
 can never widen what an expression may do.
 
 **Operands are numbers, booleans, or nested expressions.** A string literal is
 always `["lit","text"]`; a bare name is always `["ref","name"]` and must be
+declared or bound; `pi`, `e`, `tau`, and `inf` are constants and cannot be
 declared. Equality compares two values of one type; ordering is numeric.
 
 **Validation and evaluation are separate passes.** `checkExpr` runs against the
 declared scope and returns diagnostics; `evalExpr` must be total — it returns the
 failure symbol instead of throwing, even on a program that was never validated.
+
+**Numbers are right or absent.** Each numerical routine has an accuracy target
+and refuses a result it cannot vouch for: the integrator's error estimate, the
+limit's agreement of sides, the root's sign change. Derivatives are exact by
+Taylor arithmetic wherever the expression allows, and fall back to extrapolated
+differences only for orders one and two. A refused value shows as "—".
+
+**Work is bounded.** Every evaluation spends from a budget (400,000 node visits
+by default, shareable across the samples of one plot), calculus nests at most
+three deep, sums take at most 10,000 terms, and Taylor series at most order 30.
+
+**Format follows content.** A program that uses the math vocabulary or a math
+component is written as format 3; any other program stays format 2, so an older
+client draws everything it can.
 
 **Text interpolation is checked, not trusted.** `{…}` in text becomes an
 expression segment only when it parses and type-checks against the declared
@@ -57,14 +75,26 @@ https, images must be inline `data:image/…` rasters.
 - `catalog.ts` — the component table: name, purpose, container flag, primary text
   prop, and prop specs, plus the catalog version and semantic hash.
 - `types.ts` — the wire vocabulary: expressions, declarations, nodes, templates,
-  diagnostics, and the program.
+  diagnostics, the program, and the operator sets that mark format 3.
 - `dil.ts` — the DIL line parser: declarations, indentation nesting, primary
-  text, and the legacy explicit form, producing the JSON envelope.
-- `infix.ts` — the readable expression syntax and its lowering.
+  text, bare expression values, and the legacy explicit form, producing the JSON
+  envelope.
+- `infix.ts` — the readable expression syntax and its lowering: powers,
+  factorials, implicit products, typeset symbols, constants, function and calculus
+  calls.
 - `text.ts` — `{…}` interpolation parsing and the renderer for hoisted text.
-- `expr.ts` — expression validation, static typing, evaluation, and formatting.
+- `expr.ts` — expression validation, static typing, bounded evaluation, the
+  calculus operators, and number display.
+- `math.ts` — the function table, the constants, special functions, adaptive
+  Gauss–Kronrod integration, Ridders differentiation, extrapolated limits, Brent
+  root finding, and significant-digit formatting.
+- `series.ts` — exact derivatives and Taylor coefficients by truncated power
+  series arithmetic over the expression tree.
+- `print.ts` — expressions printed back as readable infix text, for text views and
+  accessible names.
 - `compile.ts` — grammar detection, prop validation against the catalog,
-  hoisting, tree repair, fallback text, and bounded JSON recovery.
+  hoisting, tree repair, format selection, fallback text, and bounded JSON
+  recovery.
 - `limits.ts` — the vocabulary bounds and the spacing grid maximum.
 - `identity.ts` — the plugin id, the tool name, the slot names, and the format
   versions. Imports nothing.
@@ -73,13 +103,17 @@ https, images must be inline `data:image/…` rasters.
 
 **Done.**
 
-- Twenty-four components; the catalog drives validation, the description, and
+- Twenty-six components; the catalog drives validation, the description, and
   the registry check (`tests/catalog.test.ts`).
 - DIL nests by indentation, fills primary text from a bare quoted string, infers
-  state kinds, and still reads the explicit `#id … in=#parent` form
-  (`tests/dil.test.ts`).
-- Expressions read as `seats * 29` and `plan == "Pro" ? 29 : 12` everywhere an
-  expression is accepted, in both grammars (`tests/infix.test.ts`).
+  state kinds, keeps a spaced bare expression whole, and still reads the explicit
+  `#id … in=#parent` form (`tests/dil.test.ts`).
+- Expressions read as `seats * 29`, `3x^2 - 2x`, `n!`, and
+  `integral(sin(x), x, 0, pi)` everywhere an expression is accepted, in both
+  grammars (`tests/infix.test.ts`).
+- The math engine matches textbook values to the stated tolerance and refuses
+  divergent integrals, divergent or one-sided-only limits, missing derivatives,
+  and rootless intervals (`tests/math.test.ts`).
 - Text, list items, and table cells interpolate `{…}` (`tests/text.test.ts`).
 - Every bound has a boundary pair, and malformed JSON recovery stays fast
   (`tests/limits.test.ts`).
@@ -88,6 +122,10 @@ https, images must be inline `data:image/…` rasters.
 
 **Not done.**
 
+- **Infinite series.** `sum` and `prod` need finite bounds; convergence
+  acceleration for an infinite upper bound is not implemented.
+- **Symbolic results.** Everything is numerical; a derivative is a number at a
+  point, never a formula.
 - **`@each` and `@if`.** A repeated row over a list and a conditional component
   need constructs the grammar does not have; `if(…)` covers value choice only.
 - **Option labels distinct from option values.** A choice shows its values.
@@ -97,11 +135,10 @@ https, images must be inline `data:image/…` rasters.
 - A table row with fewer cells than columns is accepted and renders short.
 - `fmtNum` returns text, so a numeric prop fed by it is read back as a number only
   when the text parses as one.
-- A bare `expr` prop value ends at the first space: `value=mins / 60` compiles as
-  `value=mins` plus two stray tokens, and the diagnostic names only the second
-  one (`"/" is not attached to a prop`). Written `value="mins / 60"` or
-  `value=(mins / 60)`, the same expression is correct. Found drawing the samples
-  in `docs/SAMPLES.md`; the fix is to read an `expr` value to end of line.
+- A limit that converges slower than any power of the step, such as 1/ln(x) at 0,
+  is refused rather than approximated.
+- `x(1 - x)` is not read as a product, because a name followed by brackets is a
+  call; write `x * (1 - x)`.
 
 **Next goal.** Add `@each` over a declared list without widening the expression
 union, through the same partial-line recovery.

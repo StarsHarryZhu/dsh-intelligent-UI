@@ -3,7 +3,8 @@
  * Every selector is scoped under a .dsh-iui- class and every colour, radius and
  * font comes from a host theme token, so light and dark themes, the reader's
  * font-size setting and future palette changes all apply without a rebuild.
- * Spacing stays on the 4px grid.
+ * Layout spacing stays on the 4px grid; inside a typeset formula, spacing is in
+ * em so it scales with the formula's own size, as mathematical spacing does.
  */
 
 .dsh-iui-tool { display: flex; flex-direction: column; min-width: 0; width: 100%; }
@@ -122,7 +123,7 @@
 
 .dsh-iui-figure { display: flex; flex-direction: column; gap: 6px; min-width: 0; margin: 0; }
 .dsh-iui-caption { font: var(--dsw-font-xxs-12); color: var(--dsw-alias-label-secondary); }
-.dsh-iui-table-wrap { min-width: 0; overflow-x: auto; }
+.dsh-iui-table-wrap { min-width: 0; overflow-x: auto; scrollbar-width: thin; }
 .dsh-iui-table { width: 100%; border-collapse: collapse; font: var(--dsw-font-xs-13); color: var(--dsw-alias-label-primary); }
 .dsh-iui-table th { padding: 6px 12px 6px 0; border-bottom: 0.5px solid var(--dsw-alias-border-l2); color: var(--dsw-alias-label-secondary); font-weight: 500; text-align: left; white-space: nowrap; }
 .dsh-iui-table td { padding: 6px 12px 6px 0; border-bottom: 0.5px solid var(--dsw-alias-border-l1); text-align: left; vertical-align: top; font-variant-numeric: tabular-nums; }
@@ -145,6 +146,62 @@
 .dsh-iui-chart-labels > span { display: flex; flex-direction: column; min-width: 0; }
 .dsh-iui-chart-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--dsw-font-xxxs-11); color: var(--dsw-alias-label-secondary); }
 .dsh-iui-chart-value { font: var(--dsw-font-xxs-12); color: var(--dsw-alias-label-primary); font-variant-numeric: tabular-nums; }
+
+.dsh-iui-plot { gap: 4px; }
+.dsh-iui-plot-frame { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 4px; row-gap: 4px; min-width: 0; }
+.dsh-iui-plot-area { display: block; box-sizing: border-box; width: 100%; height: 180px; border: 0.5px solid var(--dsw-alias-border-l1); border-radius: var(--dsw-radius-sm); background: var(--dsw-alias-bg-layer-2); }
+.dsh-iui-plot-yaxis { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; font: var(--dsw-font-xxxs-11); color: var(--dsw-alias-label-tertiary); font-variant-numeric: tabular-nums; }
+.dsh-iui-plot-xaxis { display: flex; justify-content: space-between; gap: 8px; font: var(--dsw-font-xxxs-11); color: var(--dsw-alias-label-tertiary); font-variant-numeric: tabular-nums; }
+.dsh-iui-plot-variable { font-style: italic; }
+.dsh-iui-plot-axis { stroke: var(--dsw-alias-border-l3); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.dsh-iui-plot-curve { fill: none; stroke: var(--dsw-alias-brand-primary); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.dsh-iui-plot-curve[data-series='1'], .dsh-iui-plot-swatch[data-series='1'] { stroke: var(--dsw-alias-state-success-primary); border-color: var(--dsw-alias-state-success-primary); }
+.dsh-iui-plot-curve[data-series='2'], .dsh-iui-plot-swatch[data-series='2'] { stroke: var(--dsw-alias-state-warn-primary); border-color: var(--dsw-alias-state-warn-primary); }
+.dsh-iui-plot-curve[data-series='3'], .dsh-iui-plot-swatch[data-series='3'] { stroke: var(--dsw-alias-state-error-primary); border-color: var(--dsw-alias-state-error-primary); }
+.dsh-iui-plot-shade { fill: var(--dsw-alias-brand-primary); fill-opacity: 0.16; stroke: none; }
+.dsh-iui-plot-tangent { stroke: var(--dsw-alias-label-secondary); stroke-width: 1; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+.dsh-iui-plot-dot { stroke: var(--dsw-alias-brand-primary); stroke-width: 8; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.dsh-iui-plot-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font: var(--dsw-font-xxs-12); color: var(--dsw-alias-label-secondary); }
+.dsh-iui-plot-key { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.dsh-iui-plot-swatch { flex: none; width: 12px; border-top: 2px solid var(--dsw-alias-brand-primary); }
+.dsh-iui-plot-readout { font: var(--dsw-font-xxs-12); color: var(--dsw-alias-label-secondary); font-variant-numeric: tabular-nums; }
+
+.dsh-iui-formula { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; color: var(--dsw-alias-label-primary); }
+.dsh-iui-formula-label { font: var(--dsw-font-xs-13); color: var(--dsw-alias-label-secondary); }
+.dsh-iui-math { display: inline-flex; flex-wrap: wrap; align-items: center; min-width: 0; font: var(--dsw-font-base-16); font-variant-numeric: lining-nums; }
+.dsh-iui-formula[data-size='xs'] .dsh-iui-math { font: var(--dsw-font-xs-13); }
+.dsh-iui-formula[data-size='sm'] .dsh-iui-math { font: var(--dsw-font-s-14); }
+.dsh-iui-formula[data-size='lg'] .dsh-iui-math { font: var(--dsw-font-m-18); }
+.dsh-iui-formula[data-size='xl'] .dsh-iui-math { font: var(--dsw-font-l-20); }
+.dsh-iui-math-row { display: inline-flex; align-items: center; }
+.dsh-iui-math-var { font-style: italic; padding-right: 0.05em; }
+.dsh-iui-math-word, .dsh-iui-math-fn, .dsh-iui-math-num, .dsh-iui-math-glyph, .dsh-iui-math-text { font-style: normal; }
+.dsh-iui-math-fn { padding-right: 0.1em; }
+.dsh-iui-math-op { padding: 0 0.25em; }
+.dsh-iui-math-op[data-tight] { padding: 0 0.1em; }
+.dsh-iui-math-op[data-word] { padding: 0 0.35em; }
+.dsh-iui-math-comma { padding-right: 0.25em; }
+.dsh-iui-math-paren { display: inline-block; transform-origin: center; }
+.dsh-iui-math-paren[data-tall] { transform: scaleY(1.9); padding: 0 0.1em; }
+.dsh-iui-math-frac { display: inline-flex; flex-direction: column; align-items: center; vertical-align: middle; padding: 0 0.15em; font-size: 0.92em; }
+.dsh-iui-math-numerator { display: inline-flex; align-items: center; padding: 0 0.2em 0.1em; border-bottom: 1px solid var(--dsw-alias-label-primary); }
+.dsh-iui-math-denominator { display: inline-flex; align-items: center; padding: 0.1em 0.2em 0; }
+.dsh-iui-math-scripted { display: inline-flex; align-items: flex-start; }
+.dsh-iui-math-sup { font-size: 0.7em; line-height: 1; margin-left: 0.05em; vertical-align: super; }
+.dsh-iui-math-sub { align-self: flex-end; font-size: 0.7em; line-height: 1; margin-left: 0.05em; }
+.dsh-iui-math-radical { display: inline-flex; align-items: stretch; }
+.dsh-iui-math-index { font-size: 0.6em; line-height: 1; margin-right: -0.4em; align-self: flex-start; }
+.dsh-iui-math-radix { display: inline-flex; align-items: flex-end; }
+.dsh-iui-math-radicand { display: inline-flex; align-items: center; padding: 0.05em 0.15em 0 0.1em; border-top: 1px solid var(--dsw-alias-label-primary); }
+.dsh-iui-math-integral { display: inline-flex; align-items: center; padding-right: 0.15em; }
+.dsh-iui-math-bigglyph { font-size: 1.6em; line-height: 1; }
+.dsh-iui-math-limits-side { display: inline-flex; flex-direction: column; justify-content: space-between; align-self: stretch; margin-left: -0.1em; }
+.dsh-iui-math-stack { display: inline-flex; flex-direction: column; align-items: center; padding-right: 0.2em; }
+.dsh-iui-math-script { display: inline-flex; align-items: center; font-size: 0.7em; line-height: 1.1; }
+.dsh-iui-math-differential { display: inline-flex; align-items: center; padding-left: 0.2em; }
+.dsh-iui-math-evaluated { display: inline-flex; align-self: stretch; align-items: flex-end; margin-left: 0.1em; padding-left: 0.15em; border-left: 1px solid var(--dsw-alias-label-secondary); }
+.dsh-iui-math-binom { display: inline-flex; flex-direction: column; align-items: center; font-size: 0.85em; line-height: 1.1; }
+.dsh-iui-math-result { font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .dsh-iui-badge {
   align-self: flex-start;
@@ -200,6 +257,7 @@
 .dsh-iui-button-mark { flex: none; font: var(--dsw-font-xxs-12); }
 
 .dsh-iui-note { font: var(--dsw-font-xxs-12); color: var(--dsw-alias-label-tertiary); }
+.dsh-iui-copy-text { display: block; margin-top: 4px; padding: 4px 8px; border-radius: var(--dsw-radius-sm); background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); font-family: var(--ds-font-family-code); white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
 .dsh-iui-foot { font: var(--dsw-font-xxxs-11); color: var(--dsw-alias-label-tertiary); }
 .dsh-iui-fallback { margin: 0; font: var(--dsw-font-xs-13); color: var(--dsw-alias-label-primary); white-space: pre-wrap; overflow-wrap: anywhere; }
 .dsh-iui-diag {

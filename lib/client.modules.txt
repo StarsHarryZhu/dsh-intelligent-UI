@@ -1,11 +1,13 @@
-/** Bundled client modules (21):
+/** Bundled client modules (26):
  *   client/card.js
  *   client/chart.js
  *   client/components.js
  *   client/edits.js
+ *   client/formula.js
  *   client/host.js
  *   client/index.js
  *   client/locales.js
+ *   client/plot.js
  *   client/program.js
  *   client/styles.css
  *   client/tail.js
@@ -18,6 +20,9 @@
  *   lang/identity.js
  *   lang/infix.js
  *   lang/limits.js
+ *   lang/math.js
+ *   lang/print.js
+ *   lang/series.js
  *   lang/text.js
  *   lang/types.js
  */

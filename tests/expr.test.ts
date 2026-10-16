@@ -73,7 +73,7 @@ describe('expression validation', () => {
 
   it('bounds nesting depth', () => {
     let deep: ExprNode = 1
-    for (let index = 0; index < 20; index += 1) deep = ['neg', deep]
+    for (let index = 0; index < 40; index += 1) deep = ['neg', deep]
     const check = checkExpr(deep, scope)
     expect(check.type).toBeUndefined()
     expect(check.problems[0]?.message).toContain('nests deeper than')

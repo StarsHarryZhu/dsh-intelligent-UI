@@ -11,7 +11,7 @@
 import type { StateKind } from './types.ts'
 
 /** Bumped whenever a descriptor's props or kinds change. */
-export const CATALOG_VERSION = '2'
+export const CATALOG_VERSION = '3'
 
 /** Tone tokens map to theme aliases, never to literal colours. */
 export const TONES = ['primary', 'secondary', 'muted', 'success', 'warn', 'error'] as const
@@ -47,6 +47,12 @@ export type PropSpec =
   | { kind: 'items'; required?: boolean }
   | { kind: 'options'; required?: boolean }
   | { kind: 'bind'; required?: boolean; state: StateKind }
+  /** One to four numeric expressions over the component's variable, such as a plot's curves. */
+  | { kind: 'fns'; required?: boolean }
+  /** An expression of any type, kept whole for typesetting. */
+  | { kind: 'math'; required?: boolean }
+  /** A name the component binds inside its `fns`; never a declared key's value. */
+  | { kind: 'variable'; required?: boolean; default?: string }
 
 /** One catalog entry. */
 export interface ComponentDescriptor {
@@ -108,7 +114,7 @@ export const CATALOG: readonly ComponentDescriptor[] = [
   },
   {
     type: 'metric',
-    description: 'One prominent number with its caption: the headline figure of an answer.',
+    description: 'One prominent number with its caption: the headline figure of an answer; digits= sets significant digits.',
     container: false,
     primary: 'label',
     props: {
@@ -116,6 +122,7 @@ export const CATALOG: readonly ComponentDescriptor[] = [
       value: { kind: 'expr', required: true, of: 'number' },
       unit: { kind: 'string', maxLength: 24 },
       tone: { kind: 'tone' },
+      digits: { kind: 'number', integer: true, min: 1, max: 12 },
     },
   },
   {
@@ -217,6 +224,38 @@ export const CATALOG: readonly ComponentDescriptor[] = [
       values: { kind: 'series', required: true },
       caption: { kind: 'text' },
       unit: { kind: 'string', maxLength: 24 },
+    },
+  },
+  {
+    type: 'plot',
+    description: 'Graph of y = f(x) over from..to: up to four curves, a point mark= with tangent=true, and shading shadeFrom..shadeTo.',
+    container: false,
+    primary: 'caption',
+    props: {
+      caption: { kind: 'text' },
+      fn: { kind: 'fns', required: true },
+      var: { kind: 'variable', default: 'x' },
+      from: { kind: 'expr', of: 'number' },
+      to: { kind: 'expr', of: 'number' },
+      ymin: { kind: 'expr', of: 'number' },
+      ymax: { kind: 'expr', of: 'number' },
+      labels: { kind: 'items' },
+      mark: { kind: 'expr', of: 'number' },
+      tangent: { kind: 'expr', of: 'boolean' },
+      shadeFrom: { kind: 'expr', of: 'number' },
+      shadeTo: { kind: 'expr', of: 'number' },
+    },
+  },
+  {
+    type: 'formula',
+    description: 'Typeset formula and its live value (digits= significant digits, default 6); an equation shows no value.',
+    container: false,
+    primary: 'expr',
+    props: {
+      expr: { kind: 'math', required: true },
+      label: { kind: 'text' },
+      digits: { kind: 'number', integer: true, min: 1, max: 12, default: 6 },
+      size: { kind: 'size', default: 'md' },
     },
   },
   {

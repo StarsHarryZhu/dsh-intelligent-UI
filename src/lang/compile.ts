@@ -16,14 +16,16 @@
 
 import { CATALOG_BY_TYPE, CATALOG_VERSION, catalogHash, SIZES, TONES, type ComponentDescriptor, type PropSpec } from './catalog.ts'
 import { parseDil, type Envelope, type RawCalc, type RawNode, type RawState } from './dil.ts'
-import { checkExpr, evalExpr, type ExprType } from './expr.ts'
-import { PROGRAM_VERSION } from './identity.ts'
+import { checkExpr, evalExpr, usesOperators, type ExprType } from './expr.ts'
 import { asNode, parseInfix } from './infix.ts'
 import { LIMITS, MAX_SPACE } from './limits.ts'
+import { formatSignificant, isMathConstant, MATH_CONSTANTS } from './math.ts'
+import { printExpr } from './print.ts'
 import { parseTemplate, renderText, valueText } from './text.ts'
-import type {
-  CalcDeclaration, Diagnostic, ExprNode, JsonValue, StateDeclaration, StateKind,
-  TextTemplate, UINode, UIProgram,
+import {
+  FORMAT_3_OPERATORS,
+  type CalcDeclaration, type Diagnostic, type ExprNode, type JsonValue, type StateDeclaration, type StateKind,
+  type TextTemplate, type UINode, type UIProgram,
 } from './types.ts'
 
 /** Catalog semantics hash folded into every program, for diagnostics across builds. */
@@ -155,7 +157,7 @@ export function compileEnvelope(envelope: Envelope, inherited: Diagnostic[] = []
   connect(nodes, ids, diagnostics)
 
   const program: UIProgram = {
-    v: PROGRAM_VERSION as 2,
+    v: needsFormat3(calc, nodes) ? 3 : 2,
     catalogVersion: CATALOG_VERSION,
     catalogHash: HASH,
     state,
@@ -168,6 +170,29 @@ export function compileEnvelope(envelope: Envelope, inherited: Diagnostic[] = []
   }
   program.fallback = buildFallback(program)
   return { ok: true, program }
+}
+
+/**
+ * Whether a program needs format 3: a math component, or an expression using the
+ * math vocabulary. Writing the oldest format that can draw a program keeps it
+ * readable by every client that can draw it; a format-2 client shows a newer
+ * program as text, with the values computed here, instead of a wrong figure.
+ */
+function needsFormat3(calc: readonly CalcDeclaration[], nodes: readonly UINode[]): boolean {
+  return calc.some(row => usesOperators(row.expr, FORMAT_3_OPERATORS))
+    || nodes.some(node => MATH_COMPONENTS.has(node.type) || usesOperators(node.props, FORMAT_3_OPERATORS))
+}
+
+/** Components a format-2 client does not have. */
+const MATH_COMPONENTS: ReadonlySet<string> = new Set(['plot', 'formula'])
+
+/** The diagnostic for a declaration that takes a constant's name. */
+function reservedName(kind: 'state' | 'calc', key: string): Diagnostic {
+  return invalid(
+    `${kind}.${key}`,
+    `"${key}" is a math constant (${Object.keys(MATH_CONSTANTS).join(', ')}), so it cannot be declared`,
+    `Rename it, for example "@${kind} ${key}Value = …".`,
+  )
 }
 
 /** Interned literal text, so repeated labels are stored once. */
@@ -204,6 +229,10 @@ function readState(raw: RawState, diagnostics: Diagnostic[]): StateDeclaration |
   const key = typeof raw.key === 'string' ? raw.key : ''
   if (!/^[A-Za-z_$][\w$]*$/u.test(key)) {
     diagnostics.push(invalid('state', 'a state declaration needs a name of letters, digits, or underscores', 'Write "@state seats = 8".'))
+    return undefined
+  }
+  if (isMathConstant(key)) {
+    diagnostics.push(reservedName('state', key))
     return undefined
   }
   const options = readOptionList(raw.options)
@@ -278,6 +307,10 @@ function readCalc(
     diagnostics.push(invalid('calc', 'a derived value needs a name', 'Write "@calc price = seats * 29".'))
     return undefined
   }
+  if (isMathConstant(key)) {
+    diagnostics.push(reservedName('calc', key))
+    return undefined
+  }
   if (scope.has(key)) {
     diagnostics.push({ code: 'duplicate_id', path: `calc.${key}`, message: `"${key}" is declared twice; the first declaration is used`, repair: `Rename the second "@calc ${key}".` })
     return undefined
@@ -288,7 +321,7 @@ function readCalc(
       code: 'invalid_expression',
       path: `calc.${key}`,
       message: `"@calc ${key}" is not a readable expression`,
-      repair: 'Use + - * / % ( ), comparisons, && || ! ?:, and min max abs floor ceil round(x, digits) over declared names.',
+      repair: 'Use + - * / ^ % ( ), comparisons, && || ! ?:, functions such as sqrt sin ln, and calculus such as integral(f, x, a, b) over declared names.',
     })
     return undefined
   }
@@ -298,7 +331,7 @@ function readCalc(
       code: 'invalid_expression' as const,
       path: problem.path,
       message: problem.message,
-      repair: 'A calc may read only @state keys and calcs declared above it.',
+      repair: 'A calc may read only @state keys, calcs declared above it, the constants pi e tau, and the variable a calculus call names.',
     })))
     return undefined
   }
@@ -594,6 +627,40 @@ function readProp(
       }
       return { ok: true, value: series }
     }
+    case 'fns': {
+      const variable = plotVariable(rawProps.var)
+      const entries = Array.isArray(value) ? value : [value]
+      if (entries.length === 0 || entries.length > MAX_CURVES) {
+        return bad(`takes one to ${MAX_CURVES} expressions`, `Write ${name}="sin(${variable})" or ${name}=["sin(${variable})","cos(${variable})"].`)
+      }
+      const scope = new Map(context.scope)
+      scope.set(variable, 'number')
+      const curves: JsonValue[] = []
+      for (const entry of entries) {
+        const expr = readExpression(entry)
+        if (expr === undefined) return bad(`"${String(entry)}" is not a readable expression`, `Write ${name}="${variable}^2 - 1".`, 'invalid_expression')
+        const check = checkExpr(expr, scope, `nodes.${context.id}.${name}`)
+        if (check.type !== 'number') {
+          return bad(check.problems[0]?.message ?? 'must produce a number', `Write each curve in terms of ${variable} and declared names, such as "${variable}^2".`, 'invalid_expression')
+        }
+        curves.push(expr as JsonValue)
+      }
+      return { ok: true, value: curves }
+    }
+    case 'math': {
+      const expr = readExpression(value)
+      if (expr === undefined) return bad('must be a readable expression such as integral(x^2, x, 0, 1)', `Write ${name}="integral(x^2, x, 0, 1)".`, 'invalid_expression')
+      const check = checkExpr(expr, context.scope, `nodes.${context.id}.${name}`)
+      if (check.type === undefined) {
+        return bad(check.problems[0]?.message ?? 'is not a valid expression', 'Use only declared @state and @calc names, constants, and calculus variables.', 'invalid_expression')
+      }
+      return { ok: true, value: expr as JsonValue }
+    }
+    case 'variable': {
+      const text = typeof value === 'string' ? value.trim() : ''
+      if (!PLOT_VARIABLE.test(text) || isMathConstant(text)) return bad('must be a short name such as x or t, and not pi, e, tau, or inf', `Write ${name}=x.`)
+      return { ok: true, value: text }
+    }
     case 'bind': {
       const key = typeof value === 'string' ? value.replace(/^\{(.*)\}$/u, '$1').trim() : ''
       const declared = context.stateKinds.get(key)
@@ -613,6 +680,18 @@ function readProp(
       return bad(`unsupported prop spec ${String(exhaustive)}`, 'This is a plugin defect, not a model error.')
     }
   }
+}
+
+/** Most curves one plot draws. */
+const MAX_CURVES = 4
+
+/** A name a component may bind for its curves. */
+const PLOT_VARIABLE = /^[A-Za-z_]\w{0,11}$/u
+
+/** The variable a plot's curves use: its valid `var`, or x. */
+function plotVariable(value: unknown): string {
+  const text = typeof value === 'string' ? value.trim() : ''
+  return PLOT_VARIABLE.test(text) && !isMathConstant(text) ? text : 'x'
 }
 
 /** Whether a string is an inline raster image the browser can show without a request. */
@@ -827,7 +906,9 @@ export function fallbackLines(program: Pick<UIProgram, 'nodes' | 'constants' | '
       case 'callout': return `Note: ${text(node, 'text')}`
       case 'badge': return `[${text(node, 'text')}]`
       case 'divider': return '----'
-      case 'metric': return `${text(node, 'label')}: ${valueText(node.props.value, values)}${unit}`
+      case 'metric': return `${text(node, 'label')}: ${digitsText(node.props.value, node.props.digits)}${unit}`
+      case 'formula': return formulaText(node)
+      case 'plot': return plotText(node)
       case 'progress': return `${text(node, 'label')}: ${valueText(node.props.value, values)} / ${node.props.max === undefined ? '100' : valueText(node.props.max, values)}`
       case 'slider':
       case 'numberInput': {
@@ -850,6 +931,50 @@ export function fallbackLines(program: Pick<UIProgram, 'nodes' | 'constants' | '
       case 'chart': return chartText(node)
       default: return undefined
     }
+  }
+
+  /** A figure at its significant digits when the program set them. */
+  function digitsText(expr: unknown, digits: unknown): string {
+    if (typeof digits !== 'number') return valueText(expr, values)
+    const produced = evalExpr(expr, key => values.get(key))
+    return typeof produced === 'number' ? formatSignificant(produced, digits) : valueText(expr, values)
+  }
+
+  /** `Area: integral(x^2, x, 0, a) = 0.333333`; an equation keeps no value. */
+  function formulaText(node: UINode): string {
+    const label = node.props.label === undefined ? '' : `${text(node, 'label')}: `
+    const digits = typeof node.props.digits === 'number' ? node.props.digits : 6
+    const produced = evalExpr(node.props.expr, key => values.get(key))
+    const shown = typeof produced === 'number' ? ` = ${formatSignificant(produced, digits)}` : typeof produced === 'symbol' ? ' = —' : ''
+    return `${label}${printExpr(node.props.expr)}${shown}`
+  }
+
+  /** The curves, the range, and the figures a reader would read off the plot. */
+  function plotText(node: UINode): string {
+    const curves = Array.isArray(node.props.fn) ? node.props.fn : []
+    const variable = typeof node.props.var === 'string' ? node.props.var : 'x'
+    const from = node.props.from === undefined ? '-5' : valueText(node.props.from, values)
+    const to = node.props.to === undefined ? '5' : valueText(node.props.to, values)
+    const caption = node.props.caption === undefined ? 'Plot' : `Plot "${text(node, 'caption')}"`
+    const parts = [`${caption}: ${curves.map(curve => `y = ${printExpr(curve)}`).join('; ')} for ${variable} from ${from} to ${to}`]
+    const first = curves[0]
+    const read = (key: string): JsonValue | undefined => values.get(key)
+    if (first !== undefined && node.props.mark !== undefined) {
+      const at = evalExpr(node.props.mark, read)
+      if (typeof at === 'number') {
+        const y = evalExpr(first, read, undefined, new Map([[variable, at]]))
+        parts.push(`point at ${variable} = ${formatSignificant(at, 6)}: y = ${typeof y === 'number' ? formatSignificant(y, 6) : '—'}`)
+        if (node.props.tangent !== undefined && evalExpr(node.props.tangent, read) === true) {
+          const slope = evalExpr(['deriv', variable, first, at], read)
+          parts.push(`tangent slope ${typeof slope === 'number' ? formatSignificant(slope, 6) : '—'}`)
+        }
+      }
+    }
+    if (first !== undefined && node.props.shadeFrom !== undefined && node.props.shadeTo !== undefined) {
+      const area = evalExpr(['integral', variable, first, node.props.shadeFrom, node.props.shadeTo], read)
+      parts.push(`shaded area from ${valueText(node.props.shadeFrom, values)} to ${valueText(node.props.shadeTo, values)} = ${typeof area === 'number' ? formatSignificant(area, 6) : '—'}`)
+    }
+    return parts.join('; ')
   }
 
   function tableText(node: UINode): string {

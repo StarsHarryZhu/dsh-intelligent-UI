@@ -9,7 +9,7 @@
  */
 import type { StateKind } from './types.ts';
 /** Bumped whenever a descriptor's props or kinds change. */
-export declare const CATALOG_VERSION = "2";
+export declare const CATALOG_VERSION = "3";
 /** Tone tokens map to theme aliases, never to literal colours. */
 export declare const TONES: readonly ["primary", "secondary", "muted", "success", "warn", "error"];
 /** A tone name from {@link TONES}. */
@@ -76,6 +76,22 @@ export type PropSpec = {
     kind: 'bind';
     required?: boolean;
     state: StateKind;
+}
+/** One to four numeric expressions over the component's variable, such as a plot's curves. */
+ | {
+    kind: 'fns';
+    required?: boolean;
+}
+/** An expression of any type, kept whole for typesetting. */
+ | {
+    kind: 'math';
+    required?: boolean;
+}
+/** A name the component binds inside its `fns`; never a declared key's value. */
+ | {
+    kind: 'variable';
+    required?: boolean;
+    default?: string;
 };
 /** One catalog entry. */
 export interface ComponentDescriptor {

@@ -1,6 +1,6 @@
 # The catalog, one sample per component
 
-A live tour of all twenty-four components: one card each, drawn in a real chat, in the order of `src/lang/catalog.ts`.
+A live tour of the catalog: one card per component, drawn in a real chat. Samples 1 to 24 were drawn on 2026-10-15 in the order the catalog had then; samples 25 and 26, the math components, were written by the model itself on 2026-10-16.
 
 Every block below is the exact `source` that was passed to `ui_render` and the exact result it reported, so this file doubles as a regression corpus — `tests/compile.test.ts` can compile any of them.
 
@@ -337,14 +337,55 @@ card "button · 把选择变成下一条消息"
 
 4 components, 2 controls.
 
+## 25. `plot`
+
+Curves of y = f(x) over a range, with an optional marked point, its tangent, and a shaded area under the first curve. Written by the model, unprompted beyond the request, after it loaded the skill:
+
+```dil
+@state a = 2 min=0 max=3 step=0.1
+@calc area = integral(x^2, x, 0, a)
+@calc slope = deriv(x^2, x, a)
+@calc fx = a^2
+card "∫₀ᵃ x² dx — 面积与切线"
+  slider "积分上限 a" bind=a min=0 max=3 step=0.1
+  row gap=4
+    metric "涂色面积" value=area digits=6
+    metric "切线斜率 f′(a)" value=slope digits=4
+  formula "integral(x^2, x, 0, a)" label="∫₀ᵃ x² dx" digits=6
+  plot fn="x^2" from=-0.4 to=3.4 ymin=-1 ymax=10 mark=a tangent=true shadeFrom=0 shadeTo=a
+  text "当 a = {a} 时：f(a) = a² = {fx}，切线斜率 f′(a) = 2a = {slope}。"
+  callout "精确值 ∫₀ᵃ x² dx = a³/3；涂色区域就是该积分，切点与切线随 a 一起移动。"
+```
+
+9 components, 1 control, zero repairs. At a = 2 it reads area 2.66667 and slope 4; at a = 3, 9 and 6.
+
+## 26. `formula`
+
+A typeset expression followed by its live value. Here with two curves, a Taylor polynomial whose degree a slider controls, and a limit:
+
+```dil
+@state n = 3 min=1 max=15 step=1
+@calc err = taylor(sin(t), t, 0, n, 2) - sin(2)
+@calc lim = limit(sin(x)/x, x, 0)
+card "sin x 的泰勒逼近与 lim sin x / x"
+  slider "阶数 n" bind=n min=1 max=15 step=1
+  plot fn=["sin(x)", "taylor(sin(t), t, 0, n, x)"] from=-6 to=6 ymin=-2.5 ymax=2.5 labels=["sin x", "n 阶泰勒多项式"]
+  row gap=4
+    metric "x = 2 处误差" value=err digits=4
+    metric "极限值" value=lim digits=6
+  formula "limit(sin(x)/x, x, 0)" label="lim(x→0) sin x / x" digits=6
+  text "n = {n} 时，n 阶泰勒多项式在 x = 2 处与 sin 2 相差 {fmt(err, 4)}。"
+  callout "阶数越高，逼近的有效范围越宽；注意奇偶阶给出同一条曲线，因为偶次项系数为 0。"
+```
+
+Zero repairs. The error reads -0.2426 at degree 3 and -3.642e-10 at degree 15 in the metric, while the sentence, which uses `fmt(err, 4)`, rounds the second to -0.0000 — the reason the skill now steers tiny values to plain `{err}`.
+
 ## What this tour found
 
-Both findings are recorded as known defects in the root `AGENTS.md` and in `src/lang/AGENTS.md`.
+**A bare `expr` value ended at the first space (fixed).** Sample 9 first read `metric "折合小时" value=mins / 60 unit="h"`, and the compiler kept `value=mins` while reporting the `/` and the `60` as stray tokens; the card showed `24 h` instead of `0.75 h`. Bare values now keep spaces inside brackets and rejoin pieces that start or follow an operator, so that line reads as written; `tests/dil.test.ts` pins it. Quoting an expression with spaces remains the documented form.
 
-**A bare `expr` value ends at the first space.** Sample 9 first read `metric "折合小时" value=mins / 60 unit="h"`, and the compiler kept `value=mins` while reporting `"/" is not attached to a prop` and `"60" is not attached to a prop` — two diagnostics that name the symptom and not the cause. The card still drew, showing `24 h` instead of `0.75 h`. Written `value="mins / 60"` or `value=(mins / 60)` it is correct, which is how the sample above is written. The fix is for the DIL reader to consume an `expr` value to end of line.
-
-**Expressions are unevenly accepted across prop kinds.** `metric.value`, `progress.value`, `progress.max`, and every `chart.values` entry take an expression, and `{…}` interpolates inside `text`, `list`, and `table` cells — but an item in `keys.items` or a cell in `table.rows` is read as plain text, so a bare expression there is silently literal. The samples above therefore use literals or interpolation in those two components. The fix is to route both prop kinds through the same text-with-interpolation reader the list items already use.
+**Expressions are unevenly accepted across prop kinds (open).** `metric.value`, `progress.value`, `progress.max`, and every `chart.values` entry take an expression, and `{…}` interpolates inside `text`, `list`, and `table` cells — but an item in `keys.items` or a cell in `table.rows` is read as plain text, so a bare expression there is silently literal. The samples above therefore use literals or interpolation in those two components. The fix is to route both prop kinds through the same text-with-interpolation reader the list items already use.
 
 ## Status
 
-All twenty-four cards were drawn in one live session on 2026-10-15, in the `ui_render` tool row, with the compiler reporting zero repairs except the first attempt at sample 9. Nothing here has been checked in the turn tail or across a page reload; those remain `VERIFY.md` steps.
+Samples 1 to 24 were drawn in one live session on 2026-10-15, in the `ui_render` tool row, with the compiler reporting zero repairs except the first attempt at sample 9. Samples 25 and 26 were drawn on 2026-10-16 in the tool row and then under the reply, and survived a page reload; that run is recorded in `VERIFY.md`.

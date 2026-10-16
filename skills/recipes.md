@@ -1,0 +1,113 @@
+# Card recipes
+
+Complete programs that compile without a repair. Adapt the names, bounds, and
+labels to the question, and write the labels in the user's language.
+
+## A subscription estimate with a plan choice
+
+```dil
+@state seats = 10 min=1 max=200
+@state plan = "Pro" options=Basic|Pro|Enterprise
+@state yearly = false
+@calc rate = plan == "Enterprise" ? 45 : plan == "Pro" ? 29 : 12
+@calc monthly = seats * rate * (yearly ? 0.8 : 1)
+card "Team subscription"
+  slider "Seats" bind=seats
+  select "Plan" bind=plan
+  checkbox "Pay yearly (20% off)" bind=yearly
+  metric "Per month" value=monthly unit=USD
+  keys items=["Per seat: {rate} USD", "Per year: {monthly * 12} USD"]
+  callout "List prices before tax."
+```
+
+## A loan payment
+
+```dil
+@state principal = 300000 min=10000 max=1000000 step=10000
+@state rate = 4.5 min=0.5 max=10 step=0.1
+@state years = 30 min=5 max=40 step=1
+@calc r = rate / 100 / 12
+@calc n = years * 12
+@calc payment = principal * r / (1 - (1 + r)^-n)
+card "Monthly mortgage payment"
+  slider "Loan" bind=principal unit=USD
+  slider "Annual rate" bind=rate unit=%
+  slider "Term" bind=years unit=years
+  metric "Payment" value=payment unit=USD
+  keys items=["Total paid: {fmt(payment * n, 0)} USD", "Interest: {fmt(payment * n - principal, 0)} USD"]
+  plot "Balance owed by month" fn="principal * (1 + r)^m - payment * ((1 + r)^m - 1) / r" var=m from=0 to=n ymin=0
+```
+
+## A unit conversion
+
+```dil
+@state celsius = 20 min=-40 max=120
+card "Temperature"
+  slider "Celsius" bind=celsius unit=°C
+  grid columns=2
+    metric "Fahrenheit" value="celsius * 9 / 5 + 32" unit=°F
+    metric "Kelvin" value="celsius + 273.15" unit=K
+```
+
+## Binomial probabilities
+
+```dil
+@state n = 20 min=1 max=100
+@state p = 0.3 min=0.01 max=0.99 step=0.01
+@state k = 6 min=0 max=100
+@calc exactly = comb(n, k) * p^k * (1 - p)^(n - k)
+@calc atMost = sum(comb(n, j) * p^j * (1 - p)^(n - j), j, 0, k)
+card "Binomial probabilities"
+  slider "Trials n" bind=n
+  slider "Success probability p" bind=p
+  slider "Successes k" bind=k
+  grid columns=2
+    metric "P(X = k)" value=exactly digits=4
+    metric "P(X ≤ k)" value=atMost digits=4
+  plot "Normal approximation" fn="exp(-(x - n*p)^2 / (2*n*p*(1 - p))) / sqrt(2*pi*n*p*(1 - p))" from=0 to=n
+```
+
+## The standard normal distribution
+
+```dil
+@state z = 1.96 min=-4 max=4 step=0.01
+card "Standard normal"
+  slider "z" bind=z
+  formula "(1 + erf(z / sqrt(2))) / 2" label="P(Z ≤ z)" digits=4
+  plot fn="exp(-x^2 / 2) / sqrt(2pi)" from=-4 to=4 shadeFrom=-4 shadeTo=z
+```
+
+## Projectile motion
+
+```dil
+@state speed = 20 min=1 max=50
+@state angle = 45 min=5 max=85
+@calc g = 9.81
+@calc theta = rad(angle)
+@calc distance = speed^2 * sin(2theta) / g
+@calc peak = (speed * sin(theta))^2 / (2g)
+card "Projectile without air resistance"
+  slider "Launch speed" bind=speed unit=m/s
+  slider "Angle" bind=angle unit=°
+  grid columns=2
+    metric "Range" value=distance unit=m digits=4
+    metric "Peak height" value=peak unit=m digits=4
+  plot "Trajectory" fn="x * tan(theta) - g * x^2 / (2 * speed^2 * cos(theta)^2)" from=0 to=distance ymin=0
+```
+
+## A quiz series
+
+Send one question per card and wait for the reader's click before the next one.
+Keep a running position in the title so the reader knows how far they are.
+
+```dil
+card "Question 3 of 5"
+  text "True or false: every differentiable function is continuous."
+  row
+    button "True" prompt="True"
+    button "False" prompt="False"
+```
+
+When the answer arrives, reply in prose: right or wrong, a two-line explanation,
+then the next card. After the last question, summarise the score in prose; a
+`table` of question, answer, and result works well for a review.

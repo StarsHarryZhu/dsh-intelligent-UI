@@ -106,12 +106,18 @@ function link(name, target) {
     if (!stat.isSymbolicLink()) return 'kept  '
     if (realpathOrUndefined(path) === target) return 'ok    '
     unlinkSync(path)
-    symlinkSync(target, path, 'dir')
+    symlinkSync(target, path, LINK_TYPE)
     return 'moved '
   }
-  symlinkSync(target, path, 'dir')
+  symlinkSync(target, path, LINK_TYPE)
   return 'linked'
 }
+
+/**
+ * A directory junction on Windows, which needs neither Developer Mode nor an
+ * administrator; an ordinary directory symlink everywhere else.
+ */
+const LINK_TYPE = process.platform === 'win32' ? 'junction' : 'dir'
 
 /** Resolve a symlink, or undefined when it dangles. */
 function realpathOrUndefined(path) {

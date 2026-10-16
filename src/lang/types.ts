@@ -21,39 +21,58 @@ export type JsonValue = null | boolean | number | string | JsonValue[] | { [key:
 export type ExprOperand = ExprNode | number | boolean
 
 /**
- * Closed expression union. There is no member access, no call form, and no
- * dynamic evaluation: the operator set IS the sandbox.
+ * Closed expression union. There is no member access, no function value, and
+ * no dynamic evaluation: the operator set IS the sandbox. A function call names
+ * an entry of the fixed table in `math.ts`; a calculus operator binds one
+ * variable name, visible only inside its body (the second element).
  */
 export type ExprNode =
   | ['lit', string | number | boolean]
   | ['ref', string]
   | ['num', number]
+  | ['const', string]
   | ['neg', ExprOperand]
-  | ['add' | 'sub' | 'mul' | 'div' | 'mod' | 'min' | 'max', ExprOperand, ExprOperand]
+  | ['add' | 'sub' | 'mul' | 'div' | 'mod' | 'pow', ExprOperand, ExprOperand]
+  | ['min' | 'max', ...ExprOperand[]]
   | ['lt' | 'gt' | 'le' | 'ge' | 'eq' | 'ne', ExprOperand, ExprOperand]
   | ['and' | 'or', ...ExprOperand[]]
   | ['not', ExprOperand]
   | ['if', ExprOperand, ExprOperand, ExprOperand]
   | ['abs' | 'floor' | 'ceil', ExprOperand]
   | ['round', ExprOperand, number]
+  | ['fn', string, ...ExprOperand[]]
+  | ['integral' | 'sum' | 'prod' | 'solve', string, ExprOperand, ExprOperand, ExprOperand]
+  | ['deriv', string, ExprOperand, ExprOperand, ExprOperand?]
+  | ['limit', string, ExprOperand, ExprOperand, number?]
+  | ['taylor', string, ExprOperand, ExprOperand, ExprOperand, ExprOperand]
   | ['concat', ...(ExprOperand | string)[]]
   | ['fmtNum', ExprOperand, number?]
 
+/** Calculus operators: `[operator, variable, body, …bounds]`. */
+export const BINDING_OPERATORS: ReadonlySet<string> = new Set(['integral', 'deriv', 'limit', 'sum', 'prod', 'solve', 'taylor'])
+
 /** Every operator the evaluator accepts, as a lookup for structural validation. */
 export const EXPR_OPERATORS: ReadonlySet<string> = new Set([
-  'lit', 'ref', 'num', 'neg',
-  'add', 'sub', 'mul', 'div', 'mod', 'min', 'max',
+  'lit', 'ref', 'num', 'const', 'neg',
+  'add', 'sub', 'mul', 'div', 'mod', 'pow', 'min', 'max',
   'lt', 'gt', 'le', 'ge', 'eq', 'ne',
   'and', 'or', 'not', 'if',
-  'abs', 'floor', 'ceil', 'round',
+  'abs', 'floor', 'ceil', 'round', 'fn',
+  ...BINDING_OPERATORS,
   'concat', 'fmtNum',
 ])
 
 /** Operators whose result is always a number, so `concat` may receive them. */
 export const NUMERIC_OPERATORS: ReadonlySet<string> = new Set([
-  'num', 'neg', 'add', 'sub', 'mul', 'div', 'mod', 'min', 'max',
-  'abs', 'floor', 'ceil', 'round',
+  'num', 'const', 'neg', 'add', 'sub', 'mul', 'div', 'mod', 'pow', 'min', 'max',
+  'abs', 'floor', 'ceil', 'round', 'fn', ...BINDING_OPERATORS,
 ])
+
+/**
+ * Operators a format-2 client does not know. A program that uses one is written
+ * as format 3, so an older client shows its text instead of a wrong figure.
+ */
+export const FORMAT_3_OPERATORS: ReadonlySet<string> = new Set(['const', 'pow', 'fn', ...BINDING_OPERATORS])
 
 /** How a declared piece of state is seeded, and which control should edit it. */
 export type StateKind = 'number' | 'string' | 'boolean' | 'select'
@@ -131,7 +150,8 @@ export type DiagnosticCode =
 
 /** The compiled program: persisted as `tool/result` presentation metadata. */
 export interface UIProgram {
-  v: 2
+  /** Format: 3 when the program needs the math vocabulary or a math component, 2 otherwise. */
+  v: 2 | 3
   catalogVersion: string
   catalogHash: string
   state: StateDeclaration[]

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { CATALOG_VERSION, catalogHash } from '../src/lang/catalog.ts'
 import { compileSource, initialValues, isDataImage } from '../src/lang/compile.ts'
@@ -333,6 +335,71 @@ describe('content safety', () => {
   it('rejects a chart value that is not numeric', () => {
     const program = ok('@state t = "x"\ncard\n  chart labels=["A"] values=["t"]\n  text "y"')
     expect(program.nodes.map(node => node.type)).toEqual(['card', 'text'])
+  })
+})
+
+describe('math', () => {
+  const calculus = [
+    '@state a = 1 min=0 max=3 step=0.1',
+    'card "Area"',
+    '  slider "a" bind=a',
+    '  formula "integral(x^2, x, 0, a)" label="Area"',
+    '  plot fn="x^2" from=-1 to=3 shadeFrom=0 shadeTo=a mark=a tangent=true',
+    '  metric "Exact" value=a^3/3 digits=6',
+  ].join('\n')
+
+  it('compiles a calculus card without a diagnostic and marks it format 3', () => {
+    const program = ok(calculus)
+    expect(program.diagnostics).toEqual([])
+    expect(program.v).toBe(3)
+    expect(first(program, 'formula').props.expr).toEqual(['integral', 'x', ['pow', ['ref', 'x'], 2], 0, ['ref', 'a']])
+    expect(first(program, 'plot').props.fn).toEqual([['pow', ['ref', 'x'], 2]])
+  })
+
+  it('writes the computed figures into the text the model reads', () => {
+    const lines = ok(calculus).fallback.split('\n').map(line => line.trim())
+    expect(lines).toContain('Area: integral(x^2, x, 0, a) = 0.333333')
+    expect(lines).toContain('Plot: y = x^2 for x from -1 to 3; point at x = 1: y = 1; tangent slope 2; shaded area from 0 to 1 = 0.333333')
+    expect(lines).toContain('Exact: 0.333333')
+  })
+
+  it('keeps format 2 for a program without the math vocabulary', () => {
+    expect(ok(TEAM_PLAN_DIL).v).toBe(2)
+    expect(ok('@calc x = max(1, 2)\ncard\n  metric "m" value=x').v).toBe(2)
+    expect(ok('@calc x = max(1, 2, 3)\ncard\n  metric "m" value=x').v).toBe(3)
+  })
+
+  it('binds a plot variable of its own, shadowing nothing outside the curves', () => {
+    const program = ok('@state t0 = 1\ncard\n  plot fn=["sin(t)", "t0 * t"] var=t from=0 to=tau')
+    expect(first(program, 'plot').props.var).toBe('t')
+    expect(program.diagnostics).toEqual([])
+    const bad = ok('card\n  plot fn="y + 1"\n  text "kept"')
+    expect(bad.nodes.map(node => node.type)).toEqual(['card', 'text'])
+  })
+
+  it('refuses a declaration named like a constant', () => {
+    const program = ok('@state e = 2\n@calc pi = 3\ncard\n  text "x"')
+    expect(program.state).toEqual([])
+    expect(program.calc).toEqual([])
+    expect(program.diagnostics.map(entry => entry.path)).toEqual(['state.e', 'calc.pi'])
+  })
+
+  it('compiles the math cards a live model wrote, without a repair', () => {
+    const samples = readFileSync(join(import.meta.dirname, '..', 'docs', 'SAMPLES.md'), 'utf8')
+    const live = [...samples.matchAll(/^## 2[56]\. [\s\S]*?```dil\n([\s\S]*?)```/gmu)].map(match => match[1] as string)
+    expect(live).toHaveLength(2)
+    for (const source of live) {
+      const program = ok(source)
+      expect(program.diagnostics).toEqual([])
+      expect(program.v).toBe(3)
+    }
+  })
+
+  it('shows an equation without a value and a failure as a dash', () => {
+    const program = ok('@state a = 3\n@state b = 4\ncard\n  formula "a^2 + b^2 = 25"\n  formula "limit(1/x, x, 0)" label="L"')
+    const lines = program.fallback.split('\n').map(line => line.trim())
+    expect(lines).toContain('a^2 + b^2 == 25')
+    expect(lines).toContain('L: limit(1 / x, x, 0) = —')
   })
 })
 

@@ -10,8 +10,10 @@ no second copy of anything the host already ships.
 
 ## 2. Constraints
 
-**Write only inside this package.** The linker creates symlinks in this package's
-`node_modules` and nowhere else; the harness checkout is read, never changed.
+**Write only inside this package.** The linker creates links in this package's
+`node_modules` and nowhere else; the harness checkout is read, never changed. On
+Windows the links are directory junctions, which need neither Developer Mode nor
+an administrator; elsewhere they are directory symlinks.
 
 **Never replace a real directory.** An existing symlink is repointed when stale; a
 real directory is kept and reported.

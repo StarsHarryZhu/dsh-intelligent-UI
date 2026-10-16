@@ -14,7 +14,7 @@
  * @module dsh-intelligent-ui/lang/compile
  */
 import { type Envelope } from './dil.ts';
-import type { Diagnostic, JsonValue, UIProgram } from './types.ts';
+import { type Diagnostic, type JsonValue, type UIProgram } from './types.ts';
 /** Result of one compile attempt. */
 export type CompileResult = {
     ok: true;

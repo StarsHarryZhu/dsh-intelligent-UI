@@ -20,6 +20,6 @@ export declare const TURN_DATA_KEY = "dsh-intelligent-ui";
 /** Locale namespace of the card chrome. */
 export declare const LOCALE_NS = "dsh-intelligent-ui";
 /** Version of the compiled program format. A client renders every version up to its own. */
-export declare const PROGRAM_VERSION = 2;
+export declare const PROGRAM_VERSION = 3;
 /** Version of the persisted `tool/result.meta` envelope. */
 export declare const UI_META_VERSION = 2;

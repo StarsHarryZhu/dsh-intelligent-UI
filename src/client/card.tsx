@@ -58,7 +58,7 @@ function CardBody(props: CardProps): ReactNode {
   const subscribe = useCallback((listener: () => void) => store.subscribe(memoryKey, listener), [store, memoryKey])
   const memory = useSyncExternalStore(subscribe, () => store.get(memoryKey) ?? UNTOUCHED)
   const composerReady = useComposerReady(kit)
-  const [notice, setNotice] = useState<CopyKey | undefined>(undefined)
+  const [notice, setNotice] = useState<{ key: CopyKey; text?: string } | undefined>(undefined)
   const values = useMemo(() => computeValues(program, memory.values), [program, memory.values])
 
   if (!program.supported) return <TextVersion text={program.fallback} note={tr('card.newer')} />
@@ -85,8 +85,13 @@ function CardBody(props: CardProps): ReactNode {
         console.error('dsh-intelligent-ui: sending a card message failed', error)
       }
     }
-    copyText(prompt)
-    setNotice(typeof actions?.setDraft === 'function' ? 'button.copied' : 'button.unavailable')
+    const reason: CopyKey = typeof actions?.setDraft === 'function' ? 'button.copied' : 'button.unavailable'
+    setNotice({ key: reason })
+    // The clipboard answers asynchronously and may refuse (an insecure page, a
+    // denied permission); then the card shows the text to copy by hand.
+    void copyText(prompt).then((copied) => {
+      if (!copied) setNotice({ key: 'button.copyFailed', text: prompt })
+    })
   }
   const roots = (program.children.get(null) ?? [])
     .map(id => program.byId.get(id))
@@ -115,7 +120,12 @@ function CardBody(props: CardProps): ReactNode {
           : <div key={node.id} className="dsh-iui-card" style={{ padding: '12px', gap: '8px' }}>{element}</div>
       })}
       {missing > 0 ? <div className="dsh-iui-note">{tr('card.partial', { count: missing })}</div> : null}
-      {notice === undefined ? null : <div className="dsh-iui-note" role="status">{tr(notice)}</div>}
+      {notice === undefined ? null : (
+        <div className="dsh-iui-note" role="status">
+          {tr(notice.key)}
+          {notice.text === undefined ? null : <code className="dsh-iui-copy-text">{notice.text}</code>}
+        </div>
+      )}
       {hasControls ? <div className="dsh-iui-foot">{tr('card.local')}</div> : null}
     </div>
   )
@@ -142,13 +152,19 @@ function numberOf(value: unknown, values: ReadonlyMap<string, JsonValue>): numbe
   return undefined
 }
 
-/** Put text on the clipboard where the page allows it; silently nothing otherwise. */
-function copyText(text: string): void {
+/**
+ * Put text on the clipboard where the page allows it.
+ * @param text - the text to copy.
+ * @returns whether the clipboard accepted it; false on a page without one.
+ */
+export async function copyText(text: string): Promise<boolean> {
   try {
     const clipboard = (globalThis as { navigator?: { clipboard?: { writeText?: (value: string) => Promise<void> } } }).navigator?.clipboard
-    void clipboard?.writeText?.(text).catch(() => undefined)
+    if (typeof clipboard?.writeText !== 'function') return false
+    await clipboard.writeText(text)
+    return true
   } catch {
-    // The clipboard is optional; the notice already tells the reader what to do.
+    return false
   }
 }
 

@@ -3,9 +3,10 @@
 ## 1. Role
 
 All source for both halves of the plugin. `index.ts` is the Node entry the cordis
-loader imports; `host/` is the compiler side that runs in the harness process;
-`client/` is the renderer side that runs in the browser; `lang/` is the part both
-halves share.
+loader imports; `host/` is the compiler side that runs in the harness process,
+with the tool and the skill registration; `client/` is the renderer side that
+runs in the browser; `lang/` is the part both halves share, including the math
+engine.
 
 The split exists because the two halves are compiled differently and trust
 different inputs. The host half trusts its own types and validates the model's
@@ -41,8 +42,10 @@ primary-text mapping, and the render registry all derive from it or are checked
 against it by `tests/catalog.test.ts`.
 
 **No runtime dependency.** The host half imports only `@deepseek-ai/dsh-tools`
-(`defineTool`) at runtime and `@deepseek-ai/cordis` for types; the browser half
-imports only React.
+(`defineTool`) at runtime, `@deepseek-ai/cordis` for types, and — in
+`host/skill.ts` alone — `node:fs` and `node:url` to read its own skill file; the
+browser half imports only React. The language layer imports nothing outside
+itself.
 
 **Exports.** `index.ts` exports `name`, `inject`, and `apply`, plus re-exports a
 test or consumer needs. The browser entry exports the same three names.
@@ -51,19 +54,19 @@ test or consumer needs. The browser entry exports the same three names.
 
 - `AGENTS.md` — this file: how the two halves share code and what each may assume.
 - `index.ts` — the Node entry: `name`, `inject`, `apply`, and the public re-exports.
-- `host/` — the harness-process half: the tool definition and the model-facing
-  contract. See `host/AGENTS.md`.
+- `host/` — the harness-process half: the tool definition, the model-facing
+  contract, and the skill registration. See `host/AGENTS.md`.
 - `client/` — the browser half: the tool row, the turn tail, the turn data
   Definition, and the card. See `client/AGENTS.md`.
-- `lang/` — the shared language layer: catalog, grammar, expressions, compiler,
-  limits, and identity. See `lang/AGENTS.md`.
+- `lang/` — the shared language layer: catalog, grammar, expressions, the math
+  engine, compiler, limits, and identity. See `lang/AGENTS.md`.
 
 ## 4. Progress
 
 **Done.**
 
-- `index.ts` registers exactly one tool, as an effect of its own context
-  (`tests/isolation.test.ts`).
+- `index.ts` registers exactly one tool, and one skill once the skill registry
+  exists, as effects of its own context (`tests/isolation.test.ts`).
 - The host and browser compiles are separate and each forbids the other's
   globals; the build fails on either half's type error.
 - The browser bundle's external requests are checked on every build.

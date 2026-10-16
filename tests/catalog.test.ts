@@ -13,10 +13,12 @@ describe('the catalog and the render registry agree in both directions', () => {
 })
 
 describe('every descriptor is internally consistent', () => {
-  it('fills a declared text prop from a bare quoted string', () => {
+  it('fills a declared text prop, or a formula, from a bare quoted string', () => {
     for (const descriptor of CATALOG) {
       if (descriptor.primary === undefined) continue
-      expect(descriptor.props[descriptor.primary]?.kind, descriptor.type).toBe('text')
+      const kind = descriptor.props[descriptor.primary]?.kind
+      // A formula's quoted string is its expression; every other primary is display text.
+      expect(kind, descriptor.type).toBe(descriptor.type === 'formula' ? 'math' : 'text')
     }
   })
 

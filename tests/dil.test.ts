@@ -93,6 +93,12 @@ describe('component lines', () => {
     expect(nodes[4]?.props).toEqual({ columns: 3 })
   })
 
+  it('keeps a bare expression whole through its brackets and spaced operators', () => {
+    const { nodes } = parse('card\n  metric "Area" value=integral(x^2, x, 0, a) unit=m2\n  metric "Hours" value=mins / 60 unit=h')
+    expect(nodes[1]?.props).toEqual({ label: 'Area', value: 'integral(x^2, x, 0, a)', unit: 'm2' })
+    expect(nodes[2]?.props).toEqual({ label: 'Hours', value: 'mins / 60', unit: 'h' })
+  })
+
   it('takes the rest of the line when a quote is never closed', () => {
     const { nodes } = parse('card\n  text "He said hello')
     expect(nodes[1]?.props).toEqual({ text: 'He said hello' })

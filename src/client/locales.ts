@@ -25,6 +25,7 @@ export const zh = {
   'button.sent': '已发送',
   'button.copied': '输入框里有未发送的内容，已改为复制到剪贴板',
   'button.unavailable': '当前无法发送，已复制到剪贴板',
+  'button.copyFailed': '无法写入剪贴板，请手动复制：',
 } satisfies Record<string, string>
 
 /** Every key the chrome uses. */
@@ -49,6 +50,7 @@ export const en = {
   'button.sent': 'Sent',
   'button.copied': 'The composer has unsent text, so this was copied to the clipboard instead',
   'button.unavailable': 'Sending is unavailable here, so this was copied to the clipboard',
+  'button.copyFailed': 'The clipboard is unavailable; copy this by hand:',
 } satisfies Record<CopyKey, string>
 
 /**

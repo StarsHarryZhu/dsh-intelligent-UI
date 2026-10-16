@@ -4,7 +4,7 @@
  */
 
 import { readFileSync, readdirSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { join, relative, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { apply as applyHost, inject as hostInject, name as hostName } from '../src/index.ts'
 import { LOCALE_NS, PLUGIN_ID, TURN_DATA_KEY, UI_TOOL_NAME } from '../src/lang/identity.ts'
@@ -47,6 +47,8 @@ describe('only the published plugin contract is used', () => {
   })
 
   it('imports no harness package at runtime except the tool definition helper', () => {
+    // The host half may also read its own bundled skill file with Node built-ins.
+    const hostAllowed = ['@deepseek-ai/dsh-tools', 'node:fs', 'node:url']
     for (const file of sources(['src'])) {
       for (const { specifier, typeOnly } of imports(file.text)) {
         if (specifier.startsWith('.') || typeOnly) continue
@@ -55,7 +57,8 @@ describe('only the published plugin contract is used', () => {
         } else if (file.path.startsWith(join('src', 'lang'))) {
           throw new Error(`${file.path} imports ${specifier}; the language layer imports nothing outside itself`)
         } else {
-          expect(specifier, file.path).toBe('@deepseek-ai/dsh-tools')
+          expect(hostAllowed, `${file.path} imports ${specifier}`).toContain(specifier)
+          if (specifier.startsWith('node:')) expect(file.path, specifier).toBe(join('src', 'host', 'skill.ts'))
         }
       }
     }
@@ -69,11 +72,35 @@ describe('only the published plugin contract is used', () => {
     expect(bundle).toContain(`id: "${PLUGIN_ID}"`)
   })
 
-  it('registers exactly one host tool, as an effect of its own context', () => {
+  /** A host context with the tool registry and, optionally, the skill registry. */
+  function hostContext(withSkills: boolean) {
+    const tools: string[] = []
+    const skills: Array<{ name: string; resourceBase: { kind: string; path: string } }> = []
+    const services: Record<string, unknown> = {
+      tools: { register: (tool: { name: string }) => { tools.push(tool.name); return () => undefined } },
+      ...(withSkills ? { skills: { register: (skill: (typeof skills)[number]) => { skills.push(skill); return () => undefined } } } : {}),
+    }
+    const ctx: Record<string, unknown> = {
+      ...services,
+      inject: (deps: string[], callback: (scope: unknown) => void) => { if (deps.every(dep => services[dep] !== undefined)) callback(ctx) },
+    }
+    return { ctx, tools, skills }
+  }
+
+  it('registers exactly one host tool and one skill, under the plugin\'s own names', () => {
     expect(hostInject).toEqual(['tools'])
-    const registered: string[] = []
-    applyHost({ tools: { register: (tool: { name: string }) => { registered.push(tool.name); return () => undefined } } } as never)
-    expect(registered).toEqual([UI_TOOL_NAME])
+    const host = hostContext(true)
+    applyHost(host.ctx as never)
+    expect(host.tools).toEqual([UI_TOOL_NAME])
+    expect(host.skills.map(skill => skill.name)).toEqual([PLUGIN_ID])
+    expect(host.skills[0]?.resourceBase).toEqual({ kind: 'directory', path: `${join(ROOT, 'skills')}${sep}` })
+  })
+
+  it('still registers the tool where the host composes no skill registry', () => {
+    const host = hostContext(false)
+    applyHost(host.ctx as never)
+    expect(host.tools).toEqual([UI_TOOL_NAME])
+    expect(host.skills).toEqual([])
   })
 })
 

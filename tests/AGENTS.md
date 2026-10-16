@@ -2,7 +2,7 @@
 
 ## 1. Role
 
-The unit, contract, and isolation suite. The language layer and the host tool are
+The unit, contract, isolation, and packaging suite. The language layer and the host tool are
 tested directly; the browser half is tested through the built bundle, with real
 React, jsdom, and Testing Library, activated through its own module-loader
 registration exactly as the page activates it. The one thing the suite cannot
@@ -31,8 +31,17 @@ written out in the spec that uses them.
 **Pluggability is checked mechanically.** `isolation.test.ts` fails when a source
 file imports a harness package it may not, when the bundle requests anything but
 React, when the browser half uses the network, timers, storage, or code
-evaluation, and when a style rule escapes the `.dsh-iui-` scope or uses a literal
-colour or radius.
+evaluation, when the host registers anything beyond its tool and its skill, and
+when a style rule escapes the `.dsh-iui-` scope or uses a literal colour or
+radius.
+
+**Numbers are pinned to known values.** A math spec states the exact value and
+the tolerance it is held to, and every refusal (a divergent integral, a missing
+derivative) is pinned as a refusal, not just as "not a crash".
+
+**Packaging is checked as the host reads it.** `manifest.test.ts` evaluates the
+version ranges with the harness's own prerelease rule and node-semver's default,
+and checks the declaration every platform loads.
 
 **Documentation is checked mechanically.** `agents-md.test.ts` fails when a folder
 has no `AGENTS.md`, when a file lacks the four sections in order, or when a
@@ -64,6 +73,14 @@ needs the build first: run `node build.js` before the suite.
 - `client.test.tsx` — the browser half through its real registration: the row's
   stages, buttons, the turn data Definition, the tail, shared edits, and every
   degradation path.
+- `math.test.ts` — the quadrature rule's constants, integrals, derivatives,
+  limits, sums, products, roots, Taylor polynomials, special functions,
+  precedence, the work budget, and number display, each against known values.
+- `skill.test.ts` — the bundled skill: frontmatter, size, references, every
+  program it teaches compiling cleanly, and Windows line endings.
+- `manifest.test.ts` — the cross-platform packaging contract: the client
+  declaration, no install-time script, published files, no symbolic links, LF
+  line endings, the claimed harness versions, and the screenshot list.
 - `isolation.test.ts` — the pluggability invariants of the root `AGENTS.md`.
 - `agents-md.test.ts` — the documentation rules this file describes.
 
@@ -71,9 +88,10 @@ needs the build first: run `node build.js` before the suite.
 
 **Done.**
 
-- Eleven specs cover the language layer, the host tool, the browser half, the
-  pluggability invariants, and the documentation rules; `node build.js && node
-  node_modules/vitest/vitest.mjs run` runs them all.
+- Fourteen specs cover the language layer, the math engine, the host tool and
+  skill, the browser half, the pluggability and packaging invariants, and the
+  documentation rules; `node build.js && node node_modules/vitest/vitest.mjs run`
+  runs them all.
 - The browser spec found two defects before any live run: a turn-tail snapshot
   that looped when the host offered no observable source, and a card whose own
   render error escaped its boundary. Both are fixed and pinned.

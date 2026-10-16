@@ -29,6 +29,10 @@ pnpm-debug.log*
 # --- Packed tarballs --------------------------------------------------------
 *.tgz
 
+# --- Local assistant memory -------------------------------------------------
+# Private notes for one machine's coding assistant; never part of the package.
+.claude/
+
 # --- Local environment ------------------------------------------------------
 .env
 .env.*

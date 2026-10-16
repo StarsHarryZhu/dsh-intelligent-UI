@@ -15,9 +15,12 @@ import { SIZES, TONES } from '../lang/catalog.ts'
 import { isDataImage } from '../lang/compile.ts'
 import { formatNumber } from '../lang/expr.ts'
 import { MAX_SPACE } from '../lang/limits.ts'
+import { formatSignificant } from '../lang/math.ts'
 import type { JsonValue } from '../lang/types.ts'
 import { renderChart } from './chart.tsx'
+import { renderFormula } from './formula.tsx'
 import type { CopyKey } from './locales.ts'
+import { PlotFigure } from './plot.tsx'
 import type { NodeRow, Program, StateRow } from './program.ts'
 
 /** Everything a renderer needs to draw one node. */
@@ -124,11 +127,12 @@ export const REGISTRY: Readonly<Record<string, Renderer>> = {
   metric: (node, _children, scope) => {
     const value = scope.number(node.props.value)
     const unit = stringProp(node, 'unit')
+    const digits = numberProp(node, 'digits')
     return (
       <div className="dsh-iui-metric" data-tone={tone(node)}>
         <div className="dsh-iui-metric-label">{scope.text(node.props.label)}</div>
         <div className="dsh-iui-metric-value">
-          {value === undefined ? '—' : formatNumber(value)}
+          {value === undefined ? '—' : digits === undefined ? formatNumber(value) : formatSignificant(value, digits)}
           {unit === undefined ? null : <span className="dsh-iui-metric-unit">{unit}</span>}
         </div>
       </div>
@@ -289,6 +293,8 @@ export const REGISTRY: Readonly<Record<string, Renderer>> = {
     <ol className="dsh-iui-steps">{list(node.props.items, scope).map((item, index) => <li key={index}>{item}</li>)}</ol>
   ),
   chart: (node, _children, scope) => renderChart(node, scope),
+  plot: (node, _children, scope) => <PlotFigure node={node} scope={scope} />,
+  formula: (node, _children, scope) => renderFormula(node, scope),
   badge: (node, _children, scope) => <span className="dsh-iui-badge" data-tone={tone(node)}>{scope.text(node.props.text)}</span>,
   callout: (node, _children, scope) => <div className="dsh-iui-callout" data-tone={tone(node) ?? 'secondary'}>{scope.text(node.props.text)}</div>,
   divider: () => <hr className="dsh-iui-divider" />,

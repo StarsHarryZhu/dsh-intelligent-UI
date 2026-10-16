@@ -1,14 +1,20 @@
 /**
- * The readable expression syntax: `seats * 29`, `plan == "Pro" ? 29 : 12`.
+ * The readable expression syntax: `seats * 29`, `plan == "Pro" ? 29 : 12`,
+ * `3x^2 - 2x + 1`, `integral(sin(x), x, 0, pi)`.
  *
  * Models write arithmetic far more reliably than nested JSON arrays, so every
  * place that takes an expression accepts this form and lowers it to the closed
  * {@link ExprNode} union. The parser only produces operators that
  * {@link checkExpr} already understands, so the readable surface can never widen
  * what an expression may do.
+ *
+ * Precedence, loosest first: `?:`, `||`, `&&`, `== !=`, `< <= > >=`, `+ -`,
+ * `* / %` and implicit multiplication (`2x`, `(a+b)(a-b)`), unary `- + !`, `^`
+ * (right-associative, so `-x^2` is `-(x^2)` and `2^3^2` is `2^9`), postfix `!`.
  * @module dsh-intelligent-ui/lang/infix
  */
 
+import { isMathConstant, mathFunctionName } from './math.ts'
 import type { ExprNode, ExprOperand } from './types.ts'
 
 /** One lexical token. */
@@ -31,7 +37,7 @@ const WORD_OPERATORS: Readonly<Record<string, string>> = { and: '&&', or: '||', 
  */
 export function parseInfix(text: string): ExprNode | undefined {
   if (text.length > MAX_EXPRESSION_LENGTH) return undefined
-  const tokens = tokenize(text)
+  const tokens = tokenize(normalize(text))
   if (tokens === undefined || tokens.length === 0) return undefined
   let index = 0
   const parsed = parseTernary()
@@ -126,11 +132,23 @@ export function parseInfix(text: string): ExprNode | undefined {
     for (;;) {
       if (left === undefined) return undefined
       const token = peek()
-      if (token?.t !== 'op' || (token.v !== '*' && token.v !== '/' && token.v !== '%')) return left
-      index += 1
-      const right = parseUnary()
-      if (right === undefined) return undefined
-      left = [token.v === '*' ? 'mul' : token.v === '/' ? 'div' : 'mod', left, right]
+      if (token?.t === 'op' && (token.v === '*' || token.v === '/' || token.v === '%')) {
+        index += 1
+        const right = parseUnary()
+        if (right === undefined) return undefined
+        left = [token.v === '*' ? 'mul' : token.v === '/' ? 'div' : 'mod', left, right]
+        continue
+      }
+      // Juxtaposition multiplies: `2x`, `3(x + 1)`, `(a + b)(a - b)`. Nothing else
+      // in the grammar puts one operand straight after another, so this never
+      // reinterprets an expression that already had a meaning.
+      if (token !== undefined && (token.t === 'num' || token.t === 'id' || (token.t === 'op' && token.v === '('))) {
+        const right = parsePower()
+        if (right === undefined) return undefined
+        left = ['mul', left, right]
+        continue
+      }
+      return left
     }
   }
 
@@ -150,7 +168,25 @@ export function parseInfix(text: string): ExprNode | undefined {
       const inner = parseUnary()
       return inner === undefined ? undefined : ['not', inner]
     }
-    return parseAtom()
+    return parsePower()
+  }
+
+  function parsePower(): ExprOperand | undefined {
+    const base = parsePostfix()
+    if (base === undefined || !isOp('^')) return base
+    index += 1
+    // The exponent may carry its own sign (`2^-1`) and associates to the right.
+    const exponent = parseUnary()
+    return exponent === undefined ? undefined : ['pow', base, exponent]
+  }
+
+  function parsePostfix(): ExprOperand | undefined {
+    let operand = parseAtom()
+    while (operand !== undefined && isOp('!')) {
+      index += 1
+      operand = ['fn', 'fact', operand]
+    }
+    return operand
   }
 
   function parseAtom(): ExprOperand | undefined {
@@ -168,7 +204,7 @@ export function parseInfix(text: string): ExprNode | undefined {
     }
     if (token.v === 'true') return true
     if (token.v === 'false') return false
-    if (!isOp('(')) return ['ref', token.v]
+    if (!isOp('(')) return isMathConstant(token.v) ? ['const', token.v] : ['ref', token.v]
     index += 1
     const parts: ExprOperand[] = []
     if (!isOp(')')) {
@@ -191,6 +227,22 @@ const COMPARISONS: Readonly<Record<string, 'lt' | 'gt' | 'le' | 'ge' | undefined
   '<': 'lt', '>': 'gt', '<=': 'le', '>=': 'ge',
 }
 
+/** Calculus spellings, mapped onto their operators. */
+const CALCULUS: Readonly<Record<string, 'integral' | 'deriv' | 'limit' | 'sum' | 'prod' | 'solve' | 'taylor'>> = {
+  integral: 'integral', integrate: 'integral',
+  deriv: 'deriv', derivative: 'deriv', diff: 'deriv',
+  limit: 'limit', lim: 'limit',
+  sum: 'sum',
+  prod: 'prod', product: 'prod',
+  solve: 'solve', findroot: 'solve',
+  taylor: 'taylor',
+}
+
+/** Argument counts of each calculus operator, variable included. */
+const CALCULUS_ARITY: Readonly<Record<string, readonly [number, number]>> = {
+  integral: [4, 4], deriv: [3, 4], limit: [3, 4], sum: [4, 4], prod: [4, 4], solve: [4, 4], taylor: [5, 5],
+}
+
 /** Lower one function call to its operator, or reject a name outside the vocabulary. */
 function call(name: string, parts: ExprOperand[]): ExprOperand | undefined {
   const [first, second, third] = parts
@@ -199,7 +251,7 @@ function call(name: string, parts: ExprOperand[]): ExprOperand | undefined {
       return parts.length === 3 ? ['if', first as ExprOperand, second as ExprOperand, third as ExprOperand] : undefined
     case 'min':
     case 'max':
-      return parts.length === 2 ? [name, first as ExprOperand, second as ExprOperand] : undefined
+      return parts.length >= 2 && parts.length <= 8 ? [name, ...parts] : undefined
     case 'abs':
     case 'floor':
     case 'ceil':
@@ -211,9 +263,50 @@ function call(name: string, parts: ExprOperand[]): ExprOperand | undefined {
     case 'fmtNum':
       if (parts.length === 1) return ['fmtNum', first as ExprOperand]
       return parts.length === 2 && typeof second === 'number' ? ['fmtNum', first as ExprOperand, second] : undefined
+    case 'pow':
+      return parts.length === 2 ? ['pow', first as ExprOperand, second as ExprOperand] : undefined
     default:
-      return undefined
+      break
   }
+  const calculus = Object.hasOwn(CALCULUS, name) ? CALCULUS[name] : undefined
+  if (calculus !== undefined) return binder(calculus, parts)
+  const table = mathFunctionName(name)
+  return table === undefined ? undefined : ['fn', table, ...parts]
+}
+
+/**
+ * Lower a calculus call. The second argument names the variable, so it must
+ * have been read as a bare name; `solve` also accepts an equation as its body.
+ */
+function binder(operator: 'integral' | 'deriv' | 'limit' | 'sum' | 'prod' | 'solve' | 'taylor', parts: ExprOperand[]): ExprOperand | undefined {
+  const [least, most] = CALCULUS_ARITY[operator] as readonly [number, number]
+  if (parts.length < least || parts.length > most) return undefined
+  const [body, variable, ...rest] = parts
+  if (!Array.isArray(variable) || variable[0] !== 'ref' || typeof variable[1] !== 'string') return undefined
+  const name = variable[1]
+  let inner = body as ExprOperand
+  if (operator === 'solve' && Array.isArray(inner) && inner[0] === 'eq') inner = ['sub', inner[1] as ExprOperand, inner[2] as ExprOperand]
+  return [operator, name, inner, ...rest] as unknown as ExprOperand
+}
+
+/**
+ * Map the symbols models paste from typeset math onto the ASCII grammar:
+ * − × · ÷ ≤ ≥ ≠ π ∞ √( and superscript squares and cubes.
+ */
+function normalize(text: string): string {
+  return text
+    .replace(/[\u2212\u2013]/gu, '-')
+    .replace(/[\u00d7\u00b7\u22c5\u2217]/gu, '*')
+    .replace(/\u00f7/gu, '/')
+    .replace(/\u2264/gu, '<=')
+    .replace(/\u2265/gu, '>=')
+    .replace(/\u2260/gu, '!=')
+    .replace(/\u03c0/gu, ' pi ')
+    .replace(/\u221e/gu, ' inf ')
+    .replace(/\u221a\s*\(/gu, 'sqrt(')
+    .replace(/\u00b2/gu, '^2')
+    .replace(/\u00b3/gu, '^3')
+    .replace(/\*\*/gu, '^')
 }
 
 /** Wrap a bare literal so every stored expression is an operator array. */
@@ -239,7 +332,7 @@ function tokenize(text: string): Tok[] | undefined {
       continue
     }
     const rest = text.slice(index)
-    const number = /^(?:\d+(?:\.\d+)?|\.\d+)/u.exec(rest)
+    const number = /^(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?/u.exec(rest)
     if (number !== null) {
       tokens.push({ t: 'num', v: Number(number[0]) })
       index += number[0].length
@@ -252,7 +345,7 @@ function tokenize(text: string): Tok[] | undefined {
       index += word[0].length
       continue
     }
-    const operator = /^(?:<=|>=|==|!=|&&|\|\||[-+*/%()<>,!?:=])/u.exec(rest)
+    const operator = /^(?:<=|>=|==|!=|&&|\|\||[-+*/%^()<>,!?:=])/u.exec(rest)
     if (operator !== null) {
       tokens.push({ t: 'op', v: operator[0] })
       index += operator[0].length

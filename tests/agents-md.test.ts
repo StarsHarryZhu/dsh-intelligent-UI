@@ -6,10 +6,10 @@ import { describe, expect, it } from 'vitest'
 const ROOT = join(import.meta.dirname, '..')
 
 /** Directories that hold code or documentation and therefore need this file. */
-const DOCUMENTED_PREFIXES = ['src', 'tests', 'docs', 'scripts']
+const DOCUMENTED_PREFIXES = ['src', 'tests', 'docs', 'scripts', 'skills', 'assets']
 
 /** Directories that exist only to hold generated or vendored files. */
-const SKIPPED = new Set(['node_modules', 'lib', '.client-build', '.git'])
+const SKIPPED = new Set(['node_modules', 'lib', '.client-build', '.git', '.claude'])
 
 /** The four sections every file must carry, in this order. */
 const SECTIONS = ['## 1. Role', '## 2. Constraints', '## 3. Contents', '## 4. Progress']
@@ -55,7 +55,7 @@ describe('every folder documents itself', () => {
     const top = readdirSync(ROOT, { withFileTypes: true })
       .filter(entry => entry.isDirectory() && !SKIPPED.has(entry.name))
       .map(entry => entry.name)
-    expect(top.sort()).toEqual(['docs', 'locale', 'scripts', 'src', 'tests'])
+    expect(top.sort()).toEqual(['assets', 'docs', 'locale', 'scripts', 'skills', 'src', 'tests'])
   })
 })
 

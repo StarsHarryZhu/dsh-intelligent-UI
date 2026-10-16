@@ -13,6 +13,8 @@ export declare const ESTIMATE_EXAMPLE: string;
 export declare const COMPARISON_EXAMPLE: string;
 /** Worked example: a question answered with one click. */
 export declare const QUIZ_EXAMPLE: string;
+/** Worked example: a calculus card the reader explores. */
+export declare const CALCULUS_EXAMPLE: string;
 /** What the model must know before writing a program. */
 export declare const UI_TOOL_DESCRIPTION: string;
 /** Short reminder appended to a failed result so a repaired call keeps the contract in view. */

@@ -314,12 +314,58 @@ function tokenizeLine(line: string): Token[] {
         }
       }
     }
-    const word = /^\S*/u.exec(line.slice(at)) as RegExpExecArray
-    tokens.push({ ...(name === undefined ? {} : { name }), value: word[0], quoted: false })
-    index = at + word[0].length
-    if (word[0] === '' && named === null) index += 1
+    const end = bareEnd(line, at)
+    const word = line.slice(at, end)
+    tokens.push({ ...(name === undefined ? {} : { name }), value: word, quoted: false })
+    index = end
+    if (word === '' && named === null) index += 1
   }
-  return tokens
+  return glueExpressions(tokens)
+}
+
+/**
+ * End of a bare value: the first whitespace outside brackets and quotes, so
+ * `value=integral(x^2, x, 0, a)` stays one token.
+ */
+function bareEnd(line: string, start: number): number {
+  let depth = 0
+  for (let index = start; index < line.length; index += 1) {
+    const character = line[index] as string
+    if (character === '"' || character === '\'') {
+      const read = readString(line, index)
+      if (read === undefined) return line.length
+      index = read.end - 1
+      continue
+    }
+    if (character === '(') depth += 1
+    else if (character === ')') depth = Math.max(0, depth - 1)
+    else if (depth === 0 && /\s/u.test(character)) return index
+  }
+  return line.length
+}
+
+/** Characters that start or end an arithmetic operator. */
+const OPERATOR_EDGE = /^[-+*/^%<>=!?:&|]|[-+*/^%<>=!?:&|]$/u
+
+/**
+ * Rejoin an expression the model spaced out: `value=mins / 60` arrives as
+ * `value=mins`, `/`, `60`. A bare token that starts with an operator, or that
+ * follows one, continues the named value before it.
+ */
+function glueExpressions(tokens: Token[]): Token[] {
+  const out: Token[] = []
+  let open: Token | undefined
+  for (const token of tokens) {
+    const continues = open !== undefined && token.name === undefined && !token.quoted && token.json === undefined
+      && !token.value.startsWith('#') && (OPERATOR_EDGE.test(token.value[0] ?? '') || OPERATOR_EDGE.test(open.value.at(-1) ?? ''))
+    if (continues && open !== undefined) {
+      open.value = `${open.value} ${token.value}`
+      continue
+    }
+    out.push(token)
+    open = token.name !== undefined && !token.quoted && token.json === undefined ? token : undefined
+  }
+  return out
 }
 
 /** Index just past the bracket that closes a JSON value, or -1 when it never closes on this line. */

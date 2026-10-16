@@ -86,7 +86,7 @@ The architecture, not the training. Each layer maps onto a mechanism DeepSeek Ha
 
 ### Deliberate differences
 
-**No code execution.** The original evaluates model-authored JavaScript in a hardened worker. This plugin has no such layer: expressions are a closed JSON union with no member access, no call form beyond named arithmetic helpers, and no dynamic evaluation, so the sandbox is the type system. A program is lossless JSON.
+**No code execution.** The original evaluates model-authored JavaScript in a hardened worker. This plugin has no such layer: expressions are a closed JSON union with no member access, no call form beyond a fixed table of math functions and seven calculus operators, and no dynamic evaluation, so the sandbox is the type system. A program is lossless JSON, and every evaluation runs on a work budget.
 
 **The streamed channel is the source, not the program.** The original recompiles partial source and resends the whole program, which is where its 83% waste comes from. Here the browser compiles the arriving lines itself for the preview, and the compiled program is persisted once, when the result lands. Nothing is resent.
 
@@ -94,7 +94,11 @@ The architecture, not the training. Each layer maps onto a mechanism DeepSeek Ha
 
 **The model sees what it built.** The tool result tells the model what a text-only reader sees, with the figures computed, and lists what the compiler repaired, so the next call is cleaner — the original's diagnostics never reached its model.
 
-**The catalog is scoped to what the host can style natively.** Twenty-four components rather than seventy, each drawn from theme tokens. A smaller catalog the model uses correctly is worth more than a large one it half-remembers.
+**The catalog is scoped to what the host can style natively.** Twenty-six components rather than seventy, each drawn from theme tokens. A smaller catalog the model uses correctly is worth more than a large one it half-remembers.
+
+**Mathematics is computed, not written.** The original's cards show figures the model computed. Here a card can carry the computation itself: integrals (adaptive Gauss–Kronrod, with infinite bounds), derivatives (exact, by Taylor-mode automatic differentiation over the expression tree), limits (extrapolated, refusing when the sides disagree), finite sums and products, roots (Brent's method), and Taylor polynomials, with `plot` and `formula` to show them. A figure the engine cannot vouch for is shown as "—" rather than guessed, and the tool result hands the model the computed figures, so the reply and the card agree. Formulas are typeset by the plugin's own spans: React 18 cannot create MathML, and the host's KaTeX is not a plugin dependency.
+
+**The judgement travels as a skill.** The tool description is the language reference; a bundled skill, registered under the plugin's name, carries when to draw a card, how to shape it, and complete recipes, and the model loads it only when a task matches.
 
 ### Deliberate give-ups
 
@@ -106,4 +110,4 @@ The architecture, not the training. Each layer maps onto a mechanism DeepSeek Ha
 
 ## Not verified
 
-The behaviour above is proven by the unit suite in jsdom with real React. What a reader sees in the running harness is proven only by working through `VERIFY.md`.
+The behaviour above is proven by the unit suite in jsdom with real React, and on the web UI by the run recorded in `VERIFY.md`. The desktop apps share the web client but have not been run with this build.

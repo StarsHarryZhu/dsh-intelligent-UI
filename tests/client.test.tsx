@@ -15,7 +15,7 @@ import * as React from 'react'
 import * as JsxRuntime from 'react/jsx-runtime'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { COMPARISON_EXAMPLE, ESTIMATE_EXAMPLE, QUIZ_EXAMPLE } from '../src/host/model-brief.ts'
+import { CALCULUS_EXAMPLE, COMPARISON_EXAMPLE, ESTIMATE_EXAMPLE, QUIZ_EXAMPLE } from '../src/host/model-brief.ts'
 import { buildPresentationMeta, createUIRenderTool } from '../src/host/tool.ts'
 
 type Component = (props: Record<string, unknown>) => React.ReactNode
@@ -241,10 +241,82 @@ describe('buttons continue the conversation', () => {
     expect(screen.getByRole('status').textContent).toContain('copied to the clipboard')
   })
 
+  it('shows the text to copy by hand when the clipboard refuses', async () => {
+    const { ToolView } = loadClient()
+    const session = kit('half a sentence')
+    const writeText = vi.fn(async () => { throw new Error('denied') })
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    render(<ToolView phase="result" block={resultBlock(await settle(QUIZ_EXAMPLE))} callId="call-7b" useDisclosure={useHostDisclosure} {...session} />)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /C\. Poisson/u })) })
+    const status = screen.getByRole('status')
+    expect(status.textContent).toContain('copy this by hand')
+    expect(status.querySelector('code')?.textContent).toBe('C')
+  })
+
   it('states the message a button will send', async () => {
     const { ToolView } = loadClient()
     render(<ToolView phase="result" block={resultBlock(await settle(QUIZ_EXAMPLE))} callId="call-8" useDisclosure={useHostDisclosure} {...kit()} />)
     expect(screen.getByRole('button', { name: /C\. Poisson/u }).getAttribute('title')).toBe('Sends: C')
+  })
+})
+
+describe('math cards', () => {
+  it('draws a calculus card whose figures follow the slider with no request', async () => {
+    const { ToolView } = loadClient()
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+    const meta = await settle(CALCULUS_EXAMPLE)
+    expect((meta.program as { v: number }).v).toBe(3)
+    const view = render(<ToolView phase="result" block={resultBlock(meta)} callId="math-1" useDisclosure={useHostDisclosure} {...kit()} />)
+    const formula = screen.getByRole('math')
+    expect(formula.getAttribute('aria-label')).toBe('integral(x^2, x, 0, a) = 0.333333')
+    expect(formula.textContent).toContain('∫')
+    expect(view.container.querySelector('.dsh-iui-plot-curve')?.getAttribute('d')).toMatch(/^M[\d.]+ [\d.]+L/u)
+    expect(view.container.querySelector('.dsh-iui-plot-shade')).not.toBeNull()
+    expect(view.container.querySelector('.dsh-iui-plot-tangent')).not.toBeNull()
+    expect(screen.getByText('x = 1 · y = 1 · slope = 2 · area = 0.333333')).toBeTruthy()
+    act(() => { fireEvent.change(screen.getByRole('slider', { name: 'Upper limit a' }), { target: { value: '2' } }) })
+    expect(screen.getByRole('math').getAttribute('aria-label')).toBe('integral(x^2, x, 0, a) = 2.66667')
+    expect(screen.getByText('x = 2 · y = 4 · slope = 4 · area = 2.66667')).toBeTruthy()
+    expect(view.container.querySelector('.dsh-iui-metric-value')?.textContent).toBe('2.66667')
+    expect(fetchSpy).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+  })
+
+  it('typesets fractions, radicals, scripts, and big operators', async () => {
+    const { ToolView } = loadClient()
+    const source = [
+      '@state n = 10',
+      'card "Forms"',
+      '  formula "sqrt(a^2 + 1) / (2a)" label="q"',
+      '  formula "sum(1/k^2, k, 1, n)" digits=4',
+      '  formula "limit(sin(x)/x, x, 0)"',
+      '  formula "a^2 + b^2 = 25"',
+      '@state a = 3',
+      '@state b = 4',
+    ].join('\n')
+    const view = render(<ToolView phase="result" block={resultBlock(await settle(source))} callId="math-2" useDisclosure={useHostDisclosure} {...kit()} />)
+    const [quotient, series, lim, equation] = screen.getAllByRole('math')
+    expect(quotient?.querySelector('.dsh-iui-math-frac .dsh-iui-math-radical .dsh-iui-math-radicand')).not.toBeNull()
+    expect(quotient?.getAttribute('aria-label')).toBe('sqrt(a^2 + 1) / (2 * a) = 0.527046')
+    expect(series?.textContent).toContain('∑')
+    expect(series?.getAttribute('aria-label')).toBe('sum(1 / k^2, k, 1, n) = 1.55')
+    expect(lim?.textContent).toContain('lim')
+    expect(lim?.getAttribute('aria-label')).toBe('limit(sin(x) / x, x, 0) = 1')
+    expect(equation?.getAttribute('aria-label')).toBe('a^2 + b^2 == 25')
+    expect(equation?.querySelector('.dsh-iui-math-result')).toBeNull()
+    expect(view.container.querySelectorAll('.dsh-iui-math-sup').length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('breaks a curve at an asymptote and labels several curves', async () => {
+    const { ToolView } = loadClient()
+    const source = 'card\n  plot fn=["tan(x)", "x"] from=-3 to=3 labels=["tan","identity"]'
+    const view = render(<ToolView phase="result" block={resultBlock(await settle(source))} callId="math-3" useDisclosure={useHostDisclosure} {...kit()} />)
+    const [tangent, line] = [...view.container.querySelectorAll('.dsh-iui-plot-curve')]
+    expect((tangent?.getAttribute('d')?.match(/M/gu) ?? []).length).toBeGreaterThanOrEqual(3)
+    expect((line?.getAttribute('d')?.match(/M/gu) ?? []).length).toBe(1)
+    expect(screen.getByText('tan')).toBeTruthy()
+    expect(screen.getByText('identity')).toBeTruthy()
   })
 })
 

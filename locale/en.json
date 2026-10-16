@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Intelligent UI",
-    "description": "Interactive cards in chat: the model writes a small interface program, the chat draws it with native controls, and every control recomputes in the browser without another model call."
+    "description": "Interactive cards in chat: the model writes a small interface program, the chat draws it with native controls, function plots, and typeset formulas, and every control recomputes in the browser without another model call."
   }
 }
