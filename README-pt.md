@@ -30,4 +30,4 @@ node node_modules/vitest/vitest.mjs run
 
 ## Licença
 
-[MIT License](LICENSE) © 2026 dsh-intelligent-ui contributors.
+[MIT License](LICENSE) © 2026 Starfield.
