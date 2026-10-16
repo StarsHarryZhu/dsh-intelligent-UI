@@ -46,9 +46,10 @@ export function renderChart(node: NodeRow, scope: RenderScope): ReactNode {
     const label = `${labels[index] ?? ''}: ${formatNumber(value)}${unit}`
     if (line) {
       marks.push(
-        <circle key={`dot${index}`} className="dsh-iui-chart-dot" cx={(index + 0.5) * slot} cy={y(value)} r={3}>
+        // A zero-length round-capped stroke stays a circle when the SVG stretches; a <circle> would not.
+        <path key={`dot${index}`} className="dsh-iui-chart-dot" d={`M${(index + 0.5) * slot} ${y(value)}h0`}>
           <title>{label}</title>
-        </circle>,
+        </path>,
       )
     } else {
       const top = Math.min(y(value), baseline)

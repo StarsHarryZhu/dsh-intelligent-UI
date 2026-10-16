@@ -182,7 +182,7 @@ function formatDiagnostic(diagnostic: Diagnostic): string {
  */
 export function buildPresentationMeta(args: { title?: string | undefined }, value: unknown): JsonValue {
   const candidate = (typeof value === 'object' && value !== null ? value : {}) as Partial<UIRenderSuccess> & Partial<UIRenderFailure>
-  const meta: Record<string, JsonValue> = { v: UI_META_VERSION }
+  const meta: Record<string, JsonValue> = { version: UI_META_VERSION }
   if (typeof args.title === 'string' && args.title.trim() !== '') meta.title = args.title.trim().slice(0, 120)
   if (candidate.ok === true && candidate.program !== undefined) {
     meta.ok = true

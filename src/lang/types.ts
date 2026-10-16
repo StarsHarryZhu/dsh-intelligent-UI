@@ -38,6 +38,7 @@ export type ExprNode =
   | ['and' | 'or', ...ExprOperand[]]
   | ['not', ExprOperand]
   | ['if', ExprOperand, ExprOperand, ExprOperand]
+  | ['pick', ExprOperand, ...ExprOperand[]]
   | ['abs' | 'floor' | 'ceil', ExprOperand]
   | ['round', ExprOperand, number]
   | ['fn', string, ...ExprOperand[]]
@@ -51,16 +52,24 @@ export type ExprNode =
 /** Calculus operators: `[operator, variable, body, …bounds]`. */
 export const BINDING_OPERATORS: ReadonlySet<string> = new Set(['integral', 'deriv', 'limit', 'sum', 'prod', 'solve', 'taylor'])
 
+/**
+ * The program version that introduced each operator. A compiled program records
+ * the highest version among everything it uses, so a client renders exactly the
+ * programs whose vocabulary it has. An operator added later takes the next
+ * version and raises `PROGRAM_VERSION` with it.
+ */
+export const OPERATOR_SINCE: Readonly<Record<string, number>> = {
+  lit: 1, ref: 1, num: 1, const: 1, neg: 1,
+  add: 1, sub: 1, mul: 1, div: 1, mod: 1, pow: 1, min: 1, max: 1,
+  lt: 1, gt: 1, le: 1, ge: 1, eq: 1, ne: 1,
+  and: 1, or: 1, not: 1, if: 1, pick: 1,
+  abs: 1, floor: 1, ceil: 1, round: 1, fn: 1,
+  integral: 1, deriv: 1, limit: 1, sum: 1, prod: 1, solve: 1, taylor: 1,
+  concat: 1, fmtNum: 1,
+}
+
 /** Every operator the evaluator accepts, as a lookup for structural validation. */
-export const EXPR_OPERATORS: ReadonlySet<string> = new Set([
-  'lit', 'ref', 'num', 'const', 'neg',
-  'add', 'sub', 'mul', 'div', 'mod', 'pow', 'min', 'max',
-  'lt', 'gt', 'le', 'ge', 'eq', 'ne',
-  'and', 'or', 'not', 'if',
-  'abs', 'floor', 'ceil', 'round', 'fn',
-  ...BINDING_OPERATORS,
-  'concat', 'fmtNum',
-])
+export const EXPR_OPERATORS: ReadonlySet<string> = new Set(Object.keys(OPERATOR_SINCE))
 
 /** Operators whose result is always a number, so `concat` may receive them. */
 export const NUMERIC_OPERATORS: ReadonlySet<string> = new Set([
@@ -68,14 +77,11 @@ export const NUMERIC_OPERATORS: ReadonlySet<string> = new Set([
   'abs', 'floor', 'ceil', 'round', 'fn', ...BINDING_OPERATORS,
 ])
 
-/**
- * Operators a format-2 client does not know. A program that uses one is written
- * as format 3, so an older client shows its text instead of a wrong figure.
- */
-export const FORMAT_3_OPERATORS: ReadonlySet<string> = new Set(['const', 'pow', 'fn', ...BINDING_OPERATORS])
-
 /** How a declared piece of state is seeded, and which control should edit it. */
 export type StateKind = 'number' | 'string' | 'boolean' | 'select'
+
+/** The program version that introduced each state kind; see {@link OPERATOR_SINCE}. */
+export const STATE_KIND_SINCE: Readonly<Record<StateKind, number>> = { number: 1, string: 1, boolean: 1, select: 1 }
 
 /** One declared interactive value. `key` is stable across recompiles. */
 export interface StateDeclaration {
@@ -150,8 +156,11 @@ export type DiagnosticCode =
 
 /** The compiled program: persisted as `tool/result` presentation metadata. */
 export interface UIProgram {
-  /** Format: 3 when the program needs the math vocabulary or a math component, 2 otherwise. */
-  v: 2 | 3
+  /**
+   * The lowest program version that can draw this program: the highest `since`
+   * among its components, props, operators, and state kinds.
+   */
+  version: number
   catalogVersion: string
   catalogHash: string
   state: StateDeclaration[]

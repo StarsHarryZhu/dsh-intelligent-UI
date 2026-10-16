@@ -1,6 +1,6 @@
 ---
 name: dsh-intelligent-ui
-description: Use when the ui_render tool is available and an answer would be clearer as an interactive card - an estimate the reader adjusts, a comparison, a chart or function plot, a formula with live values, a short form, or a multiple-choice question answered by clicking. Covers choosing a card over prose, designing one, math cards, and repairing a failed call.
+description: Use when the ui_render tool is available and an answer would be clearer as an interactive card - an estimate the reader adjusts, a comparison, a chart or function plot, a formula with live values, a short form, a multiple-choice question answered by clicking, or a process the reader plays step by step. Covers choosing a card over prose, designing one, math cards, animation, and repairing a failed call.
 ---
 
 # Answering with interactive cards
@@ -24,6 +24,8 @@ side, or answer with a click:
 - A function, a derivative, an integral, a limit, or a series: `plot` and
   `formula`. Read `math.md` first.
 - A practice question: the stem in `text` and one `button` per option.
+- A process that unfolds: code running line by line, an algorithm's passes, a
+  point moving along a curve. Drive it with a `player`; see "Animate" below.
 
 Answer in prose instead when the answer is one number or one sentence, when
 nothing would be adjusted or compared, or when the user asked for text, code, or
@@ -80,6 +82,27 @@ card "Question 2 of 5"
     button "C. ∫₀¹ x² dx" prompt="C"
 ```
 
+## Animate
+
+A `player` drives one number state through time: the reader plays, pauses,
+steps one frame back or forward, scrubs, and changes the speed. It is always
+drawn at the bottom of its card, as the card's control bar, so write it last. Everything that
+reads the state recomputes on every frame, in the browser, without calling you.
+
+- Use one frame state, `@state frame = 1 min=1 max=N step=1`, for a process in
+  steps; use a fine `step=` such as 0.01 for continuous motion.
+- List per-frame values with `pick(frame, …)` in a `@calc`: the running line,
+  each variable, a sentence about what just happened. All options of one
+  `pick` share a type, and one `pick` takes at most 32 options; compute longer
+  runs from `frame` with arithmetic instead.
+- Show code as `steps items=[…] mono=true current=line`: numbered lines, code
+  type with its indentation kept, and the running line highlighted. A `table`
+  or `keys` beside it shows the variables of that frame.
+- `duration=` is seconds for one run at 1×; without it a run takes one second
+  per step, between two and ten seconds.
+- In your reply, say what the reader will see when they press play; the text
+  view you receive shows the first frame only.
+
 ## When the call fails
 
 The result lists each problem with a repair. Apply every repair and call
@@ -102,4 +125,5 @@ Read these from this skill's base directory when the card needs them:
 - `math.md`: functions, the calculus operators and their accuracy, `plot` and
   `formula`, and six calculus recipes.
 - `recipes.md`: complete cards for prices, loans, unit conversion, probability,
-  projectile motion, and quiz series.
+  projectile motion, quiz series, and two animations: code traced line by line
+  and a tangent sweeping a curve.

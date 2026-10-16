@@ -11,16 +11,15 @@
  * ```
  *
  * One statement per line, so a streamed program can be compiled from the lines
- * that have arrived. Indentation nests a component inside the container above it;
- * the older explicit form, `#id type … in=#parent`, is still read. The parser only
- * produces the JSON envelope; the compiler validates it against the catalog.
+ * that have arrived. Indentation nests a component inside the container above it,
+ * and is the only way to nest one. The parser only produces the JSON envelope;
+ * the compiler validates it against the catalog.
  * @module dsh-intelligent-ui/lang/dil
  */
 import type { Diagnostic } from './types.ts';
 /** One `@state` row of the envelope, before validation. */
 export interface RawState {
     key?: unknown;
-    kind?: unknown;
     init?: unknown;
     min?: unknown;
     max?: unknown;

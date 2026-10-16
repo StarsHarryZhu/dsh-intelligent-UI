@@ -35,8 +35,9 @@ own-property check and draws nothing when there is no entry. Never create an
 element from a model-supplied name.
 
 **Read defensively.** A persisted program comes from a possibly different build:
-every field is guarded, every guard has a fallback, and the format version
-decides whether it renders or shows its text.
+every field is guarded, every guard has a fallback, and the `version` fields of
+the envelope and the program decide whether it renders or shows its text. A
+program without them predates version 1 and shows its text.
 
 **The boundary sits above the renderer.** `Card` wraps `CardBody` in its failure
 boundary because a component's own render error is caught only by an ancestor;
@@ -55,6 +56,17 @@ remount loses nothing. They are not persisted.
 and the card says so. When the page refuses the clipboard, the card shows the
 prompt as selectable text instead of claiming a copy. A card sends at most once.
 
+**Playback is local.** `player` advances its bound state on animation frames,
+at most about 30 values a second, through the same edit path a slider uses; the
+browser half still sets no timers. The pace comes from the clock, and one frame
+never advances more than a second of run time, so a throttled page keeps its
+pace and a tab that slept does not jump. A page that paints no frames, such as a
+hidden tab, pauses. Whether it plays and how fast belong to that copy of the
+card; the frame is in the shared store. Scrubbing, stepping, and unmounting stop
+it, and nothing reaches the model. The player always sits at the bottom of its
+card, under a hairline: `readProgram` docks it there even in a program saved
+before the compiler did.
+
 **Plots and formulas compute with the shared evaluator.** A plot samples its
 curves through `evalExpr` on one shared budget, takes its tangent's slope from an
 exact derivative and its shaded area from the integrator, and clips curves to the
@@ -67,10 +79,10 @@ theme tokens for every colour, radius, and font. The only inline styles are
 spacing steps and grid tracks computed from validated whole numbers. Typeset math
 spaces itself in em; layout spacing stays on the 4px grid.
 
-**One bundle for web and desktop.** The desktop apps run this same bundle inside
-the same web client, so nothing here may branch on the platform or rely on a
-browser feature the desktop shell restricts; the clipboard is the one optional
-feature, and it degrades as described above.
+**Web UI only, no platform branches.** This bundle targets the web UI of
+0.2.1-alpha.1 and later. Desktop adaptation is paused (root `AGENTS.md`), so add
+no desktop-specific code here; nothing may branch on the platform, and the
+clipboard is the one optional browser feature, degrading as described above.
 
 **No harness client package.** Host controls are matched by copying their look
 into `styles.css`; requiring `@deepseek-ai/dsh-client-ui-primitives` or any other
@@ -85,7 +97,8 @@ client package is forbidden.
 - `tail.tsx` — the turn-tail entry that draws a completed turn's cards.
 - `turn-data.ts` — the data-only Conversation Definition that collects cards per turn.
 - `card.tsx` — the card: values, edits, button sends, notices, and the boundaries.
-- `components.tsx` — the type-to-renderer registry and the number field.
+- `components.tsx` — the type-to-renderer registry, the number field, and the
+  animation player.
 - `chart.tsx` — bar and line charts as inline SVG.
 - `plot.tsx` — function plots: sampled curves, ranges, the marked point and
   tangent, the shaded area, the legend, and the readout.
@@ -109,11 +122,17 @@ client package is forbidden.
 - The tail draws only completed turns, follows the observable Turn data source,
   and shares edits with the row.
 - Buttons send once through the composer and never overwrite a draft.
-- Format-1 and format-2 programs render; newer formats show their text; a
-  renderer failure degrades the card to its text and leaves the transcript intact.
+- Version-1 programs render; any other version, and programs from before the
+  version fields, show their text; a renderer failure degrades the card to its
+  text and leaves the transcript intact.
+- The player plays to the end in its duration and stops, restarts from the
+  beginning, steps one frame, pauses when scrubbed, stepped, or unmounted, and
+  cycles 1×, 2×, and 0.5×; `current=` and `mono=` highlight and set code type
+  (`tests/client.test.tsx`).
 - Plots break at asymptotes, label several curves, and print the point, slope,
-  and area they draw; formulas typeset fractions, radicals, scripts, integrals,
-  sums, limits, and derivatives (`tests/client.test.tsx`).
+  and area they draw; chart and plot dots stay round when the SVG stretches;
+  formulas typeset fractions, radicals, scripts, integrals, sums, limits, and
+  derivatives (`tests/client.test.tsx`).
 - Verified live on 2026-10-16 in dark and light themes, across a reload, with
   the clipboard refused and with a draft in the composer.
 
@@ -127,9 +146,12 @@ client package is forbidden.
 - In `verbose` mode, or with a finished turn expanded, a card can show in both
   its row and the tail; both copies share one state.
 - A turn whose `turn/start` lies above the loaded history window gets no tail.
-- The desktop apps default to the `standard` transcript view, which collapses a
-  running turn's tool rows; the streaming preview is then out of sight until the
-  reader expands the step group, and the card appears when the turn finishes.
+- The `standard` transcript view collapses a running turn's tool rows; the
+  streaming preview is then out of sight until the reader expands the step group,
+  and the card appears when the turn finishes.
+- On the macOS desktop app (0.2.0-rc.2) no card was drawn and, with the plugin
+  loaded, past conversations would not open; the engine range now refuses that
+  host. Cause not established; the turn-data Definition is the first suspect.
 
-**Next goal.** Verify the same surfaces in the macOS and Windows desktop apps, per
-`docs/VERIFY.md`.
+**Next goal.** When the desktop app reaches 0.2.1-alpha.1, find why the Definition
+or the slots failed there, in a throwaway session, before claiming desktop support.

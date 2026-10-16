@@ -16,14 +16,14 @@
 
 import { CATALOG_BY_TYPE, CATALOG_VERSION, catalogHash, SIZES, TONES, type ComponentDescriptor, type PropSpec } from './catalog.ts'
 import { parseDil, type Envelope, type RawCalc, type RawNode, type RawState } from './dil.ts'
-import { checkExpr, evalExpr, usesOperators, type ExprType } from './expr.ts'
+import { checkExpr, evalExpr, type ExprType } from './expr.ts'
 import { asNode, parseInfix } from './infix.ts'
 import { LIMITS, MAX_SPACE } from './limits.ts'
 import { formatSignificant, isMathConstant, MATH_CONSTANTS } from './math.ts'
 import { printExpr } from './print.ts'
 import { parseTemplate, renderText, valueText } from './text.ts'
 import {
-  FORMAT_3_OPERATORS,
+  OPERATOR_SINCE, STATE_KIND_SINCE,
   type CalcDeclaration, type Diagnostic, type ExprNode, type JsonValue, type StateDeclaration, type StateKind,
   type TextTemplate, type UINode, type UIProgram,
 } from './types.ts'
@@ -155,9 +155,10 @@ export function compileEnvelope(envelope: Envelope, inherited: Diagnostic[] = []
     return { ok: false, diagnostics }
   }
   connect(nodes, ids, diagnostics)
+  dockPlayers(nodes)
 
   const program: UIProgram = {
-    v: needsFormat3(calc, nodes) ? 3 : 2,
+    version: programVersion(state, calc, nodes),
     catalogVersion: CATALOG_VERSION,
     catalogHash: HASH,
     state,
@@ -173,18 +174,45 @@ export function compileEnvelope(envelope: Envelope, inherited: Diagnostic[] = []
 }
 
 /**
- * Whether a program needs format 3: a math component, or an expression using the
- * math vocabulary. Writing the oldest format that can draw a program keeps it
- * readable by every client that can draw it; a format-2 client shows a newer
- * program as text, with the values computed here, instead of a wrong figure.
+ * The lowest program version that can draw a program: the highest `since` among
+ * the state kinds, components, props, and operators it uses. A client of that
+ * version or newer renders it; an older one shows its text.
  */
-function needsFormat3(calc: readonly CalcDeclaration[], nodes: readonly UINode[]): boolean {
-  return calc.some(row => usesOperators(row.expr, FORMAT_3_OPERATORS))
-    || nodes.some(node => MATH_COMPONENTS.has(node.type) || usesOperators(node.props, FORMAT_3_OPERATORS))
+function programVersion(state: readonly StateDeclaration[], calc: readonly CalcDeclaration[], nodes: readonly UINode[]): number {
+  let version = 1
+  const raise = (since: number | undefined): void => {
+    if (since !== undefined && since > version) version = since
+  }
+  for (const row of state) raise(STATE_KIND_SINCE[row.kind])
+  for (const row of calc) raise(expressionSince(row.expr))
+  for (const node of nodes) {
+    const descriptor = CATALOG_BY_TYPE.get(node.type)
+    raise(descriptor?.since)
+    if (node.bind !== undefined) raise(descriptor?.props.bind?.since)
+    for (const [name, value] of Object.entries(node.props)) {
+      raise(descriptor?.props[name]?.since)
+      raise(expressionSince(value))
+    }
+  }
+  return version
 }
 
-/** Components a format-2 client does not have. */
-const MATH_COMPONENTS: ReadonlySet<string> = new Set(['plot', 'formula'])
+/** The highest `since` among the operators anywhere inside a prop or expression value. */
+function expressionSince(value: unknown): number {
+  let version = 1
+  const visit = (part: unknown, depth: number): void => {
+    if (depth > LIMITS.maxDepth * 8) return
+    if (Array.isArray(part)) {
+      const head: unknown = part[0]
+      if (typeof head === 'string' && Object.hasOwn(OPERATOR_SINCE, head)) version = Math.max(version, OPERATOR_SINCE[head] as number)
+      for (const child of part) visit(child, depth + 1)
+    } else if (typeof part === 'object' && part !== null) {
+      for (const child of Object.values(part)) visit(child, depth + 1)
+    }
+  }
+  visit(value, 0)
+  return version
+}
 
 /** The diagnostic for a declaration that takes a constant's name. */
 function reservedName(kind: 'state' | 'calc', key: string): Diagnostic {
@@ -219,12 +247,7 @@ interface NodeContext {
   constants: Constants
 }
 
-/** Accepted spellings of a state kind. */
-const STATE_KINDS: Readonly<Record<string, StateKind>> = {
-  number: 'number', string: 'string', text: 'string', boolean: 'boolean', select: 'select',
-}
-
-/** Read one state declaration, inferring its kind from the initial value when none is given. */
+/** Read one state declaration, inferring its kind from the initial value. */
 function readState(raw: RawState, diagnostics: Diagnostic[]): StateDeclaration | undefined {
   const key = typeof raw.key === 'string' ? raw.key : ''
   if (!/^[A-Za-z_$][\w$]*$/u.test(key)) {
@@ -236,14 +259,12 @@ function readState(raw: RawState, diagnostics: Diagnostic[]): StateDeclaration |
     return undefined
   }
   const options = readOptionList(raw.options)
-  const declared = typeof raw.kind === 'string' ? STATE_KINDS[raw.kind] : undefined
   let init: unknown = raw.init
-  const kind: StateKind = declared ?? (options !== undefined ? 'select'
+  // The kind follows from the initial value: an options list, a number, true/false, or text.
+  const kind: StateKind = options !== undefined ? 'select'
     : typeof init === 'number' ? 'number'
       : typeof init === 'boolean' ? 'boolean'
-        : 'string')
-  if (kind === 'number' && typeof init === 'string' && init.trim() !== '' && Number.isFinite(Number(init))) init = Number(init)
-  if (kind === 'boolean' && (init === 'true' || init === 'false')) init = init === 'true'
+        : 'string'
   if (kind === 'number') {
     if (typeof init !== 'number' || !Number.isFinite(init)) {
       diagnostics.push(invalid(`state.${key}`, `state "${key}" is a number, so its initial value must be a number`, `Write "@state ${key} = 8".`))
@@ -700,43 +721,15 @@ export function isDataImage(value: string): boolean {
 }
 
 /**
- * Read a text prop into its hoisted form.
- *
- * Accepted forms: a string with `{…}` interpolation, a number, and the older
- * template objects (`{"$text":[{"text":"…"},{"$expr":[…]}]}`).
+ * Read a text prop into its hoisted form: a string with `{…}` interpolation, or a
+ * number or true/false shown as written.
  */
 function readText(value: unknown, context: NodeContext): { value: JsonValue; notes: string[] } | undefined {
   if (typeof value === 'number' || typeof value === 'boolean') value = String(value)
-  if (typeof value === 'string') {
-    const parsed = parseTemplate(value, context.scope)
-    const notes = parsed.rejected.map(segment => `${segment} is not an expression over declared names, so it is shown as written`)
-    return { value: hoist(parsed.template, context.constants), notes }
-  }
-  const legacy = readLegacyTemplate(value)
-  if (legacy === undefined) return undefined
-  for (const segment of legacy) {
-    if ('expr' in segment && checkExpr(segment.expr, context.scope).type === undefined) return undefined
-  }
-  return { value: hoist(legacy, context.constants), notes: [] }
-}
-
-/** Read the older template object forms. */
-function readLegacyTemplate(value: unknown): TextTemplate | undefined {
-  const record = asRecord(value)
-  const parts = Array.isArray(value) ? value : Array.isArray(record.$text) ? record.$text : undefined
-  if (parts === undefined) {
-    if (typeof record.text === 'string') return [{ text: record.text }]
-    if (Array.isArray(record.$expr)) return [{ expr: record.$expr as ExprNode }]
-    return undefined
-  }
-  const segments: TextTemplate = []
-  for (const part of parts) {
-    if (typeof part === 'string') segments.push({ text: part })
-    else if (typeof asRecord(part).text === 'string') segments.push({ text: asRecord(part).text as string })
-    else if (Array.isArray(asRecord(part).$expr)) segments.push({ expr: asRecord(part).$expr as ExprNode })
-    else return undefined
-  }
-  return segments.length === 0 ? undefined : segments
+  if (typeof value !== 'string') return undefined
+  const parsed = parseTemplate(value, context.scope)
+  const notes = parsed.rejected.map(segment => `${segment} is not an expression over declared names, so it is shown as written`)
+  return { value: hoist(parsed.template, context.constants), notes }
 }
 
 /**
@@ -765,7 +758,7 @@ function connect(nodes: UINode[], ids: Set<string>, diagnostics: Diagnostic[]): 
     if (node.parent === null) continue
     let parent = byId.get(node.parent)
     if (parent === undefined) {
-      diagnostics.push({ code: 'orphan_node', path: `nodes.${node.id}`, message: `in=${node.parent} names no component; <${node.type}> was placed in the card`, repair: 'Nest it by indentation under its container.' })
+      diagnostics.push({ code: 'orphan_node', path: `nodes.${node.id}`, message: `parent "${node.parent}" names no component; <${node.type}> was placed in the card`, repair: 'Nest it under its container: by indentation in DIL, or in "children" in JSON.' })
       node.parent = null
       continue
     }
@@ -821,6 +814,31 @@ function connect(nodes: UINode[], ids: Set<string>, diagnostics: Diagnostic[]): 
       break
     }
   }
+}
+
+/**
+ * Put every player at the bottom of the card that holds it, as the card's control
+ * bar, wherever the source wrote it. It joins the outermost card above it and
+ * follows every other node, so it is that card's last child; players keep their
+ * written order among themselves. The browser applies it again to every program
+ * it reads, so a card saved before this rule draws the same way.
+ * @param nodes - the flat node list, reordered and re-parented in place.
+ */
+export function dockPlayers<T extends { id: string; type: string; parent: string | null }>(nodes: T[]): void {
+  const players = nodes.filter(node => node.type === 'player')
+  if (players.length === 0) return
+  const byId = new Map(nodes.map(node => [node.id, node]))
+  for (const player of players) {
+    let card: T | undefined
+    let cursor = player.parent === null ? undefined : byId.get(player.parent)
+    for (let depth = 0; cursor !== undefined && depth <= LIMITS.maxDepth; depth += 1) {
+      if (cursor.type === 'card') card = cursor
+      cursor = cursor.parent === null ? undefined : byId.get(cursor.parent)
+    }
+    if (card !== undefined) player.parent = card.id
+  }
+  const rest = nodes.filter(node => node.type !== 'player')
+  nodes.splice(0, nodes.length, ...rest, ...players)
 }
 
 /** Depth of one node from its root. */
@@ -911,7 +929,8 @@ export function fallbackLines(program: Pick<UIProgram, 'nodes' | 'constants' | '
       case 'plot': return plotText(node)
       case 'progress': return `${text(node, 'label')}: ${valueText(node.props.value, values)} / ${node.props.max === undefined ? '100' : valueText(node.props.max, values)}`
       case 'slider':
-      case 'numberInput': {
+      case 'numberInput':
+      case 'player': {
         const declaration = program.state.find(entry => entry.key === bound)
         const min = typeof node.props.min === 'number' ? node.props.min : declaration?.min
         const max = typeof node.props.max === 'number' ? node.props.max : declaration?.max

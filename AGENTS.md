@@ -3,7 +3,9 @@
 ## 1. Role
 
 Intelligent UI for DeepSeek Harness: a **fully plugin-based** take on ChatGPT's
-Intelligent UI architecture. The model writes a small, catalogued interface
+Intelligent UI architecture. Its Chinese name, which the Plugin Manager shows from
+`locale/zh.json` and `README-zh.md` uses as its title, means "progressive
+interaction". The model writes a small, catalogued interface
 program, the chat renders it as a native card, and every control change
 recomputes in the browser with **zero model calls**.
 
@@ -27,8 +29,9 @@ result's presentation metadata, and one skill, `dsh-intelligent-ui`, which
 teaches the model when and how to use the tool. The browser half draws the
 program in two places — in the tool row while the turn runs (with a live preview
 while the arguments stream), and under the reply once the turn has finished,
-because a finished turn folds its tool rows away. The same browser bundle serves
-the web UI and both desktop apps, which wrap the same web client.
+because a finished turn folds its tool rows away. It supports the web UI of
+DeepSeek Harness 0.2.1-alpha.1 and later within 0.2.x; the desktop apps are not
+supported for now (see "Desktop apps: paused" below).
 
 ## 2. Constraints
 
@@ -79,12 +82,16 @@ browser storage in the browser half.
 three deep, and a value that cannot be computed reliably is shown as "—", never
 as a guess. A program can make a card show nothing; it cannot make the page stall.
 
-**One bundle for every platform.** `dsh.client.platform` is `"web"`, the only
-value the module registry serves; the macOS and Windows desktop apps load that
-same declaration. Nothing in either half branches on the operating system. The
-package installs from a git checkout without a build step, so `lib/` is committed,
-no install-time script exists, line endings are pinned by `.gitattributes`, and
-the repository holds no symbolic link.
+**Web UI only, for now.** `dsh.client.platform` is `"web"`, the only value the
+module registry serves, and `engines.dsh` is `>=0.2.1-alpha.1 <0.3.0-0`. The host
+blocks installation and activation outside that range, which today keeps out the
+desktop apps (the macOS app ships 0.2.0-rc.2). Desktop adaptation is paused: add no
+desktop-specific code and claim no desktop support until the desktop app ships
+0.2.1-alpha.1 or later and Part 2 of `docs/VERIFY.md` passes on it. Nothing in
+either half branches on the operating system. The package installs from a git
+checkout without a build step, so `lib/` is committed, no install-time script
+exists, line endings are pinned by `.gitattributes`, and the repository holds no
+symbolic link.
 
 **No literal styling.** Every colour, radius, and font in `src/client/styles.css`
 comes from a host theme token, every selector is scoped under a `.dsh-iui-` class,
@@ -94,9 +101,17 @@ em, as mathematical spacing must scale with the formula.
 **Every registration is an effect.** Use the disposer a service's `register()`
 returns, inside `ctx.effect`. Unloading the plugin must remove every contribution.
 
-**Failures stay inside the card.** A malformed program, a newer program format, an
+**Failures stay inside the card.** A malformed program, a program of another version, an
 unexpected host prop, or a client-side defect degrades that one card to readable
 text or to nothing. The surrounding transcript is not this plugin's to break.
+
+**Every field records the version that introduced it.** Programs and their
+envelope carry a `version` field, and version 1 is the first and only format:
+nothing persisted before it is read, and such a card shows its text. Every
+component, prop, operator, and state kind is dated with `since`; a program's
+version is the highest `since` it uses. Anything new takes the next version and
+raises `PROGRAM_VERSION` in the same change, so a client keeps drawing every
+program whose vocabulary it has. See `src/lang/AGENTS.md`.
 
 **Naming.** `name` in `package.json` is the cordis row id, the client module id,
 the skill name, and the `__ModuleLoader__.load({ id })` key: one string,
@@ -106,6 +121,13 @@ slot key.
 **Every folder documents itself.** Each directory holds an `AGENTS.md` with exactly
 the four sections of this file, in order, in English. The `Contents` list names
 the files that actually exist; `tests/agents-md.test.ts` enforces both rules.
+
+**Release tags are short and bilingual.** An annotated tag's message is a
+Chinese version, then an English version of the same items. Each version has
+exactly two parts, Added and Fixed, with one short phrase or sentence per item,
+and nothing else: no title line, no scope notes, no other prose. The English half
+reads `English version:`, then `Added:` and `Fixed:`, each followed by `- ` items;
+the Chinese half has the same shape with Chinese labels.
 
 **Build and test.** `node scripts/link-dev.mjs` links the toolchain from the
 sibling harness checkout. `node build.js` is the only build command and ends with
@@ -145,8 +167,8 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
 - `src/` — all source. See `src/AGENTS.md`.
 - `skills/` — the bundled skill that teaches the model to use `ui_render`. See
   `skills/AGENTS.md`.
-- `assets/` — the screenshots `screenshots.json` and the README show. See
-  `assets/AGENTS.md`.
+- `assets/` — the screenshots `screenshots.json` and the README show, including
+  one drawn card per component in `assets/catalog/`. See `assets/AGENTS.md`.
 - `tests/` — the unit, contract, isolation, and packaging suite. See
   `tests/AGENTS.md`.
 - `docs/` — the architecture write-up, the drawn component catalogue, the live
@@ -171,8 +193,12 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
 - The browser half registers through `apply(ctx)` alone and the build proves it
   on every run; the bundle is tested with real React 18.3.1, jsdom, and Testing
   Library through its own `__ModuleLoader__` registration (`tests/client.test.tsx`).
-- Programs persisted by earlier builds (formats 1 and 2) still render; a newer
-  format is shown as text; an unknown component is skipped and counted.
+- Animation: `player` plays, pauses, steps, and scrubs a number state, with a
+  duration and a reader-chosen speed; `pick` and the `current=` and `mono=`
+  props let a card trace code line by line (`tests/client.test.tsx`).
+- Programs and envelopes carry a `version` field and every field is dated;
+  version 1 renders, any other version and anything persisted before the field
+  existed shows its text; an unknown component is skipped and counted.
 - The pluggability and packaging invariants are checked mechanically
   (`tests/isolation.test.ts`, `tests/manifest.test.ts`), and the harness checkout
   is unchanged.
@@ -195,41 +221,9 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
   - disabling the plugin in Settings → Plugins and restarting left every session
     opening with no cards and no plugin event type in the logs; re-enabling
     restored the cards.
-- **Live verification on the macOS desktop app, 2026-10-16**, DeepSeek Harness
-  0.2.0-rc.2 (the app bundle) with DeepSeek-Flash, against Part 2 of
-  `docs/VERIFY.md`, run by the app's own agent:
-  - installed from the working checkout as a `link:` dependency, the way the
-    Plugin Manager's switch writes it, and accepted by the engine range;
-  - it activated without an app restart: `ui_render` joined the agent's tools,
-    the live `tool.call.toolview` slot took one occupant keyed `ui_render` and
-    `conversation.chat.turnTail` one entry `dsh-intelligent-ui`, and the skill
-    loaded;
-  - every card program compiled and its result carried the figures the web run
-    recorded (-0.242631 at degree 3, -3.64234e-10 at degree 15), a deliberately
-    malformed program reported its diagnostic instead of drawing, and a disable
-    and re-enable cycle removed and restored every registration while the page
-    stayed up;
-  - a settled card's compiled program was in the host's own `meta` field on its
-    ordinary `tool/result` event, and no session line held a plugin-owned event
-    type, so a reload loses nothing and an uninstall cannot strand a session.
-  - **the drawing failed.** Eight cards were written and none appeared in the
-    app's page, checked twice, although every registration was live. The app
-    bundle ships DeepSeek Harness 0.2.0-rc.2 while the browser half is built and
-    verified against 0.2.1-alpha.4, and the declared engine range admits both, so
-    that skew is the first thing to rule out; the cause was not established.
 
 **Not done.**
 
-- **Desktop card display.** The macOS run recorded above proved installation,
-  activation, compilation, persistence, and the log invariants, and failed the
-  one thing the plugin exists for: no card was drawn in the app's page. Until
-  that is fixed, the drawing half of D3 and of steps 4, 5, 6, and 8 fails, and
-  the desktop apps cannot be called verified.
-- **Desktop verification, the interactive half.** The run above also leaves the
-  steps that need a person at the page (the console expressions of step 2, the
-  streaming preview and folded row of D3, the drag and network panel of step 5,
-  the clipboard and click of step 8, all of step 10, and the disable-and-restart
-  half of step 12) and the whole of Part 3 unrun.
 - **Infinite series.** `sum` and `prod` take finite bounds only.
 - **Image attachments.** `image` accepts only inline `data:image/…` sources; the
   conversation's attachment loader is not wired.
@@ -256,26 +250,51 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
 
 **Known defects.**
 
-- The macOS desktop app (0.2.0-rc.2) drew none of the eight cards a 2026-10-16
-  run wrote, although `ui_render`, the `tool.call.toolview` cell, the
-  `conversation.chat.turnTail` entry, and the skill were all live and the
-  programs were persisted. The registration failure the symptom fits — the
-  turn-data Definition — is swallowed into the console by design, so the page's
-  console is where to look next. Cause not established.
-
 - In the `verbose` transcript mode, and when a reader expands a folded turn, a
   card can appear both in its tool row and under the reply. Both copies share one
   state, so they never disagree.
-- On the desktop apps' default `standard` transcript view, a running turn's tool
-  rows are collapsed, so the streaming preview is hidden until the reader expands
-  the step group; the card appears under the reply when the turn finishes.
+- In the `standard` transcript view, a running turn's tool rows are collapsed, so
+  the streaming preview is hidden until the reader expands the step group; the
+  card appears under the reply when the turn finishes.
 - A tail needs the turn's `turn/start` event in the loaded history window; a turn
   that starts above the window keeps its card in the tool row only.
 - An item in `keys.items` or a cell in `table.rows` is read as text, so
   `"Monthly: {monthly}"` interpolates while a bare expression there does not.
 - `{fmt(x, 4)}` rounds a tiny value to `0.0000`; `{x}` shows it in exponent form.
   The skill says so, but a model may still choose `fmt`.
+- Developing on Windows (Part 3, W4 of `docs/VERIFY.md`: link the toolchain,
+  build, run the suite) failed in the maintainer's 2026-10-16 run. The output was
+  not recorded, so the failing step is unknown. Using the plugin from the web UI
+  does not depend on it.
 
-**Next goal.** Finish the desktop section of `docs/VERIFY.md`: the interactive
-steps on macOS, then the whole of Part 3 on Windows, each appended to the recorded
-runs.
+**Desktop apps: paused.** Desktop adaptation is abandoned for now and resumes
+once the desktop app ships DeepSeek Harness 0.2.1-alpha.1 or later. Until then the
+engine range refuses the desktop app, and README, market entry, and this file say
+the desktop apps are not supported. What the 2026-10-16 runs found on 0.2.0-rc.2,
+the macOS app, installed from the working checkout as a `link:` dependency:
+
+- D1 passed: installed into the desktop profile, accepted by the engine range of
+  the time (`>=0.2.0-0 <0.3.0-0`), and active without an app restart.
+- D2 partly: `ui_render`, the `tool.call.toolview` cell keyed `ui_render`, the
+  `conversation.chat.turnTail` entry, and the skill were all live; the step-2
+  console expressions and the stylesheet count were not taken.
+- D3 and D4 failed: every program compiled and was persisted with its figures in
+  the host's own `meta` field, but no card was ever drawn in the page, under the
+  reply or in the row, so every visual and interactive check failed.
+- **With the plugin loaded, every past conversation in the desktop app failed to
+  open.** This is the reason for the pause: a plugin must never cost a reader
+  their history.
+- W2 passed on macOS (`git ls-files --eol` shows `w/lf`); W1 and W3 are
+  Windows-only and were not run; W4 failed on Windows (above).
+
+Cause not established. The first suspect is the version skew: the browser half is
+built and verified against 0.2.1-alpha.4, and on 0.2.0-rc.2 a registration that
+participates in replaying the transcript — the data-only turn-data Definition — is
+the one whose failure would fit both symptoms (no tail cards, history that will not
+open). When resuming: install on a desktop app of 0.2.1-alpha.1 or later with a
+throwaway session first, open the page's console, and run Part 2 of
+`docs/VERIFY.md` before opening any real conversation.
+
+**Next goal.** Submit the market entry in `docs/market/`. After that, resume the
+desktop apps once one ships 0.2.1-alpha.1 or later, starting with why history
+failed to open, and collect the output of W4 on Windows.

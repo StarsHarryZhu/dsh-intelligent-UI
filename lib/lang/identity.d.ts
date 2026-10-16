@@ -19,7 +19,11 @@ export declare const TURN_TAIL_SLOT = "conversation.chat.turnTail";
 export declare const TURN_DATA_KEY = "dsh-intelligent-ui";
 /** Locale namespace of the card chrome. */
 export declare const LOCALE_NS = "dsh-intelligent-ui";
-/** Version of the compiled program format. A client renders every version up to its own. */
-export declare const PROGRAM_VERSION = 3;
-/** Version of the persisted `tool/result.meta` envelope. */
-export declare const UI_META_VERSION = 2;
+/**
+ * Version of the compiled program format, carried in the program's `version`
+ * field. A client renders every version up to its own; a program records the
+ * lowest version that can draw it.
+ */
+export declare const PROGRAM_VERSION = 1;
+/** Version of the persisted `tool/result.meta` envelope, carried in its `version` field. */
+export declare const UI_META_VERSION = 1;

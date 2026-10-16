@@ -1,7 +1,7 @@
 import { assertSupportedJsonSchema, validateJsonSchemaValue } from '@deepseek-ai/dsh-tools'
 import type { JsonSchemaNode } from '@deepseek-ai/dsh-tools'
 import { describe, expect, it } from 'vitest'
-import { COMPARISON_EXAMPLE, ESTIMATE_EXAMPLE, QUIZ_EXAMPLE, UI_TOOL_DESCRIPTION } from '../src/host/model-brief.ts'
+import { ANIMATION_EXAMPLE, CALCULUS_EXAMPLE, COMPARISON_EXAMPLE, ESTIMATE_EXAMPLE, QUIZ_EXAMPLE, UI_TOOL_DESCRIPTION } from '../src/host/model-brief.ts'
 import { buildPresentationMeta, createUIRenderTool, renderForModel, UI_TOOL_NAME } from '../src/host/tool.ts'
 import { CATALOG } from '../src/lang/catalog.ts'
 import { compileSource } from '../src/lang/compile.ts'
@@ -69,7 +69,7 @@ describe('what the model is told', () => {
   })
 
   it('ships examples that compile without a single diagnostic', () => {
-    for (const example of [ESTIMATE_EXAMPLE, COMPARISON_EXAMPLE, QUIZ_EXAMPLE]) {
+    for (const example of [ESTIMATE_EXAMPLE, COMPARISON_EXAMPLE, QUIZ_EXAMPLE, CALCULUS_EXAMPLE, ANIMATION_EXAMPLE]) {
       const result = compileSource(example)
       expect(result.ok).toBe(true)
       if (result.ok) expect(result.program.diagnostics).toEqual([])
@@ -116,13 +116,14 @@ describe('compiling a call', () => {
 })
 
 describe('what is persisted for the card', () => {
-  it('carries the program, the format version, and a trimmed title', async () => {
+  it('carries the program, the version fields, and a trimmed title', async () => {
     const value = await run({ source: ESTIMATE_EXAMPLE })
     const meta = buildPresentationMeta({ title: `  ${'t'.repeat(200)}  ` }, value) as Record<string, unknown>
-    expect(meta.v).toBe(2)
+    expect(meta.version).toBe(1)
+    expect(meta).not.toHaveProperty('v')
     expect(meta.ok).toBe(true)
     expect((meta.title as string).length).toBe(120)
-    expect((meta.program as Record<string, unknown>).v).toBe(2)
+    expect((meta.program as Record<string, unknown>).version).toBe(1)
     expect(JSON.parse(JSON.stringify(meta))).toEqual(meta)
   })
 

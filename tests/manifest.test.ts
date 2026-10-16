@@ -1,9 +1,10 @@
 /**
- * The package installs the same way on every platform the harness runs on.
+ * The package installs the same way on every platform the web UI runs on.
  *
- * Web, macOS desktop, and Windows desktop all load one browser bundle through
- * `dsh.client` with `platform: "web"`, and all install the package from a git
- * checkout without building it. These specs pin what that requires.
+ * The web UI loads one browser bundle through `dsh.client` with
+ * `platform: "web"` and installs the package from a git checkout without
+ * building it. The engine range keeps hosts older than 0.2.1-alpha.1 out, which
+ * today includes the desktop apps. These specs pin what that requires.
  */
 
 import { existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs'
@@ -62,7 +63,7 @@ function satisfies(version: string, range: string, includePrerelease: boolean): 
   })
 }
 
-describe('one browser declaration for web and both desktops', () => {
+describe('one browser declaration', () => {
   it('declares the only platform the module registry serves', () => {
     expect(manifest.dsh.client.platform).toBe('web')
   })
@@ -137,14 +138,20 @@ describe('the versions it claims', () => {
   const engine = manifest.engines.dsh as string
   const peer = manifest.peerDependencies['@deepseek-ai/dsh-tools'] as string
 
-  it('passes the harness compatibility check on the verified hosts and no later minor', () => {
-    for (const version of ['0.2.0-rc.2', '0.2.1-alpha.4', '0.2.1', '0.2.9']) expect(satisfies(version, engine, true), version).toBe(true)
-    for (const version of ['0.1.9', '0.3.0-alpha.1', '0.3.0']) expect(satisfies(version, engine, true), version).toBe(false)
+  it('passes the harness compatibility check from 0.2.1-alpha.1 and no later minor', () => {
+    expect(engine).toBe('>=0.2.1-alpha.1 <0.3.0-0')
+    for (const version of ['0.2.1-alpha.1', '0.2.1-alpha.4', '0.2.1', '0.2.9']) expect(satisfies(version, engine, true), version).toBe(true)
+    for (const version of ['0.1.9', '0.2.1-alpha.0', '0.3.0-alpha.1', '0.3.0']) expect(satisfies(version, engine, true), version).toBe(false)
+  })
+
+  it('refuses the desktop app build whose history failed to load with the plugin', () => {
+    // The macOS desktop app ships 0.2.0-rc.2; the host blocks installation and activation below the range.
+    expect(satisfies('0.2.0-rc.2', engine, true)).toBe(false)
   })
 
   it('declares a peer range that admits the harness prereleases under default semver', () => {
-    for (const version of ['0.2.0-rc.2', '0.2.1-alpha.4', '0.2.3']) expect(satisfies(version, peer, false), version).toBe(true)
-    expect(satisfies('0.3.0', peer, false)).toBe(false)
+    for (const version of ['0.2.1-alpha.1', '0.2.1-alpha.4', '0.2.3']) expect(satisfies(version, peer, false), version).toBe(true)
+    for (const version of ['0.2.0-rc.2', '0.3.0']) expect(satisfies(version, peer, false), version).toBe(false)
     expect(manifest.devDependencies['@deepseek-ai/dsh-tools']).toBe(peer)
   })
 })

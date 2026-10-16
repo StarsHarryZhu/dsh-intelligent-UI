@@ -10,7 +10,7 @@ import type { Translate } from './host.ts'
 export const zh = {
   'card.label': '交互界面',
   'card.local': '调整控件只在本地重算，不会发消息给模型。',
-  'card.newer': '这个界面来自更新版本的插件，下面是它的文字版本。',
+  'card.newer': '这个界面来自另一个版本的插件，下面是它的文字版本。',
   'card.crashed': '这个界面无法显示，下面是它的文字版本。',
   'card.partial': '有 {count} 个组件无法显示。',
   'row.preparing': '正在生成界面…',
@@ -26,6 +26,11 @@ export const zh = {
   'button.copied': '输入框里有未发送的内容，已改为复制到剪贴板',
   'button.unavailable': '当前无法发送，已复制到剪贴板',
   'button.copyFailed': '无法写入剪贴板，请手动复制：',
+  'player.play': '播放',
+  'player.pause': '暂停',
+  'player.prev': '上一步',
+  'player.next': '下一步',
+  'player.speed': '播放速度 {speed}×，点击切换',
 } satisfies Record<string, string>
 
 /** Every key the chrome uses. */
@@ -35,7 +40,7 @@ export type CopyKey = keyof typeof zh
 export const en = {
   'card.label': 'Interactive',
   'card.local': 'Changing the controls recomputes here; nothing is sent to the model.',
-  'card.newer': 'This interface comes from a newer version of the plugin; here is its text version.',
+  'card.newer': 'This interface comes from another version of the plugin; here is its text version.',
   'card.crashed': 'This interface could not be shown; here is its text version.',
   'card.partial': '{count} component(s) could not be shown.',
   'row.preparing': 'Building the interface…',
@@ -51,6 +56,11 @@ export const en = {
   'button.copied': 'The composer has unsent text, so this was copied to the clipboard instead',
   'button.unavailable': 'Sending is unavailable here, so this was copied to the clipboard',
   'button.copyFailed': 'The clipboard is unavailable; copy this by hand:',
+  'player.play': 'Play',
+  'player.pause': 'Pause',
+  'player.prev': 'Step back',
+  'player.next': 'Step forward',
+  'player.speed': 'Speed {speed}×; click to change',
 } satisfies Record<CopyKey, string>
 
 /**

@@ -17,7 +17,8 @@ checks its claims.
 **The entry must be true of the code.** Every number and name in the description
 is checked by the list's reviewers against this repository: the component count
 is the catalog's length, the calculus operators are the ones `src/lang/expr.ts`
-evaluates, and the skill is the one in `skills/`. Change the entry in the same
+evaluates, the skill is the one in `skills/`, and the version it asks for is the
+lower bound of `engines.dsh`. Change the entry in the same
 change that makes a claim false.
 
 **The list's format, exactly.** `url`, `name`, `category`, and `description.en`
@@ -45,7 +46,8 @@ the maintainer's actions; nothing in this repository automates them.
 **Done.**
 
 - The entry parses as YAML, names category `ui`, and its claims match the code as
-  of version 0.2.0.
+  of version 0.1.1, including the required harness version (`engines.dsh`
+  `>=0.2.1-alpha.1 <0.3.0-0`) and that the desktop apps are not supported yet.
 - The repository carries the `dsh-plugin` topic and a `screenshots.json`.
 
 **Not done.**

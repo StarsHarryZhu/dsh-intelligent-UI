@@ -14,6 +14,7 @@
  * @module dsh-intelligent-ui/lang/infix
  */
 
+import { MAX_PICK_OPTIONS } from './expr.ts'
 import { isMathConstant, mathFunctionName } from './math.ts'
 import type { ExprNode, ExprOperand } from './types.ts'
 
@@ -265,6 +266,8 @@ function call(name: string, parts: ExprOperand[]): ExprOperand | undefined {
       return parts.length === 2 && typeof second === 'number' ? ['fmtNum', first as ExprOperand, second] : undefined
     case 'pow':
       return parts.length === 2 ? ['pow', first as ExprOperand, second as ExprOperand] : undefined
+    case 'pick':
+      return parts.length >= 3 && parts.length <= MAX_PICK_OPTIONS + 1 ? ['pick', ...parts] as ExprOperand : undefined
     default:
       break
   }

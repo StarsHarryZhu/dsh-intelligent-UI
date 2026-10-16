@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { CATALOG_VERSION, catalogHash } from '../src/lang/catalog.ts'
+import { CATALOG_BY_TYPE, CATALOG_VERSION, catalogHash } from '../src/lang/catalog.ts'
 import { compileSource, initialValues, isDataImage } from '../src/lang/compile.ts'
 import { renderText } from '../src/lang/text.ts'
-import type { Diagnostic, UINode, UIProgram } from '../src/lang/types.ts'
+import { OPERATOR_SINCE, STATE_KIND_SINCE, type Diagnostic, type UINode, type UIProgram } from '../src/lang/types.ts'
 
 /** The estimate every grammar should agree on. */
 const TEAM_PLAN_DIL = [
@@ -62,8 +62,9 @@ describe('the canonical estimate', () => {
     expect(slider.props).not.toHaveProperty('bind')
   })
 
-  it('stamps the format version and the catalog generation', () => {
-    expect(program.v).toBe(2)
+  it('stamps the program version and the catalog generation', () => {
+    expect(program.version).toBe(1)
+    expect(program).not.toHaveProperty('v')
     expect(program.catalogVersion).toBe(CATALOG_VERSION)
     expect(program.catalogHash).toBe(catalogHash())
   })
@@ -103,29 +104,20 @@ describe('the canonical estimate', () => {
     expect(json.fallback).toBe(program.fallback)
   })
 
-  it('compiles the explicit legacy form a model may still write', () => {
-    const legacy = ok([
-      '@state seats = 8 number min=1 max=50 step=1',
-      '@calc price = seats * 29',
-      '#root card padding=3 gap=2',
-      '#heading title text="Team plan estimate" size=lg in=#root',
-      '#seats slider label=Seats bind=seats min=1 max=50 step=1 in=#root',
-      '#price metric label=Monthly value=price unit=USD in=#root',
+  it('refuses the explicit id form and the $text template objects, saying what to write', () => {
+    const lines = ok([
+      '@calc price = 29',
+      'card',
+      '#price metric label=Monthly value=price in=#root',
+      '  text "kept"',
     ].join('\n'))
-    expect(legacy.nodes.map(node => node.id)).toEqual(['root', 'heading', 'seats', 'price'])
-    expect(initialValues(legacy).get('price')).toBe(232)
-  })
-
-  it('accepts the older JSON array expressions and $text templates', () => {
-    const legacy = ok(JSON.stringify({
-      states: [{ key: 'n', kind: 'number', init: 2 }],
-      calcs: [{ key: 'double', expr: ['mul', ['ref', 'n'], 2] }],
-      nodes: [
-        { id: 'root', type: 'card', parent: null, props: {} },
-        { id: 't', type: 'text', parent: 'root', props: { text: { $text: [{ text: 'Twice: ' }, { $expr: ['ref', 'double'] }] } } },
-      ],
+    expect(lines.nodes.map(node => node.type)).toEqual(['card', 'text'])
+    expect(lines.diagnostics[0]?.repair).toMatch(/without an id/u)
+    const json = ok(JSON.stringify({
+      nodes: [{ type: 'card', children: [{ type: 'text', text: { $text: [{ text: 'Twice' }] } }, { type: 'text', text: 'kept' }] }],
     }))
-    expect(textOf(legacy, first(legacy, 'text'), 'text')).toBe('Twice: 4')
+    expect(json.nodes.map(node => node.type)).toEqual(['card', 'text'])
+    expect(json.diagnostics[0]?.message).toMatch(/<text> text: must be text/u)
   })
 })
 
@@ -233,8 +225,9 @@ describe('forgiving form, reporting every repair', () => {
   })
 
   it('places a component whose parent does not exist', () => {
-    const program = ok('#c card\ntext "x" in=#ghost')
+    const program = ok(JSON.stringify({ nodes: [{ id: 'c', type: 'card' }, { type: 'text', parent: 'ghost', text: 'x' }] }))
     expect(first(program, 'text').parent).toBe('c')
+    expect(program.diagnostics[0]?.message).toMatch(/parent "ghost" names no component/u)
   })
 
   it('cuts a parent loop instead of hanging', () => {
@@ -244,7 +237,7 @@ describe('forgiving form, reporting every repair', () => {
   })
 
   it('renames a duplicate id', () => {
-    const program = ok('#a card\n#a text "x"')
+    const program = ok(JSON.stringify({ nodes: [{ id: 'a', type: 'card' }, { id: 'a', type: 'text', parent: 'a', text: 'x' }] }))
     expect(program.nodes.map(node => node.id)).toEqual(['a', 'text2'])
     expect(program.diagnostics[0]?.code).toBe('duplicate_id')
   })
@@ -256,8 +249,7 @@ describe('forgiving form, reporting every repair', () => {
   })
 
   it('reads numeric text where a number is expected', () => {
-    const program = ok(JSON.stringify({ states: [{ key: 's', kind: 'number', init: '8' }], nodes: [{ type: 'grid', columns: '3' }] }))
-    expect(program.state[0]?.init).toBe(8)
+    const program = ok(JSON.stringify({ nodes: [{ type: 'grid', columns: '3' }] }))
     expect(first(program, 'grid').props.columns).toBe(3)
   })
 })
@@ -299,13 +291,13 @@ describe('sources as models actually send them', () => {
 
   it('compiles the quiz card a course-review session tried to send', () => {
     const program = ok([
-      '#root card padding=3 gap=2',
-      '#t title text="第 1 题 · 模型识别（单选）" in=#root',
-      '#q text text="A quality inspector selects 15 items at random, without replacement, from a lot of 500 items." in=#root',
-      '#opts col gap=1 in=#root',
-      '#oa button text="A. Binomial" prompt="选 A" in=#opts',
-      '#ob button text="B. Hypergeometric" prompt="选 B" in=#opts',
-      '#hint text text="也可以直接在对话里回复字母。" in=#root',
+      'card padding=3 gap=2',
+      '  title "第 1 题 · 模型识别（单选）"',
+      '  text "A quality inspector selects 15 items at random, without replacement, from a lot of 500 items."',
+      '  col gap=1',
+      '    button "A. Binomial" prompt="选 A"',
+      '    button "B. Hypergeometric" prompt="选 B"',
+      '  text "也可以直接在对话里回复字母。"',
     ].join('\n'))
     expect(program.diagnostics).toEqual([])
     expect(program.nodes.filter(node => node.type === 'button').map(node => textOf(program, node, 'prompt'))).toEqual(['选 A', '选 B'])
@@ -348,10 +340,10 @@ describe('math', () => {
     '  metric "Exact" value=a^3/3 digits=6',
   ].join('\n')
 
-  it('compiles a calculus card without a diagnostic and marks it format 3', () => {
+  it('compiles a calculus card without a diagnostic', () => {
     const program = ok(calculus)
     expect(program.diagnostics).toEqual([])
-    expect(program.v).toBe(3)
+    expect(program.version).toBe(1)
     expect(first(program, 'formula').props.expr).toEqual(['integral', 'x', ['pow', ['ref', 'x'], 2], 0, ['ref', 'a']])
     expect(first(program, 'plot').props.fn).toEqual([['pow', ['ref', 'x'], 2]])
   })
@@ -363,10 +355,24 @@ describe('math', () => {
     expect(lines).toContain('Exact: 0.333333')
   })
 
-  it('keeps format 2 for a program without the math vocabulary', () => {
-    expect(ok(TEAM_PLAN_DIL).v).toBe(2)
-    expect(ok('@calc x = max(1, 2)\ncard\n  metric "m" value=x').v).toBe(2)
-    expect(ok('@calc x = max(1, 2, 3)\ncard\n  metric "m" value=x').v).toBe(3)
+  it('records the highest version among the fields a program uses', () => {
+    const programs = [
+      ok(TEAM_PLAN_DIL),
+      ok(calculus),
+      ok('@state t = 0 min=0 max=3\ncard\n  player "t" bind=t\n  steps items=["a","b"] current=t mono=true\n  text "{pick(t + 1, \"x\", \"y\")}"'),
+    ]
+    for (const program of programs) {
+      const used = [
+        ...program.state.map(row => STATE_KIND_SINCE[row.kind]),
+        ...program.nodes.flatMap((node) => {
+          const descriptor = CATALOG_BY_TYPE.get(node.type)
+          return [descriptor?.since ?? 1, ...Object.keys(node.props).map(name => descriptor?.props[name]?.since ?? 1)]
+        }),
+        ...[...JSON.stringify([program.calc, program.nodes]).matchAll(/\["([A-Za-z]+)"/gu)]
+          .map(match => OPERATOR_SINCE[match[1] as string] ?? 1),
+      ]
+      expect(program.version).toBe(Math.max(...used))
+    }
   })
 
   it('binds a plot variable of its own, shadowing nothing outside the curves', () => {
@@ -384,14 +390,14 @@ describe('math', () => {
     expect(program.diagnostics.map(entry => entry.path)).toEqual(['state.e', 'calc.pi'])
   })
 
-  it('compiles the math cards a live model wrote, without a repair', () => {
+  it('compiles the math and animation cards a live model wrote, without a repair', () => {
     const samples = readFileSync(join(import.meta.dirname, '..', 'docs', 'SAMPLES.md'), 'utf8')
-    const live = [...samples.matchAll(/^## 2[56]\. [\s\S]*?```dil\n([\s\S]*?)```/gmu)].map(match => match[1] as string)
-    expect(live).toHaveLength(2)
+    const live = [...samples.matchAll(/^## 2[567]\. [\s\S]*?```dil\n([\s\S]*?)```/gmu)].map(match => match[1] as string)
+    expect(live).toHaveLength(3)
     for (const source of live) {
       const program = ok(source)
       expect(program.diagnostics).toEqual([])
-      expect(program.v).toBe(3)
+      expect(program.version).toBe(1)
     }
   })
 
@@ -412,5 +418,67 @@ describe('streaming compile', () => {
 
   it('waits quietly for a JSON object to close', () => {
     expect(compileSource('{"nodes":[{"type":"card"', { partial: true })).toEqual({ ok: false, diagnostics: [] })
+  })
+})
+
+describe('animation', () => {
+  const source = [
+    '@state t = 2 min=0 max=7 step=1',
+    'card "Run"',
+    '  player "Step {t}" bind=t duration=8 unit="of 7"',
+    '  steps items=["x = 0", "  x += 1"] current=t mono=true',
+    '  list items=["a"] current="t - 1"',
+    '  table columns=["k"] rows=[["{pick(t, \\"a\\", \\"b\\")}"]] current=1 mono=t > 3',
+  ].join('\n')
+
+  it('compiles the player and the step-through props without a repair', () => {
+    const program = ok(source)
+    expect(program.diagnostics).toEqual([])
+    expect(first(program, 'player').bind).toEqual({ key: 't', kind: 'number' })
+    expect(first(program, 'player').props.duration).toBe(8)
+    expect(first(program, 'steps').props.current).toEqual(['ref', 't'])
+    expect(first(program, 'steps').props.mono).toEqual(['lit', true])
+    expect(first(program, 'table').props.mono).toEqual(['gt', ['ref', 't'], 3])
+  })
+
+  it('keeps leading spaces in list items, so code keeps its indentation', () => {
+    const program = ok(source)
+    const items = first(program, 'steps').props.items as unknown[]
+    expect(items.map(item => renderText(item, initialValues(program), program.constants))).toEqual(['x = 0', '  x += 1'])
+  })
+
+  it('describes the player in the text version', () => {
+    expect(ok(source).fallback.split('\n').map(line => line.trim())).toContain('Step 2: 2 of 7 (0–7)')
+  })
+
+  it('bounds the duration and types current and mono', () => {
+    const program = ok('@state t = 0\n@state s = "a"\ncard\n  player "p" bind=t duration=0.1\n  steps items=["a"] current=s mono=1')
+    expect(first(program, 'player').props).not.toHaveProperty('duration')
+    expect(first(program, 'steps').props).toEqual({ items: expect.any(Array) })
+    expect(program.diagnostics.map(entry => entry.path)).toEqual(['nodes.player2.duration', 'nodes.steps3.current', 'nodes.steps3.mono'])
+  })
+
+  it('binds the player to a number state only', () => {
+    const program = ok('@state s = "a"\ncard\n  player "p" bind=s\n  text "kept"')
+    expect(program.nodes.map(node => node.type)).toEqual(['card', 'text'])
+  })
+})
+
+describe('the player docks at the bottom of its card', () => {
+  it('moves a player written first, or inside a row, to the end of the outermost card', () => {
+    const program = ok([
+      '@state t = 0 min=0 max=3',
+      'card "Run"',
+      '  player "first" bind=t',
+      '  row',
+      '    text "left"',
+      '    player "nested" bind=t',
+      '  text "after"',
+    ].join('\n'))
+    const card = first(program, 'card')
+    const children = program.nodes.filter(node => node.parent === card.id).map(node => node.type)
+    expect(children).toEqual(['row', 'text', 'player', 'player'])
+    expect(program.nodes.filter(node => node.type === 'player').map(node => textOf(program, node, 'label'))).toEqual(['first', 'nested'])
+    expect(program.fallback.split('\n').map(line => line.trim()).slice(-2)).toEqual(['first: 0 (0–3)', 'nested: 0 (0–3)'])
   })
 })

@@ -42,9 +42,18 @@ differences only for orders one and two. A refused value shows as "—".
 by default, shareable across the samples of one plot), calculus nests at most
 three deep, sums take at most 10,000 terms, and Taylor series at most order 30.
 
-**Format follows content.** A program that uses the math vocabulary or a math
-component is written as format 3; any other program stays format 2, so an older
-client draws everything it can.
+**Every field records the version that introduced it.** Each component, prop,
+operator, and state kind carries a `since` version (`catalog.ts`,
+`OPERATOR_SINCE` and `STATE_KIND_SINCE` in `types.ts`). A compiled program's
+`version` is the highest `since` among what it uses, so a client draws exactly the
+programs whose vocabulary it has. Anything added later takes the next version and
+raises `PROGRAM_VERSION` with it; `tests/catalog.test.ts` checks every field is
+dated and that the newest date is the current version.
+
+**Version 1 is the only format.** Programs and envelopes persisted before the
+`version` fields existed are not read; the client shows their text. The compiler
+accepts DIL nested by indentation only (no `#id`, `in=`, angle brackets, or kind
+words) and the JSON envelope, and reports anything else with a repair.
 
 **Text interpolation is checked, not trusted.** `{…}` in text becomes an
 expression segment only when it parses and type-checks against the declared
@@ -54,6 +63,11 @@ names; otherwise it stays literal text and is reported.
 invalid or missing required prop drops its component; a component without a
 usable parent joins the nearest card; a duplicate id is renamed. Only an empty or
 unreadable program fails. Every repair becomes a diagnostic the model reads.
+
+**A player is its card's control bar.** The compiler moves every `player` to the
+end of the outermost card above it (`dockPlayers` in `compile.ts`), whatever line
+the source wrote it on, and the browser applies the same rule to every program it
+reads, so the card, the preview, and the text view agree.
 
 **Literal text is hoisted.** Static text moves into the program's `constants`
 table, interned, so the structure stays fixed while content varies.
@@ -75,10 +89,10 @@ https, images must be inline `data:image/…` rasters.
 - `catalog.ts` — the component table: name, purpose, container flag, primary text
   prop, and prop specs, plus the catalog version and semantic hash.
 - `types.ts` — the wire vocabulary: expressions, declarations, nodes, templates,
-  diagnostics, the program, and the operator sets that mark format 3.
+  diagnostics, the program, and the version that introduced each operator and
+  state kind.
 - `dil.ts` — the DIL line parser: declarations, indentation nesting, primary
-  text, bare expression values, and the legacy explicit form, producing the JSON
-  envelope.
+  text, and bare expression values, producing the JSON envelope.
 - `infix.ts` — the readable expression syntax and its lowering: powers,
   factorials, implicit products, typeset symbols, constants, function and calculus
   calls.
@@ -93,7 +107,7 @@ https, images must be inline `data:image/…` rasters.
 - `print.ts` — expressions printed back as readable infix text, for text views and
   accessible names.
 - `compile.ts` — grammar detection, prop validation against the catalog,
-  hoisting, tree repair, format selection, fallback text, and bounded JSON
+  hoisting, tree repair, the program version, fallback text, and bounded JSON
   recovery.
 - `limits.ts` — the vocabulary bounds and the spacing grid maximum.
 - `identity.ts` — the plugin id, the tool name, the slot names, and the format
@@ -103,11 +117,15 @@ https, images must be inline `data:image/…` rasters.
 
 **Done.**
 
-- Twenty-six components; the catalog drives validation, the description, and
-  the registry check (`tests/catalog.test.ts`).
+- Twenty-seven components, `player` among them; the catalog drives validation,
+  the description, and the registry check, and every field is dated
+  (`tests/catalog.test.ts`).
 - DIL nests by indentation, fills primary text from a bare quoted string, infers
-  state kinds, keeps a spaced bare expression whole, and still reads the explicit
-  `#id … in=#parent` form (`tests/dil.test.ts`).
+  state kinds, keeps a spaced bare expression whole, and refuses the old explicit
+  form with a repair (`tests/dil.test.ts`).
+- `pick(i, a, b, …)` chooses the i-th option lazily, floored and held inside the
+  options, and `current=` and `mono=` give `steps`, `list`, and `table` a
+  highlighted item and code type (`tests/expr.test.ts`, `tests/compile.test.ts`).
 - Expressions read as `seats * 29`, `3x^2 - 2x`, `n!`, and
   `integral(sin(x), x, 0, pi)` everywhere an expression is accepted, in both
   grammars (`tests/infix.test.ts`).

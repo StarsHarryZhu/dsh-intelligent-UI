@@ -99,4 +99,10 @@ describe('the readable expression syntax', () => {
     expect(readString('"a \\"b\\" \\n c"', 0)).toEqual({ value: 'a "b" \n c', end: 14 })
     expect(readString('"open', 0)).toBeUndefined()
   })
+
+  it('reads pick with text, numbers, and expressions as options', () => {
+    expect(parseInfix('pick(t + 1, "a", 2, b * 3)')).toEqual(['pick', ['add', ['ref', 't'], 1], ['lit', 'a'], 2, ['mul', ['ref', 'b'], 3]])
+    expect(parseInfix('pick(t)')).toBeUndefined()
+    expect(parseInfix('pick(t, "a")')).toBeUndefined()
+  })
 })

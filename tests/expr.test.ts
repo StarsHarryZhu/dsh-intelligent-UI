@@ -196,3 +196,30 @@ describe('expression evaluation', () => {
     expect(formatNumber(Number.NaN)).toBe('—')
   })
 })
+
+describe('pick', () => {
+  const scope = new Map<string, 'number' | 'string' | 'boolean'>([['t', 'number'], ['label', 'string']])
+
+  it('types as its options, which must agree', () => {
+    expect(checkExpr(['pick', ['ref', 't'], ['lit', 'a'], ['lit', 'b']], scope).type).toBe('string')
+    expect(checkExpr(['pick', ['ref', 't'], 1, ['mul', ['ref', 't'], 2]], scope).type).toBe('number')
+    expect(checkExpr(['pick', ['ref', 't'], 1, ['lit', 'b']], scope).problems[0]?.message).toContain('pick options must produce the same type')
+    expect(checkExpr(['pick', ['ref', 'label'], 1, 2], scope).type).toBeUndefined()
+    expect(checkExpr(['pick', ['ref', 't'], 1], scope).problems[0]?.message).toContain('pick takes 3..33 argument(s)')
+  })
+
+  it('picks the option at a 1-based index, floored and held inside the options', () => {
+    const node: ExprNode = ['pick', ['ref', 't'], ['lit', 'a'], ['lit', 'b'], ['lit', 'c']]
+    expect(run(node, { t: 1 })).toBe('a')
+    expect(run(node, { t: 2.9 })).toBe('b')
+    expect(run(node, { t: 3 })).toBe('c')
+    expect(run(node, { t: 0 })).toBe('a')
+    expect(run(node, { t: 99 })).toBe('c')
+    expect(run(['pick', ['ref', 'missing'], 1, 2])).toBe(EXPR_FAILURE)
+  })
+
+  it('evaluates only the chosen option', () => {
+    // The other option would fail; picking past it must not.
+    expect(run(['pick', 2, ['ref', 'missing'], 7])).toBe(7)
+  })
+})

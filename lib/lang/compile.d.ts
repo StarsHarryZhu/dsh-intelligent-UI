@@ -51,6 +51,19 @@ export declare function compileEnvelope(envelope: Envelope, inherited?: Diagnost
 /** Whether a string is an inline raster image the browser can show without a request. */
 export declare function isDataImage(value: string): boolean;
 /**
+ * Put every player at the bottom of the card that holds it, as the card's control
+ * bar, wherever the source wrote it. It joins the outermost card above it and
+ * follows every other node, so it is that card's last child; players keep their
+ * written order among themselves. The browser applies it again to every program
+ * it reads, so a card saved before this rule draws the same way.
+ * @param nodes - the flat node list, reordered and re-parented in place.
+ */
+export declare function dockPlayers<T extends {
+    id: string;
+    type: string;
+    parent: string | null;
+}>(nodes: T[]): void;
+/**
  * Build the plain-text stand-in for a program.
  *
  * Every consumer that cannot render the node list gets this instead, and the

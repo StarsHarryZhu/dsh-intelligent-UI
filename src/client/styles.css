@@ -100,6 +100,33 @@
 .dsh-iui-field-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font: var(--dsw-font-xxs-12); color: var(--dsw-alias-label-secondary); }
 .dsh-iui-field-value { color: var(--dsw-alias-label-primary); font-variant-numeric: tabular-nums; }
 .dsh-iui-range { width: 100%; margin: 0; accent-color: var(--dsw-alias-brand-primary); cursor: pointer; }
+.dsh-iui-card > .dsh-iui-player { margin-top: 4px; padding-top: 12px; border-top: 0.5px solid var(--dsw-alias-border-l1); }
+.dsh-iui-player-bar { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.dsh-iui-player-bar > .dsh-iui-range { flex: 1 1 auto; min-width: 48px; margin-left: 4px; }
+.dsh-iui-player-button, .dsh-iui-player-speed {
+  box-sizing: border-box;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  min-width: 28px;
+  padding: 0 6px;
+  border: 0.5px solid var(--dsw-alias-border-l3);
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xxs-strong-12);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.dsh-iui-player-speed { min-width: 40px; }
+.dsh-iui-player-button[data-primary] { border-color: transparent; background: var(--dsw-alias-button-primary-fill); color: var(--dsw-alias-label-primary-foreground); }
+.dsh-iui-player-button:hover:not(:disabled), .dsh-iui-player-speed:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.dsh-iui-player-button[data-primary]:hover:not(:disabled) { background: var(--dsw-alias-button-primary-hover); }
+.dsh-iui-player-button:disabled { cursor: default; opacity: 0.4; }
+.dsh-iui-player-icon { display: block; }
 .dsh-iui-input-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .dsh-iui-unit { flex: none; font: var(--dsw-font-xxs-12); color: var(--dsw-alias-label-secondary); }
 .dsh-iui-input, .dsh-iui-select {
@@ -114,7 +141,8 @@
   color: var(--dsw-alias-label-primary);
   font: var(--dsw-font-xs-13);
 }
-.dsh-iui-input:focus-visible, .dsh-iui-select:focus-visible, .dsh-iui-range:focus-visible, .dsh-iui-button:focus-visible, .dsh-iui-check input:focus-visible {
+.dsh-iui-input:focus-visible, .dsh-iui-select:focus-visible, .dsh-iui-range:focus-visible, .dsh-iui-button:focus-visible, .dsh-iui-check input:focus-visible,
+.dsh-iui-player-button:focus-visible, .dsh-iui-player-speed:focus-visible {
   outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 1px;
 }
@@ -134,13 +162,23 @@
 .dsh-iui-keys-row:last-child { border-bottom: 0; }
 .dsh-iui-keys-row dt { color: var(--dsw-alias-label-secondary); }
 .dsh-iui-keys-row dd { margin: 0; color: var(--dsw-alias-label-primary); text-align: right; }
+.dsh-iui-current { border-radius: var(--dsw-radius-xs); background: var(--dsw-alias-interactive-bg-active); font-weight: 500; }
+/* The tint reaches past the text by a shadow, not a margin, so the list marker never moves or clips. */
+.dsh-iui-list > .dsh-iui-current, .dsh-iui-steps > .dsh-iui-current { box-shadow: -4px 0 0 var(--dsw-alias-interactive-bg-active), 4px 0 0 var(--dsw-alias-interactive-bg-active); }
+.dsh-iui-list[data-mono], .dsh-iui-steps[data-mono], .dsh-iui-figure[data-mono] .dsh-iui-table td {
+  font-family: var(--ds-font-family-code);
+  font-size: 12px;
+  white-space: pre;
+}
+/* Code-type markers are wider than the body font's, and the scroller would clip them in the default 20px. */
+.dsh-iui-list[data-mono], .dsh-iui-steps[data-mono] { gap: 2px; padding-left: 32px; overflow-x: auto; scrollbar-width: thin; }
 .dsh-iui-list, .dsh-iui-steps { display: flex; flex-direction: column; gap: 4px; margin: 0; padding-left: 20px; font: var(--dsw-font-s-14); color: var(--dsw-alias-label-primary); }
 
 .dsh-iui-chart { gap: 4px; }
 .dsh-iui-chart-plot { display: block; width: 100%; height: 120px; overflow: visible; }
 .dsh-iui-chart-bar { fill: var(--dsw-alias-brand-primary); transition: y 160ms ease-out, height 160ms ease-out; }
 .dsh-iui-chart-line { fill: none; stroke: var(--dsw-alias-brand-primary); stroke-width: 2; vector-effect: non-scaling-stroke; }
-.dsh-iui-chart-dot { fill: var(--dsw-alias-brand-primary); }
+.dsh-iui-chart-dot { fill: none; stroke: var(--dsw-alias-brand-primary); stroke-width: 6; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .dsh-iui-chart-axis { stroke: var(--dsw-alias-border-l2); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .dsh-iui-chart-labels { display: grid; gap: 4px; text-align: center; }
 .dsh-iui-chart-labels > span { display: flex; flex-direction: column; min-width: 0; }
@@ -274,6 +312,6 @@
 @keyframes dsh-iui-pulse { 50% { opacity: 0.45; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .dsh-iui-row-head, .dsh-iui-button, .dsh-iui-progress-fill, .dsh-iui-chart-bar { transition: none; }
+  .dsh-iui-row-head, .dsh-iui-button, .dsh-iui-player-button, .dsh-iui-player-speed, .dsh-iui-progress-fill, .dsh-iui-chart-bar { transition: none; }
   .dsh-iui-row-head[data-state='running'] .dsh-iui-row-status { animation: none; }
 }

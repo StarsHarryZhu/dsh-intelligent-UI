@@ -1,74 +1,57 @@
 # dsh-intelligent-ui
 
-Interactive cards in DeepSeek Harness chats. The model writes a small interface program; the chat draws it as a native card — sliders, inputs, choices, metrics, tables, charts, function plots, typeset formulas, and answer buttons — and every control recomputes in your browser without another model call.
+Interactive cards in DeepSeek Harness chats. The model writes a small interface program, the chat draws it as a native card, and every control recomputes in your browser without another model call. A button sends its text as your next message.
 
 [中文](README-zh.md)
 
-![A calculus card under the model's reply: a slider for the upper limit, the typeset integral with its value, and the plot with the shaded area and the tangent](assets/calculus-in-chat.png)
 
-## What it does
-
-- Registers one tool, `ui_render`. The model passes a program in `source`; the plugin validates it against a fixed catalog of 26 components and stores the compiled program with the tool result.
-- Draws the card in the tool row while the reply is being written (with a live preview as the program streams in), and under the reply once the turn is finished.
-- Recomputes every figure locally when you move a control. Nothing is sent until you press a button, which sends its text as your next message.
-- Computes mathematics in the card: integrals (including infinite bounds), derivatives, limits, sums and products, roots, and Taylor polynomials, shown with `plot` and `formula`. A value that cannot be computed reliably shows "—" instead of a guess, and the model receives the computed figures, so its reply matches the card.
-- Ships a skill, `dsh-intelligent-ui`, that teaches the model when a card beats prose and how to build one; the model loads it on its own when a request fits.
-- Uses the host's theme, fonts, and language; works in light and dark mode.
-- Never runs model-written code: the program is data, drawn only by the plugin's own components.
-
-A program looks like this:
-
-```
-@state a = 1 min=0 max=3 step=0.1
-card "Area under y = x²"
-  slider "Upper limit a" bind=a
-  formula "integral(x^2, x, 0, a)" label="Area"
-  plot fn="x^2" from=-0.5 to=3 shadeFrom=0 shadeTo=a mark=a tangent=true
-  metric "Exact value a³/3" value=a^3/3 digits=6
-```
-
-![A Taylor approximation card in the light theme: sin x and its degree-n polynomial on one plot, the error at x = 2, and the typeset limit of sin(x)/x](assets/taylor-light.png)
-
-## What you can put in a card
-
-Twenty-six components, every one drawn with the host's own theme tokens, fonts, and 4px spacing grid:
-
-| Group | Components |
+| | |
 |---|---|
-| Layout | `card` `col` `row` `grid` |
-| Text | `title` `text` `badge` `callout` `divider` `link` `image` |
-| Data | `metric` `progress` `table` `keys` `list` `steps` `chart` |
-| Math | `plot` `formula` |
-| Controls | `slider` `numberInput` `textInput` `select` `checkbox` |
-| Action | `button` |
+| Requires | DeepSeek Harness **>= 0.2.1-alpha.1** (below 0.3.0), web UI |
+| Desktop apps | **Not supported yet.** The desktop app (0.2.0-rc.2) is below the required version, so the plugin does not install or activate there. Support will follow once the desktop app ships 0.2.1-alpha.1 or later. |
+| Install | Settings → Plugins → Add plugin → `https://github.com/StarsHarryZhu/dsh-intelligent-UI` (needs `git` on `PATH`), then restart the harness and reload the page |
 
-[`docs/SAMPLES.md`](docs/SAMPLES.md) has one drawn card per component, with the exact program and the exact result of each.
+## The 27 components
 
-## Install
+One card per component, drawn by this plugin in the host's light theme. The program behind each card is in [`docs/SAMPLES.md`](docs/SAMPLES.md).
 
-In DeepSeek Harness, open Settings → Plugins → Add plugin and install from `https://github.com/StarsHarryZhu/dsh-intelligent-UI` (or from a local folder). Restart the harness after installing or rebuilding, and reload the page. Installing from GitHub needs `git` on your `PATH`; nothing is built during the install.
+| Component | Group | What it shows | Screenshot |
+|---|---|---|---|
+| `card` | Layout | The framed root: optional title, padding, and gap. | <img src="assets/catalog/card.png" alt="card" width="360"> |
+| `col` | Layout | A vertical stack in reading order. | <img src="assets/catalog/col.png" alt="col" width="360"> |
+| `row` | Layout | Equal-width cells side by side; they wrap on a narrow screen. | <img src="assets/catalog/row.png" alt="row" width="360"> |
+| `grid` | Layout | An even grid of one to four columns. | <img src="assets/catalog/grid.png" alt="grid" width="360"> |
+| `title` | Text | A headline line in five sizes. | <img src="assets/catalog/title.png" alt="title" width="360"> |
+| `text` | Text | A sentence, with `{…}` live values. | <img src="assets/catalog/text.png" alt="text" width="360"> |
+| `badge` | Text | A one-word status label in five tones. | <img src="assets/catalog/badge.png" alt="badge" width="360"> |
+| `callout` | Text | One emphasized remark: an assumption, a caveat, a next step. | <img src="assets/catalog/callout.png" alt="callout" width="360"> |
+| `divider` | Text | A hairline separator. | <img src="assets/catalog/divider.png" alt="divider" width="360"> |
+| `link` | Text | A citation link, opened only when clicked. | <img src="assets/catalog/link.png" alt="link" width="360"> |
+| `image` | Text | An inline `data:` image with alt text and a caption. | <img src="assets/catalog/image.png" alt="image" width="360"> |
+| `metric` | Data | One prominent number that recomputes as controls move. | <img src="assets/catalog/metric.png" alt="metric" width="360"> |
+| `progress` | Data | A proportion bar. | <img src="assets/catalog/progress.png" alt="progress" width="360"> |
+| `table` | Data | A comparison table; `current=` highlights a row. | <img src="assets/catalog/table.png" alt="table" width="360"> |
+| `keys` | Data | Label and value pairs for exact figures. | <img src="assets/catalog/keys.png" alt="keys" width="360"> |
+| `list` | Data | A bulleted list; `current=` highlights an item. | <img src="assets/catalog/list.png" alt="list" width="360"> |
+| `steps` | Data | A numbered procedure; with `mono=true` and `current=`, a code listing with the running line highlighted. | <img src="assets/catalog/steps.png" alt="steps" width="360"> |
+| `chart` | Data | A bar or line chart. | <img src="assets/catalog/chart.png" alt="chart" width="360"> |
+| `plot` | Math | Curves of y = f(x) with a marked point, its tangent, and a shaded integral. | <img src="assets/catalog/plot.png" alt="plot" width="360"> |
+| `formula` | Math | A typeset expression with its live value. | <img src="assets/catalog/formula.png" alt="formula" width="360"> |
+| `slider` | Controls | A range slider bound to a number. | <img src="assets/catalog/slider.png" alt="slider" width="360"> |
+| `numberInput` | Controls | Exact number entry. | <img src="assets/catalog/numberInput.png" alt="numberInput" width="360"> |
+| `textInput` | Controls | A one-line text field. | <img src="assets/catalog/textInput.png" alt="textInput" width="360"> |
+| `select` | Controls | A dropdown choice. | <img src="assets/catalog/select.png" alt="select" width="360"> |
+| `checkbox` | Controls | An on/off switch. | <img src="assets/catalog/checkbox.png" alt="checkbox" width="360"> |
+| `button` | Action | Sends its text as your next message, then locks the card. | <img src="assets/catalog/button.png" alt="button" width="360"> |
+| `player` | Animation | A control bar at the bottom of the card: plays, pauses, steps, and scrubs a number at 0.5× to 2×; everything that reads it follows. | <img src="assets/catalog/player.png" alt="player" width="360"> |
 
-Then ask for something a card answers better than prose, for example: "Show me what a team plan costs at $29 per seat, with a slider for the number of seats", or "Plot y = x³ − 3x with a slider for the point where the tangent is drawn".
+## How it works
 
-## Platforms
-
-The web UI and the macOS and Windows desktop apps run the same web client, and this plugin's one browser bundle, so it behaves the same on all three. Two differences come from the host, not the plugin:
-
-- The desktop apps keep their own plugin profile: install the plugin from the desktop app's own Settings → Plugins, even if it is already installed for the web UI.
-- The desktop apps default to the Standard transcript view, which keeps a running turn's tool rows collapsed. The card appears under the reply when the turn finishes; expand the steps (or switch to Detailed in Settings) to watch the live preview.
-
-## Uninstall
-
-Disable or remove the bundle in Settings → Plugins, then restart. Sessions keep opening; earlier calls show as ordinary tool rows. The plugin adds no session event types.
-
-## Compatibility
-
-| Surface | Status |
-|---|---|
-| Harness | DeepSeek Harness `0.2.x` (`engines.dsh` `>=0.2.0-0 <0.3.0-0`) |
-| Verified | Web UI, 0.2.1-alpha.4, 2026-10-16 (see `docs/VERIFY.md`) |
-| Desktop | macOS and Windows apps load the same bundle; their checklist is in `docs/VERIFY.md` |
-| Node | `^22.19.0 || >=24.0.0` |
+- The plugin registers one tool, `ui_render`, and one skill, `dsh-intelligent-ui`, which teaches the model when a card beats prose. The model never writes HTML or JavaScript: its program is checked against the 27-component catalog and stored with the tool result.
+- A card draws in the tool row while the reply streams, and under the reply once it finishes. Moving a control recomputes every figure locally.
+- A `player` animates a card: code traced line by line, an algorithm's passes, a point moving along a curve. Playback runs in the browser and sends nothing to the model.
+- Cards compute integrals (including infinite bounds), derivatives, limits, sums and products, roots, and Taylor polynomials. A value that cannot be computed reliably shows "—", never a guess.
+- Uninstalling leaves every session opening as before; earlier calls show as ordinary tool rows.
 
 ## Development
 
@@ -78,7 +61,7 @@ node build.js               # type-check, build, and self-check the bundle
 node node_modules/vitest/vitest.mjs run
 ```
 
-See `AGENTS.md` for the rules of the tree and `docs/VERIFY.md` for the live checklist.
+`AGENTS.md` holds the rules of the tree; `docs/VERIFY.md` is the live checklist.
 
 ## License
 

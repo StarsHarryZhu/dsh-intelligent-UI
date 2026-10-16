@@ -25,8 +25,8 @@ around it.
 
 **No snapshot of a whole program.** A program is asserted field by field.
 
-**Fixtures are inline.** Worked examples and the one persisted format-1 card are
-written out in the spec that uses them.
+**Fixtures are inline.** Worked examples and the one card persisted before the
+version fields are written out in the spec that uses them.
 
 **Pluggability is checked mechanically.** `isolation.test.ts` fails when a source
 file imports a harness package it may not, when the bundle requests anything but
@@ -41,7 +41,7 @@ derivative) is pinned as a refusal, not just as "not a crash".
 
 **Packaging is checked as the host reads it.** `manifest.test.ts` evaluates the
 version ranges with the harness's own prerelease rule and node-semver's default,
-and checks the declaration every platform loads.
+and checks the one browser declaration the web UI loads.
 
 **Documentation is checked mechanically.** `agents-md.test.ts` fails when a folder
 has no `AGENTS.md`, when a file lacks the four sections in order, or when a
@@ -53,34 +53,36 @@ needs the build first: run `node build.js` before the suite.
 ## 3. Contents
 
 - `AGENTS.md` — this file: what the suite covers and how a spec is written.
-- `expr.test.ts` — expression typing and evaluation, totality, text equality, and
-  the `concat` restrictions.
+- `expr.test.ts` — expression typing and evaluation, totality, text equality,
+  the `concat` restrictions, and `pick`.
 - `infix.test.ts` — the readable expression syntax: precedence, logic, ternaries,
   quoted text, named functions, and rejections.
 - `text.test.ts` — `{…}` interpolation, escapes, rejected interpolations, and
   hoisted-text rendering.
-- `dil.test.ts` — the line grammar: indentation nesting, flat lines, the explicit
-  form, primary text, quoting, declarations, comments, fences, and streaming.
+- `dil.test.ts` — the line grammar: indentation nesting, flat lines, the refused
+  old forms, primary text, quoting, declarations, comments, fences, and streaming.
 - `compile.test.ts` — both grammars end to end, interpolation in lists and
   tables, choices, every repair the compiler makes, what still fails, real model
-  sources, content safety, and streaming compiles.
+  sources, content safety, streaming compiles, the program version, and the
+  animation props.
 - `limits.test.ts` — each bound at its limit and one past it, and bounded JSON
   recovery.
-- `catalog.test.ts` — the catalog and the render registry in both directions, and
-  each descriptor's internal consistency.
+- `catalog.test.ts` — the catalog and the render registry in both directions,
+  each descriptor's internal consistency, and the version every field records.
 - `tool.test.ts` — the tool definition's wire shape, its result schema, what the
   model is told, and the persisted metadata.
 - `client.test.tsx` — the browser half through its real registration: the row's
-  stages, buttons, the turn data Definition, the tail, shared edits, and every
-  degradation path.
+  stages, buttons, the turn data Definition, the tail, shared edits, the player,
+  and every degradation path.
 - `math.test.ts` — the quadrature rule's constants, integrals, derivatives,
   limits, sums, products, roots, Taylor polynomials, special functions,
   precedence, the work budget, and number display, each against known values.
 - `skill.test.ts` — the bundled skill: frontmatter, size, references, every
   program it teaches compiling cleanly, and Windows line endings.
-- `manifest.test.ts` — the cross-platform packaging contract: the client
-  declaration, no install-time script, published files, no symbolic links, LF
-  line endings, the claimed harness versions, and the screenshot list.
+- `manifest.test.ts` — the packaging contract: the client declaration, no
+  install-time script, published files, no symbolic links, LF line endings, the
+  claimed harness versions (from 0.2.1-alpha.1, refusing the 0.2.0-rc.2 desktop
+  app), and the screenshot list.
 - `isolation.test.ts` — the pluggability invariants of the root `AGENTS.md`.
 - `agents-md.test.ts` — the documentation rules this file describes.
 

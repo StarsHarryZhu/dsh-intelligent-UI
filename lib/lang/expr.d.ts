@@ -19,6 +19,8 @@ export type ExprType = 'number' | 'string' | 'boolean';
 export declare const EXPR_FAILURE: unique symbol;
 /** Maximum expression nesting accepted by validation and evaluation. */
 export declare const MAX_EXPR_DEPTH = 32;
+/** Most options one `pick` chooses among. */
+export declare const MAX_PICK_OPTIONS = 32;
 /** Most parts one `concat` accepts. */
 export declare const MAX_CONCAT_PARTS = 8;
 /** Longest string `concat` may build, so a program cannot manufacture unbounded text. */
@@ -76,14 +78,6 @@ type Produced = number | string | boolean | typeof EXPR_FAILURE;
  * @returns the produced number, string, boolean, or {@link EXPR_FAILURE}.
  */
 export declare function evalExpr(node: unknown, read: (key: string) => JsonValue | undefined, budget?: EvalBudget, bindings?: ReadonlyMap<string, number>): Produced;
-/**
- * Whether an expression tree uses the math vocabulary, which a format-2 client
- * would not evaluate correctly.
- * @param node - any JSON value; arrays are searched recursively.
- * @param operators - the operators that mark the newer format.
- * @returns true when an operator from the set appears, or min/max takes more than two arguments.
- */
-export declare function usesOperators(node: unknown, operators: ReadonlySet<string>): boolean;
 /** Truthiness for `and` / `or` / `if`: numbers count when non-zero, strings when non-empty. */
 export declare function truthy(value: number | string | boolean): boolean;
 /**

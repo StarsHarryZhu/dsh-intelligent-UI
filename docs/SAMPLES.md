@@ -1,6 +1,6 @@
 # The catalog, one sample per component
 
-A live tour of the catalog: one card per component, drawn in a real chat. Samples 1 to 24 were drawn on 2026-10-15 in the order the catalog had then; samples 25 and 26, the math components, were written by the model itself on 2026-10-16.
+A live tour of the catalog: one card per component, drawn in a real chat. Samples 1 to 24 were drawn on 2026-10-15 in the order the catalog had then; samples 25 and 26, the math components, and sample 27, the animation player, were written by the model itself on 2026-10-16.
 
 Every block below is the exact `source` that was passed to `ui_render` and the exact result it reported, so this file doubles as a regression corpus — `tests/compile.test.ts` can compile any of them.
 
@@ -380,6 +380,47 @@ card "sin x 的泰勒逼近与 lim sin x / x"
 
 Zero repairs. The error reads -0.2426 at degree 3 and -3.642e-10 at degree 15 in the metric, while the sentence, which uses `fmt(err, 4)`, rounds the second to -0.0000 — the reason the skill now steers tiny values to plain `{err}`.
 
+## 27. `player`
+
+An animation control. The reader asked for bubble sort on [4, 2, 3, 1] traced line by line, with play and pause, single steps, the running line highlighted, and i, j, and the array at every step. The model loaded the skill, read `recipes.md`, and wrote one frame state with every column of its trace as a `pick`; it also bound a bar chart to the array, so the bars reorder as the run plays. `steps … current=line mono=true` is the code listing.
+
+```dil
+@state frame = 1 min=1 max=24 step=1
+@calc line = pick(frame, 1, 2, 3, 4, 2, 3, 4, 2, 3, 4, 2, 1, 2, 3, 2, 3, 4, 2, 1, 2, 3, 4, 2, 0)
+@calc i = pick(frame, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2)
+@calc j = pick(frame, 0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0)
+@calc a = pick(frame, "4 2 3 1", "4 2 3 1", "4 2 3 1", "2 4 3 1", "2 4 3 1", "2 4 3 1", "2 3 4 1", "2 3 4 1", "2 3 4 1", "2 3 1 4", "2 3 1 4", "2 3 1 4", "2 3 1 4", "2 3 1 4", "2 3 1 4", "2 3 1 4", "2 1 3 4", "2 1 3 4", "2 1 3 4", "2 1 3 4", "2 1 3 4", "1 2 3 4", "1 2 3 4", "1 2 3 4")
+@calc v0 = pick(frame, 4, 4, 4, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1)
+@calc v1 = pick(frame, 2, 2, 2, 4, 4, 4, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 1, 1, 1, 1, 1, 2, 2, 2)
+@calc v2 = pick(frame, 3, 3, 3, 3, 3, 3, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 3, 3, 3)
+@calc v3 = pick(frame, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4)
+@calc note = pick(frame, "第 1 轮：i = 0，进入外层循环", "j = 0，0 < 3，进入内层循环", "比较 a[0] = 4 与 a[1] = 2：4 > 2 成立", "交换 a[0] 与 a[1]：4 和 2 互换位置", "j = 1，1 < 3，继续内层循环", "比较 a[1] = 4 与 a[2] = 3：4 > 3 成立", "交换 a[1] 与 a[2]：4 和 3 互换位置", "j = 2，2 < 3，继续内层循环", "比较 a[2] = 4 与 a[3] = 1：4 > 1 成立", "交换 a[2] 与 a[3]：4 和 1 互换位置", "内层结束：j 遍历 0、1、2，最大值 4 已归位", "第 2 轮：i = 1，只需比较前 3 个元素", "j = 0，0 < 2，进入内层循环", "比较 a[0] = 2 与 a[1] = 3：2 > 3 不成立，不交换", "j = 1，1 < 2，继续内层循环", "比较 a[1] = 3 与 a[2] = 1：3 > 1 成立", "交换 a[1] 与 a[2]：3 和 1 互换位置", "内层结束：j 遍历 0、1，3 已归位", "第 3 轮：i = 2，只需比较前 2 个元素", "j = 0，0 < 1，进入内层循环", "比较 a[0] = 2 与 a[1] = 1：2 > 1 成立", "交换 a[0] 与 a[1]：2 和 1 互换位置", "内层结束：j 只取 0，2 已归位", "排序完成：1 2 3 4，全程 6 次比较、5 次交换")
+card "冒泡排序：[4, 2, 3, 1] 逐行执行"
+  player "播放 / 暂停 / 单步" bind=frame unit="/ 24" duration=12
+  chart shape=bar labels=["a[0]", "a[1]", "a[2]", "a[3]"] values=["v0", "v1", "v2", "v3"] caption="当前数组：柱高就是元素值"
+  steps items=["for i in range(n - 1):", "  for j in range(n - 1 - i):", "    if a[j] > a[j + 1]:", "      a[j], a[j + 1] = a[j + 1], a[j]"] current=line mono=true
+  keys items=["i: {i}", "j: {j}", "a: {a}"]
+  callout "{note}"
+```
+
+Result:
+
+```
+The card is shown: 6 component(s), 1 control(s).
+What a text-only reader sees:
+## 冒泡排序：[4, 2, 3, 1] 逐行执行
+  播放 / 暂停 / 单步: 1 / 24 (1–24)
+  a[0]: 4 · a[1]: 2 · a[2]: 3 · a[3]: 1
+  1. for i in range(n - 1):
+  2.   for j in range(n - 1 - i):
+  3.     if a[j] > a[j + 1]:
+  4.       a[j], a[j + 1] = a[j + 1], a[j]
+  i: 0 · j: 0 · a: 4 2 3 1
+  Note: 第 1 轮：i = 0，进入外层循环
+```
+
+6 components, 1 control, zero repairs. Played in the web UI, the run went from frame 1 to frame 24 in its twelve seconds and stopped; stepping back, scrubbing to frame 5, and switching to 2× each did what they say, and the highlighted line, the bars, and the note followed every frame without a request.
+
 ## What this tour found
 
 **A bare `expr` value ended at the first space (fixed).** Sample 9 first read `metric "折合小时" value=mins / 60 unit="h"`, and the compiler kept `value=mins` while reporting the `/` and the `60` as stray tokens; the card showed `24 h` instead of `0.75 h`. Bare values now keep spaces inside brackets and rejoin pieces that start or follow an operator, so that line reads as written; `tests/dil.test.ts` pins it. Quoting an expression with spaces remains the documented form.
@@ -388,4 +429,4 @@ Zero repairs. The error reads -0.2426 at degree 3 and -3.642e-10 at degree 15 in
 
 ## Status
 
-Samples 1 to 24 were drawn in one live session on 2026-10-15, in the `ui_render` tool row, with the compiler reporting zero repairs except the first attempt at sample 9. Samples 25 and 26 were drawn on 2026-10-16 in the tool row and then under the reply, and survived a page reload; that run is recorded in `VERIFY.md`.
+Samples 1 to 24 were drawn in one live session on 2026-10-15, in the `ui_render` tool row, with the compiler reporting zero repairs except the first attempt at sample 9. Samples 25 and 26 were drawn on 2026-10-16 in the tool row and then under the reply, and survived a page reload; that run is recorded in `VERIFY.md`. Sample 27 was drawn on 2026-10-16 after the program-version reset, and played as described above.

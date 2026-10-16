@@ -56,19 +56,19 @@ describe('nesting by indentation', () => {
     ])
   })
 
-  it('still reads the explicit form, ids and in= included', () => {
-    const { nodes } = parse([
-      '#root card padding=3',
-      '#h title text="Team plan" in=#root',
-      '#m metric label=Monthly value=price in=#root',
-    ].join('\n'))
-    expect(parents(nodes)).toEqual([['card#root', null], ['title#h', 'root'], ['metric#m', 'root']])
-    expect(nodes[1]?.props).toEqual({ text: 'Team plan' })
+  it('refuses a line that starts with an id, and says how to write it', () => {
+    const { nodes, diagnostics } = parse('card\n#m metric label=Monthly value=1')
+    expect(nodes.map(node => node.type)).toEqual(['card'])
+    expect(diagnostics[0]).toEqual(expect.objectContaining({ code: 'unterminated_line', line: 2 }))
+    expect(diagnostics[0]?.repair).toMatch(/without an id/u)
   })
 
-  it('lets in= override indentation', () => {
-    const { nodes } = parse('#a card\n#b card\n  text "x" in=#a')
-    expect(nodes[2]?.parent).toBe('a')
+  it('ignores in= and places the line by its indentation', () => {
+    const { nodes, diagnostics } = parse('card "A"\ncard "B"\n  text "x" in=#card1')
+    expect(nodes[2]?.parent).toBe('card2')
+    expect(nodes[2]?.props).toEqual({ text: 'x' })
+    expect(diagnostics[0]).toEqual(expect.objectContaining({ code: 'unknown_prop', line: 3 }))
+    expect(diagnostics[0]?.repair).toMatch(/indenting/u)
   })
 })
 
@@ -121,9 +121,10 @@ describe('component lines', () => {
     expect((nodes[0]?.props as Record<string, unknown>).__proto__).toBe(1)
   })
 
-  it('accepts the angle-bracket form some models write', () => {
-    const { nodes } = parse('<card>\n  <text text="x"/>')
-    expect(nodes.map(node => node.type)).toEqual(['card', 'text'])
+  it('refuses the angle-bracket form, and says how to write it', () => {
+    const diagnostics: Diagnostic[] = []
+    expect(parseDil('<card>\n  <text text="x"/>', diagnostics)).toBeUndefined()
+    expect(diagnostics[0]?.repair).toMatch(/angle brackets/u)
   })
 })
 
@@ -138,11 +139,17 @@ describe('declarations', () => {
     ])
   })
 
-  it('still accepts the explicit kind word and comma or JSON option lists', () => {
-    const { states } = parse('@state seats = 8 number\n@state tier = "pro" select options=free,pro\n@state size = "M" options=["S","M"]')
-    expect(states[0]).toEqual({ key: 'seats', init: 8, kind: 'number' })
-    expect(states[1]).toEqual({ key: 'tier', init: 'pro', kind: 'select', options: ['free', 'pro'] })
-    expect(states[2]?.options).toEqual(['S', 'M'])
+  it('reads comma and JSON option lists', () => {
+    const { states } = parse('@state tier = "pro" options=free,pro\n@state size = "M" options=["S","M"]')
+    expect(states[0]).toEqual({ key: 'tier', init: 'pro', options: ['free', 'pro'] })
+    expect(states[1]?.options).toEqual(['S', 'M'])
+  })
+
+  it('reports a kind word after the value instead of reading it', () => {
+    const { states, diagnostics } = parse('@state seats = 8 number')
+    expect(states[0]).toEqual({ key: 'seats', init: 8 })
+    expect(diagnostics[0]).toEqual(expect.objectContaining({ code: 'unknown_prop', line: 1 }))
+    expect(diagnostics[0]?.repair).toMatch(/kind follows from the value/u)
   })
 
   it('keeps a calc as readable text for the compiler', () => {

@@ -266,7 +266,7 @@ describe('math cards', () => {
     const fetchSpy = vi.fn()
     vi.stubGlobal('fetch', fetchSpy)
     const meta = await settle(CALCULUS_EXAMPLE)
-    expect((meta.program as { v: number }).v).toBe(3)
+    expect((meta.program as { version: number }).version).toBe(1)
     const view = render(<ToolView phase="result" block={resultBlock(meta)} callId="math-1" useDisclosure={useHostDisclosure} {...kit()} />)
     const formula = screen.getByRole('math')
     expect(formula.getAttribute('aria-label')).toBe('integral(x^2, x, 0, a) = 0.333333')
@@ -415,7 +415,7 @@ describe('the turn data and the turn tail', () => {
 })
 
 describe('persisted programs from other builds', () => {
-  /** A card persisted by the first build of this plugin (format 1), copied from a real session. */
+  /** A card persisted before programs carried a `version` field, copied from a real session. */
   const LEGACY_META = {
     ok: true,
     title: '可拖动的报价器',
@@ -446,9 +446,30 @@ describe('persisted programs from other builds', () => {
     },
   }
 
-  it('still draws a card persisted by the first build', () => {
+  /** The same card as this build persists it, with both version fields. */
+  const CURRENT_META = { ...LEGACY_META, version: 1, program: { ...LEGACY_META.program, version: 1 } }
+
+  it('shows a card from before the version fields as its text, not as a drawing', () => {
     const { Tail } = loadClient()
     const turn = { turn: 11, end: { data: { reason: { kind: 'completed' } } }, data: { get: () => ({ cards: [{ seq: 2524, callId: 'legacy', meta: LEGACY_META }] }) } }
+    render(<Tail turn={turn} seq={2533} {...kit()} />)
+    expect(screen.getByText('# Team plan')).toBeTruthy()
+    expect(screen.getByText(/another version of the plugin/u)).toBeTruthy()
+    expect(screen.queryByRole('slider')).toBeNull()
+  })
+
+  it('shows a program without a version field as its text inside a current envelope', () => {
+    const { Tail } = loadClient()
+    const meta = { ...CURRENT_META, program: LEGACY_META.program }
+    const turn = { turn: 1, end: { data: { reason: { kind: 'completed' } } }, data: { get: () => ({ cards: [{ seq: 1, callId: 'unversioned', meta }] }) } }
+    render(<Tail turn={turn} seq={9} {...kit()} />)
+    expect(screen.getByText('# Team plan')).toBeTruthy()
+    expect(screen.queryByRole('slider')).toBeNull()
+  })
+
+  it('draws a card persisted by this build', () => {
+    const { Tail } = loadClient()
+    const turn = { turn: 11, end: { data: { reason: { kind: 'completed' } } }, data: { get: () => ({ cards: [{ seq: 2524, callId: 'current', meta: CURRENT_META }] }) } }
     render(<Tail turn={turn} seq={2533} {...kit()} />)
     expect(screen.getByText('Team plan')).toBeTruthy()
     expect(screen.getByText('232')).toBeTruthy()
@@ -460,7 +481,7 @@ describe('persisted programs from other builds', () => {
 
   it('does not stack the call title over a heading the program already has', () => {
     const { Tail } = loadClient()
-    const turn = { turn: 11, end: { data: { reason: { kind: 'completed' } } }, data: { get: () => ({ cards: [{ seq: 1, callId: 'titled', meta: LEGACY_META }] }) } }
+    const turn = { turn: 11, end: { data: { reason: { kind: 'completed' } } }, data: { get: () => ({ cards: [{ seq: 1, callId: 'titled', meta: CURRENT_META }] }) } }
     render(<Tail turn={turn} seq={9} {...kit()} />)
     expect(screen.queryByText('可拖动的报价器')).toBeNull()
     expect(screen.getByText('Team plan')).toBeTruthy()
@@ -476,17 +497,17 @@ describe('persisted programs from other builds', () => {
 
   it('shows a newer format as text instead of half-drawing it', () => {
     const { Tail } = loadClient()
-    const meta = { ...LEGACY_META, program: { ...LEGACY_META.program, v: 99, fallback: 'text version of the future' } }
+    const meta = { ...CURRENT_META, program: { ...CURRENT_META.program, version: 99, fallback: 'text version of the future' } }
     const turn = { turn: 1, end: { data: { reason: { kind: 'completed' } } }, data: { get: () => ({ cards: [{ seq: 1, callId: 'future', meta }] }) } }
     render(<Tail turn={turn} seq={9} {...kit()} />)
     expect(screen.getByText('text version of the future')).toBeTruthy()
-    expect(screen.getByText(/newer version of the plugin/u)).toBeTruthy()
+    expect(screen.getByText(/another version of the plugin/u)).toBeTruthy()
   })
 
   it('draws what it knows and says what it skipped', () => {
     const { Tail } = loadClient()
-    const program = { ...LEGACY_META.program, nodes: [...LEGACY_META.program.nodes, { id: 'x', type: 'hologram', parent: 'root', props: {} }] }
-    const turn = { turn: 1, end: { data: { reason: { kind: 'completed' } } }, data: { get: () => ({ cards: [{ seq: 1, callId: 'mixed', meta: { ...LEGACY_META, program } }] }) } }
+    const program = { ...CURRENT_META.program, nodes: [...CURRENT_META.program.nodes, { id: 'x', type: 'hologram', parent: 'root', props: {} }] }
+    const turn = { turn: 1, end: { data: { reason: { kind: 'completed' } } }, data: { get: () => ({ cards: [{ seq: 1, callId: 'mixed', meta: { ...CURRENT_META, program } }] }) } }
     const view = render(<Tail turn={turn} seq={9} {...kit()} />)
     expect(screen.getByText('1 component(s) could not be shown.')).toBeTruthy()
     expect(view.container.querySelector('hologram')).toBeNull()
@@ -500,13 +521,172 @@ describe('persisted programs from other builds', () => {
     window.addEventListener('error', quiet)
     try {
       const hostile = new Proxy({}, { getOwnPropertyDescriptor: () => { throw new Error('boom') } })
-      const program = { ...LEGACY_META.program, constants: hostile, fallback: 'safe text version' }
-      const turn = { turn: 1, end: { data: { reason: { kind: 'completed' } } }, data: { get: () => ({ cards: [{ seq: 1, callId: 'broken', meta: { ...LEGACY_META, program } }] }) } }
+      const program = { ...CURRENT_META.program, constants: hostile, fallback: 'safe text version' }
+      const turn = { turn: 1, end: { data: { reason: { kind: 'completed' } } }, data: { get: () => ({ cards: [{ seq: 1, callId: 'broken', meta: { ...CURRENT_META, program } }] }) } }
       const view = render(<div data-testid="transcript"><Tail turn={turn} seq={9} {...kit()} /><p>the rest of the transcript</p></div>)
       expect(within(view.getByTestId('transcript')).getByText('safe text version')).toBeTruthy()
       expect(screen.getByText('the rest of the transcript')).toBeTruthy()
     } finally {
       window.removeEventListener('error', quiet)
     }
+  })
+})
+
+describe('animation', () => {
+  const STEPPER = [
+    '@state t = 0 min=0 max=4 step=1',
+    'card "Walkthrough"',
+    '  player "Step" bind=t duration=4',
+    '  steps items=["a = 1", "  b = 2", "c = 3", "d = 4", "e"] current=t + 1 mono=true',
+    '  table columns=["name", "value"] rows=[["i", "{t}"], ["j", "{t * 2}"]] current=t',
+    '  text "{pick(t + 1, \\"start\\", \\"one\\", \\"two\\", \\"three\\", \\"done\\")}"',
+  ].join('\n')
+
+  /** Animation frames the test advances by hand. */
+  function frames() {
+    let queue: Array<(now: number) => void> = []
+    const cancel = vi.fn()
+    vi.stubGlobal('requestAnimationFrame', (callback: (now: number) => void) => { queue.push(callback); return queue.length })
+    vi.stubGlobal('cancelAnimationFrame', cancel)
+    let now = 0
+    return {
+      cancel,
+      /** Run queued frames `count` times, `ms` apart; returns how many ran. */
+      run(count: number, ms = 100): number {
+        let ran = 0
+        for (let index = 0; index < count && queue.length > 0; index += 1) {
+          const pending = queue
+          queue = []
+          act(() => { for (const callback of pending) callback(now) })
+          now += ms
+          ran += 1
+        }
+        return ran
+      },
+      get pending(): number { return queue.length },
+    }
+  }
+
+  async function draw(callId: string) {
+    const { ToolView } = loadClient()
+    const meta = await settle(STEPPER)
+    return render(<ToolView phase="result" block={resultBlock(meta)} callId={callId} useDisclosure={useHostDisclosure} {...kit()} />)
+  }
+
+  const highlighted = (view: ReturnType<typeof render>, selector: string): string | undefined =>
+    view.container.querySelector(`${selector} [aria-current="step"]`)?.textContent ?? undefined
+
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it('draws the controls and the first frame', async () => {
+    const view = await draw('anim-1')
+    expect(screen.getByRole('button', { name: 'Play' }).getAttribute('aria-pressed')).toBe('false')
+    expect((screen.getByRole('button', { name: 'Step back' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByRole('button', { name: 'Speed 1×; click to change' }).textContent).toBe('1×')
+    expect(view.container.querySelector('.dsh-iui-steps')?.hasAttribute('data-mono')).toBe(true)
+    expect(view.container.querySelector('.dsh-iui-card')?.lastElementChild?.classList.contains('dsh-iui-player')).toBe(true)
+    expect(highlighted(view, '.dsh-iui-steps')).toBe('a = 1')
+    expect(highlighted(view, '.dsh-iui-table')).toBeUndefined()
+    expect(view.container.querySelectorAll('.dsh-iui-steps li')[1]?.textContent).toBe('  b = 2')
+    expect(screen.getByText('start')).toBeTruthy()
+  })
+
+  it('docks the player at the bottom of a card saved with it first', async () => {
+    const { ToolView } = loadClient()
+    const meta = await settle(STEPPER)
+    const program = meta.program as { nodes: Array<{ type: string }> }
+    const player = program.nodes.find(node => node.type === 'player') as { type: string }
+    const nodes = [program.nodes[0], player, ...program.nodes.slice(1).filter(node => node !== player)]
+    const saved = { ...meta, program: { ...program, nodes } }
+    const view = render(<ToolView phase="result" block={resultBlock(saved)} callId="anim-8" useDisclosure={useHostDisclosure} {...kit()} />)
+    expect(view.container.querySelector('.dsh-iui-card')?.lastElementChild?.classList.contains('dsh-iui-player')).toBe(true)
+  })
+
+  it('steps forward and back by one step, inside the range', async () => {
+    const view = await draw('anim-2')
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Step forward' })) })
+    expect(highlighted(view, '.dsh-iui-steps')).toBe('  b = 2')
+    expect(highlighted(view, '.dsh-iui-table')).toBe('i1')
+    expect(screen.getByText('one')).toBeTruthy()
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Step back' })) })
+    expect(screen.getByText('start')).toBeTruthy()
+    for (let index = 0; index < 6; index += 1) {
+      const next = screen.getByRole('button', { name: 'Step forward' }) as HTMLButtonElement
+      if (!next.disabled) act(() => { fireEvent.click(next) })
+    }
+    expect(screen.getByText('done')).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Step forward' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('plays to the end in its duration and stops there, without a request', async () => {
+    const clock = frames()
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+    await draw('anim-3')
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Play' })) })
+    expect(screen.getByRole('button', { name: 'Pause' }).getAttribute('aria-pressed')).toBe('true')
+    clock.run(16)
+    expect(screen.getByText('one')).toBeTruthy()
+    const ran = clock.run(100)
+    expect(ran).toBeGreaterThan(20)
+    expect(ran).toBeLessThan(30)
+    expect(screen.getByText('done')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Play' }).getAttribute('aria-pressed')).toBe('false')
+    expect(clock.pending).toBe(0)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('keeps its pace on a page that paints once a second', async () => {
+    const clock = frames()
+    await draw('anim-7')
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Play' })) })
+    clock.run(3, 1000)
+    expect(screen.getByText('two')).toBeTruthy()
+    clock.run(10, 5000)
+    expect(screen.getByText('done')).toBeTruthy()
+  })
+
+  it('starts again from the beginning once a run has ended', async () => {
+    const clock = frames()
+    await draw('anim-4')
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Play' })) })
+    clock.run(100)
+    expect(screen.getByText('done')).toBeTruthy()
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Play' })) })
+    expect(screen.getByText('start')).toBeTruthy()
+  })
+
+  it('pauses when the reader scrubs, steps, or the card unmounts', async () => {
+    const clock = frames()
+    const view = await draw('anim-5')
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Play' })) })
+    clock.run(3)
+    act(() => { fireEvent.change(screen.getByRole('slider', { name: 'Step' }), { target: { value: '3' } }) })
+    expect(screen.getByRole('button', { name: 'Play' }).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByText('three')).toBeTruthy()
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Play' })) })
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Step back' })) })
+    expect(screen.getByRole('button', { name: 'Play' }).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByText('two')).toBeTruthy()
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Play' })) })
+    const cancelled = clock.cancel.mock.calls.length
+    view.unmount()
+    expect(clock.cancel.mock.calls.length).toBe(cancelled + 1)
+  })
+
+  it('cycles the speed, and a faster run takes fewer frames', async () => {
+    const clock = frames()
+    await draw('anim-6')
+    const speed = (): HTMLElement => screen.getByRole('button', { name: /^Speed/u })
+    act(() => { fireEvent.click(speed()) })
+    expect(speed().textContent).toBe('2×')
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Play' })) })
+    const fast = clock.run(100)
+    expect(screen.getByText('done')).toBeTruthy()
+    expect(fast).toBeLessThan(25)
+    act(() => { fireEvent.click(speed()) })
+    expect(speed().textContent).toBe('0.5×')
+    act(() => { fireEvent.click(speed()) })
+    expect(speed().textContent).toBe('1×')
   })
 })

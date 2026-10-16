@@ -10,10 +10,10 @@
  * @module dsh-intelligent-ui/client/components
  */
 
-import { Fragment, useEffect, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import { SIZES, TONES } from '../lang/catalog.ts'
 import { isDataImage } from '../lang/compile.ts'
-import { formatNumber } from '../lang/expr.ts'
+import { evalExpr, formatNumber } from '../lang/expr.ts'
 import { MAX_SPACE } from '../lang/limits.ts'
 import { formatSignificant } from '../lang/math.ts'
 import type { JsonValue } from '../lang/types.ts'
@@ -250,11 +250,33 @@ export const REGISTRY: Readonly<Record<string, Renderer>> = {
       </label>
     )
   },
+  player: (node, _children, scope) => {
+    const key = node.bind ?? ''
+    const row = declaration(scope.program, key)
+    const min = numberProp(node, 'min') ?? row?.min ?? 0
+    const max = numberProp(node, 'max') ?? row?.max ?? 100
+    const step = numberProp(node, 'step') ?? row?.step ?? 1
+    const current = scope.values.get(key)
+    return (
+      <Player
+        label={scope.text(node.props.label)}
+        value={typeof current === 'number' ? current : min}
+        min={min}
+        max={max}
+        step={step > 0 ? step : 1}
+        duration={numberProp(node, 'duration') ?? defaultDuration(min, max, step)}
+        unit={stringProp(node, 'unit')}
+        tr={scope.tr}
+        onChange={(value) => { scope.setValue(key, value) }}
+      />
+    )
+  },
   table: (node, _children, scope) => {
     const columns = list(node.props.columns, scope)
     const rows = Array.isArray(node.props.rows) ? node.props.rows as unknown[] : []
+    const current = currentIndex(node, scope)
     return (
-      <figure className="dsh-iui-figure">
+      <figure className="dsh-iui-figure" data-mono={mono(node, scope)}>
         {node.props.caption === undefined ? null : <figcaption className="dsh-iui-caption">{scope.text(node.props.caption)}</figcaption>}
         <div className="dsh-iui-table-wrap">
           <table className="dsh-iui-table">
@@ -263,7 +285,7 @@ export const REGISTRY: Readonly<Record<string, Renderer>> = {
             )}
             <tbody>
               {rows.map((row, rowIndex) => (
-                <tr key={rowIndex}>
+                <tr key={rowIndex} {...currentMark(rowIndex === current)}>
                   {(Array.isArray(row) ? row as unknown[] : []).map((cell, cellIndex) => <td key={cellIndex}>{scope.text(cell)}</td>)}
                 </tr>
               ))}
@@ -286,12 +308,22 @@ export const REGISTRY: Readonly<Record<string, Renderer>> = {
       })}
     </dl>
   ),
-  list: (node, _children, scope) => (
-    <ul className="dsh-iui-list">{list(node.props.items, scope).map((item, index) => <li key={index}>{item}</li>)}</ul>
-  ),
-  steps: (node, _children, scope) => (
-    <ol className="dsh-iui-steps">{list(node.props.items, scope).map((item, index) => <li key={index}>{item}</li>)}</ol>
-  ),
+  list: (node, _children, scope) => {
+    const current = currentIndex(node, scope)
+    return (
+      <ul className="dsh-iui-list" data-mono={mono(node, scope)}>
+        {list(node.props.items, scope).map((item, index) => <li key={index} {...currentMark(index === current)}>{item}</li>)}
+      </ul>
+    )
+  },
+  steps: (node, _children, scope) => {
+    const current = currentIndex(node, scope)
+    return (
+      <ol className="dsh-iui-steps" data-mono={mono(node, scope)}>
+        {list(node.props.items, scope).map((item, index) => <li key={index} {...currentMark(index === current)}>{item}</li>)}
+      </ol>
+    )
+  },
   chart: (node, _children, scope) => renderChart(node, scope),
   plot: (node, _children, scope) => <PlotFigure node={node} scope={scope} />,
   formula: (node, _children, scope) => renderFormula(node, scope),
@@ -333,6 +365,176 @@ export const REGISTRY: Readonly<Record<string, Renderer>> = {
       </button>
     )
   },
+}
+
+/** Playback speeds the reader cycles through, as multiples of the program's pace. */
+const SPEEDS: readonly number[] = [1, 2, 0.5]
+
+/**
+ * Longest stretch one animation frame may advance. A throttled page that paints
+ * once a second still plays at its true pace; a tab that slept resumes where it was.
+ */
+const MAX_FRAME_MS = 1000
+
+/** Least time between two values the player hands the card, about 30 per second. */
+const MIN_EMIT_MS = 32
+
+/**
+ * A run's length when the program gave none: one second per step, from two to ten seconds.
+ * @returns seconds for one run from min to max.
+ */
+function defaultDuration(min: number, max: number, step: number): number {
+  const steps = step > 0 ? (max - min) / step : 0
+  return Math.max(2, Math.min(10, Number.isFinite(steps) ? steps : 0))
+}
+
+/**
+ * An animation control: play and pause, one step back or forward, scrubbing, and speed.
+ *
+ * Playback only moves the bound value; every figure that reads it recomputes
+ * locally, as it does when the reader drags a slider, and nothing reaches the
+ * model. Whether it is playing and how fast belong to this copy of the card; the
+ * value goes through the shared store, so both copies show the same frame.
+ */
+function Player(props: {
+  label: string
+  value: number
+  min: number
+  max: number
+  step: number
+  duration: number
+  unit: string | undefined
+  tr: RenderScope['tr']
+  onChange(value: number): void
+}): ReactNode {
+  const [playing, setPlaying] = useState(false)
+  const [speed, setSpeed] = useState(1)
+  const latest = useRef(props)
+  latest.current = props
+  useEffect(() => {
+    if (!playing) return undefined
+    const frames = globalThis as { requestAnimationFrame?: (callback: (now: number) => void) => number; cancelAnimationFrame?: (handle: number) => void }
+    const { min, max, value } = latest.current
+    if (typeof frames.requestAnimationFrame !== 'function' || !(max > min)) {
+      setPlaying(false)
+      return undefined
+    }
+    const request = frames.requestAnimationFrame.bind(globalThis)
+    // Play from where the reader left it, or from the start once a run has ended.
+    let position = value >= max ? min : Math.max(min, value)
+    if (position !== value) latest.current.onChange(position)
+    let shown = position
+    let previous: number | undefined
+    let emitted = -Infinity
+    let handle = 0
+    // The clock, not the frame count, sets the pace; a page that paints no frames, such as a hidden tab, pauses.
+    const tick = (now: number): void => {
+      const { step, duration } = latest.current
+      const elapsed = previous === undefined ? 0 : Math.min(MAX_FRAME_MS, Math.max(0, now - previous))
+      previous = now
+      position = Math.min(max, position + (elapsed / 1000) * speed * (max - min) / Math.max(0.1, duration))
+      const snapped = position >= max ? max : Math.min(max, tidy(min + Math.floor((position - min) / step + 1e-9) * step))
+      if (snapped !== shown && (now - emitted >= MIN_EMIT_MS || snapped === max)) {
+        shown = snapped
+        emitted = now
+        latest.current.onChange(snapped)
+      }
+      if (position >= max) {
+        setPlaying(false)
+        return
+      }
+      handle = request(tick)
+    }
+    handle = request(tick)
+    return () => { frames.cancelAnimationFrame?.(handle) }
+  }, [playing, speed])
+  const { label, value, min, max, step, unit, tr } = props
+  const move = (delta: number): void => {
+    setPlaying(false)
+    props.onChange(Math.max(min, Math.min(max, tidy(value + delta))))
+  }
+  return (
+    <div className="dsh-iui-field dsh-iui-player">
+      <span className="dsh-iui-field-head">
+        <span>{label}</span>
+        <span className="dsh-iui-field-value">{`${formatNumber(value)}${unit === undefined ? '' : ` ${unit}`}`}</span>
+      </span>
+      <span className="dsh-iui-player-bar">
+        <button type="button" className="dsh-iui-player-button" aria-label={tr('player.prev')} title={tr('player.prev')} disabled={value <= min} onClick={() => { move(-step) }}>
+          <PlayerIcon path="M7.5 3.5v5L4 6z" />
+        </button>
+        <button
+          type="button"
+          className="dsh-iui-player-button"
+          data-primary=""
+          aria-label={tr(playing ? 'player.pause' : 'player.play')}
+          title={tr(playing ? 'player.pause' : 'player.play')}
+          aria-pressed={playing}
+          disabled={!(max > min)}
+          onClick={() => { setPlaying(!playing) }}
+        >
+          <PlayerIcon path={playing ? 'M3 2h2.2v8H3zM6.8 2H9v8H6.8z' : 'M3.5 1.8l6.5 4.2-6.5 4.2z'} />
+        </button>
+        <button type="button" className="dsh-iui-player-button" aria-label={tr('player.next')} title={tr('player.next')} disabled={value >= max} onClick={() => { move(step) }}>
+          <PlayerIcon path="M4.5 3.5v5L8 6z" />
+        </button>
+        <input
+          className="dsh-iui-range"
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          aria-label={label}
+          onChange={(event) => {
+            setPlaying(false)
+            props.onChange(Number(event.currentTarget.value))
+          }}
+        />
+        <button
+          type="button"
+          className="dsh-iui-player-speed"
+          aria-label={tr('player.speed', { speed })}
+          title={tr('player.speed', { speed })}
+          onClick={() => { setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length] as number) }}
+        >
+          {`${speed}×`}
+        </button>
+      </span>
+    </div>
+  )
+}
+
+/** One 12px glyph of the player, drawn in the text colour. */
+function PlayerIcon(props: { path: string }): ReactNode {
+  return (
+    <svg className="dsh-iui-player-icon" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false">
+      <path d={props.path} fill="currentColor" />
+    </svg>
+  )
+}
+
+/** Remove binary noise from a stepped value, so 0.1 + 0.2 shows as 0.3. */
+function tidy(value: number): number {
+  return Math.round(value * 1e9) / 1e9
+}
+
+/** The 0-based item a `current=` prop highlights, or -1 when it names none. */
+function currentIndex(node: NodeRow, scope: RenderScope): number {
+  if (node.props.current === undefined) return -1
+  const value = scope.number(node.props.current)
+  return value === undefined ? -1 : Math.floor(value) - 1
+}
+
+/** The marks of the highlighted item: a class for the look and `aria-current` for assistive tech. */
+function currentMark(current: boolean): { className?: string; 'aria-current'?: 'step' } {
+  return current ? { className: 'dsh-iui-current', 'aria-current': 'step' } : {}
+}
+
+/** `data-mono` when the `mono=` prop is true. */
+function mono(node: NodeRow, scope: RenderScope): '' | undefined {
+  if (node.props.mono === undefined) return undefined
+  return evalExpr(node.props.mono, key => scope.values.get(key)) === true ? '' : undefined
 }
 
 /**

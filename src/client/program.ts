@@ -3,14 +3,15 @@
  *
  * The program in `tool/result.meta` was persisted by a possibly different build,
  * so nothing here trusts the compiler's types. Every field is guarded, every
- * guard has a fallback, and nothing throws. Programs of every format version up
- * to {@link PROGRAM_VERSION} render; a newer one is shown as its text stand-in.
+ * guard has a fallback, and nothing throws. A program whose `version` is 1 to
+ * {@link PROGRAM_VERSION} renders; any other one, newer or from before version
+ * fields existed, is shown as its text stand-in.
  * @module dsh-intelligent-ui/client/program
  */
 
-import { compileSource } from '../lang/compile.ts'
+import { compileSource, dockPlayers } from '../lang/compile.ts'
 import { evalExpr } from '../lang/expr.ts'
-import { PROGRAM_VERSION } from '../lang/identity.ts'
+import { PROGRAM_VERSION, UI_META_VERSION } from '../lang/identity.ts'
 import type { JsonValue } from '../lang/types.ts'
 
 /** One declared state value, as read. */
@@ -61,6 +62,13 @@ export type CardMeta =
 export function readMeta(meta: unknown): CardMeta | undefined {
   const record = asRecord(meta)
   const title = typeof record.title === 'string' && record.title.trim() !== '' ? { title: record.title.trim() } : {}
+  if (!knownVersion(record.version, UI_META_VERSION)) {
+    // An envelope this build cannot read still shows the text its program carries.
+    const fallback = asRecord(record.program).fallback
+    return record.ok === true && typeof fallback === 'string' && fallback !== ''
+      ? { ok: true, program: textOnly(fallback), ...title }
+      : undefined
+  }
   if (record.ok === true) {
     const program = readProgram(record.program)
     return program === undefined ? undefined : { ok: true, program, ...title }
@@ -85,12 +93,11 @@ export function readMeta(meta: unknown): CardMeta | undefined {
  */
 export function readProgram(value: unknown): Program | undefined {
   const record = asRecord(value)
-  const version = typeof record.v === 'number' ? record.v : 1
   const nodes: NodeRow[] = []
   const byId = new Map<string, NodeRow>()
   for (const raw of asArray(record.nodes).map(asRecord)) {
     if (typeof raw.id !== 'string' || raw.id === '' || typeof raw.type !== 'string' || byId.has(raw.id)) continue
-    const bind = typeof raw.bind === 'string' ? raw.bind : typeof asRecord(raw.bind).key === 'string' ? asRecord(raw.bind).key as string : undefined
+    const bind = typeof asRecord(raw.bind).key === 'string' ? asRecord(raw.bind).key as string : undefined
     const node: NodeRow = {
       id: raw.id,
       type: raw.type,
@@ -102,6 +109,7 @@ export function readProgram(value: unknown): Program | undefined {
     byId.set(node.id, node)
   }
   if (nodes.length === 0) return undefined
+  dockPlayers(nodes)
   const children = new Map<string | null, string[]>()
   for (const node of nodes) {
     // A parent the program never declared is unreachable, so the node is dropped
@@ -129,7 +137,7 @@ export function readProgram(value: unknown): Program | undefined {
     .filter(raw => typeof raw.key === 'string')
     .map(raw => ({ key: raw.key as string, expr: raw.expr }))
   return {
-    supported: version <= PROGRAM_VERSION,
+    supported: knownVersion(record.version, PROGRAM_VERSION),
     state,
     calc,
     nodes,
@@ -195,6 +203,16 @@ export function acceptEdit(row: StateRow, value: unknown): JsonValue | undefined
     case 'string':
       return typeof value === 'string' ? value.slice(0, 2000) : undefined
   }
+}
+
+/** Whether a version field names a version this build reads: a whole number from 1 to `newest`. */
+function knownVersion(value: unknown, newest: number): boolean {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= newest
+}
+
+/** A program that only shows its text stand-in. */
+function textOnly(fallback: string): Program {
+  return { supported: false, state: [], calc: [], nodes: [], byId: new Map(), children: new Map(), constants: {}, fallback }
 }
 
 /** Whether a value is a JSON scalar. */

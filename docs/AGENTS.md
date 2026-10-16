@@ -43,9 +43,10 @@ proven.
   layers this plugin reproduces on DeepSeek Harness mechanisms; the deliberate
   differences; and what was given up.
 - `VERIFY.md` — the checklist in three parts: the web UI (activation, persisted
-  cards, math cards, the skill, buttons, a bad program, reload, themes, and the
-  uninstall regression), the macOS and Windows desktop apps, and what only
-  Windows shows; plus the recorded runs.
+  cards, math cards, the skill, buttons, a bad program, reload, themes, the
+  uninstall regression, and an animated card), the macOS and Windows desktop apps, and what only
+  Windows shows; plus the recorded runs. The desktop parts are suspended while
+  desktop support is paused.
 - `SAMPLES.md` — the catalog tour: one drawn card per component, with the exact
   source and result of each, and the defects the tour found.
 - `market/` — the awesome-dsh-plugin entry and how to submit it. See
@@ -58,21 +59,25 @@ proven.
 - `PRINCIPLE.md` describes the two drawing surfaces, the turn data Definition,
   button sends, and the streaming preview as they are implemented.
 - `VERIFY.md` covers every acceptance criterion with a runnable step, including a
-  check that costs no model call: cards persisted by an earlier build. The web
-  part was run on 2026-10-16 and is recorded there.
-- `SAMPLES.md` carries all twenty-six components as they were actually drawn, and
+  check that costs no model call: a persisted card, and a card from before the
+  version fields showing its text. The web part was run on 2026-10-16 and is
+  recorded there.
+- `SAMPLES.md` carries all twenty-seven components as they were actually drawn, and
   doubles as a compile corpus: `tests/compile.test.ts` compiles the two math
   samples a live model wrote.
 - Screenshots of rendered cards live in the repository's `assets/`.
 
 **Not done.**
 
-- **The desktop parts of `VERIFY.md` have no recorded run.**
+- **The desktop parts of `VERIFY.md` are suspended.** One macOS run and the
+  maintainer's verdict are recorded: no card was drawn and past conversations
+  would not open, so desktop support is paused until the desktop app ships
+  0.2.1-alpha.1 or later. W4 failed on Windows without recorded output.
 
 **Known defects.**
 
 - `VERIFY.md` names one specific historical session for the zero-cost check; on
   another machine, any session with a settled `ui_render` call serves instead.
 
-**Next goal.** Record the first desktop run of `VERIFY.md`, on macOS and on
-Windows.
+**Next goal.** Rerun Parts 2 and 3 of `VERIFY.md` once the desktop app reaches
+0.2.1-alpha.1, in a throwaway session first, and record the output of W4.

@@ -83,7 +83,7 @@ function print(node: unknown, depth: number): Printed {
       return atom(`fmt(${list(args)})`)
     case 'integral': case 'deriv': case 'limit': case 'sum': case 'prod': case 'solve': case 'taylor':
       return atom(`${operator}(${child(args[1]).text}, ${String(args[0])}${args.length > 2 ? `, ${list(args.slice(2))}` : ''})`)
-    case 'min': case 'max': case 'abs': case 'floor': case 'ceil': case 'concat':
+    case 'min': case 'max': case 'abs': case 'floor': case 'ceil': case 'concat': case 'pick':
       return atom(`${operator}(${list(args)})`)
     default: {
       const binary = Object.hasOwn(BINARY, operator) ? BINARY[operator] : undefined

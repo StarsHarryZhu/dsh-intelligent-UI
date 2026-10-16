@@ -111,3 +111,33 @@ card "Question 3 of 5"
 When the answer arrives, reply in prose: right or wrong, a two-line explanation,
 then the next card. After the last question, summarise the score in prose; a
 `table` of question, answer, and result works well for a review.
+
+## Code traced line by line
+
+Trace the program by hand first, one frame per executed line, then write each
+column of the trace as one `pick`. Frame 11 highlights no line, because the run
+has ended.
+
+```dil
+@state frame = 1 min=1 max=11 step=1
+@calc line = pick(frame, 1, 2, 3, 4, 2, 3, 4, 1, 2, 3, 0)
+@calc i = pick(frame, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1)
+@calc j = pick(frame, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0)
+@calc items = pick(frame, "3 1 2", "3 1 2", "3 1 2", "1 3 2", "1 3 2", "1 3 2", "1 2 3", "1 2 3", "1 2 3", "1 2 3", "1 2 3")
+@calc note = pick(frame, "First pass", "Compare positions 0 and 1", "3 > 1, so swap", "Swapped", "Compare positions 1 and 2", "3 > 2, so swap", "Swapped", "Second pass", "Compare positions 0 and 1", "1 > 2 is false", "Sorted")
+card "Bubble sort on 3 1 2"
+  steps items=["for i in range(n - 1):", "  for j in range(n - 1 - i):", "    if a[j] > a[j + 1]:", "      a[j], a[j + 1] = a[j + 1], a[j]"] current=line mono=true
+  keys items=["i: {i}", "j: {j}", "a: {items}"]
+  callout "{note}"
+  player "Step" bind=frame unit="/ 11"
+```
+
+## A tangent sweeping a curve
+
+```dil
+@state x0 = -2 min=-2 max=2 step=0.01
+card "The tangent along y = x³ − 3x"
+  plot fn="x^3 - 3x" from=-2.5 to=2.5 ymin=-4 ymax=4 mark=x0 tangent=true
+  metric "Slope f′(x)" value="deriv(x^3 - 3x, x, x0)" digits=3
+  player "x" bind=x0 duration=6
+```

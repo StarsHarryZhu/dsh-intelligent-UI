@@ -11,9 +11,9 @@
  * ```
  *
  * One statement per line, so a streamed program can be compiled from the lines
- * that have arrived. Indentation nests a component inside the container above it;
- * the older explicit form, `#id type … in=#parent`, is still read. The parser only
- * produces the JSON envelope; the compiler validates it against the catalog.
+ * that have arrived. Indentation nests a component inside the container above it,
+ * and is the only way to nest one. The parser only produces the JSON envelope;
+ * the compiler validates it against the catalog.
  * @module dsh-intelligent-ui/lang/dil
  */
 
@@ -24,7 +24,6 @@ import type { Diagnostic } from './types.ts'
 /** One `@state` row of the envelope, before validation. */
 export interface RawState {
   key?: unknown
-  kind?: unknown
   init?: unknown
   min?: unknown
   max?: unknown
@@ -108,20 +107,19 @@ export function parseDil(source: string, diagnostics: Diagnostic[], partial = fa
       unread += 1
       continue
     }
-    if (typeof node.id !== 'string' || node.id === '') node.id = freshId(ids, node.type as string)
-    ids.add(node.id as string)
+    const id = freshId(ids, node.type as string)
+    node.id = id
+    ids.add(id)
     while (stack.length > 0 && (stack.at(-1) as { indent: number }).indent >= indent) stack.pop()
     const container = CATALOG_BY_TYPE.get(node.type as string)?.container === true
-    if (node.parent === undefined) {
-      const enclosing = [...stack].reverse().find(entry => entry.container)
-      // Without indentation the reading order still decides: an unindented line
-      // after a card belongs to that card. Only another card starts a new root.
-      if (enclosing !== undefined) node.parent = enclosing.id
-      else if (lastRoot !== undefined && node.type !== 'card') node.parent = lastRoot
-      else node.parent = null
-    }
-    if (container && node.parent === null) lastRoot = node.id as string
-    stack.push({ indent, id: node.id as string, container })
+    const enclosing = [...stack].reverse().find(entry => entry.container)
+    // Without indentation the reading order still decides: an unindented line
+    // after a card belongs to that card. Only another card starts a new root.
+    if (enclosing !== undefined) node.parent = enclosing.id
+    else if (lastRoot !== undefined && node.type !== 'card') node.parent = lastRoot
+    else node.parent = null
+    if (container && node.parent === null) lastRoot = id
+    stack.push({ indent, id, container })
     nodes.push(node)
   }
   if (unread > 0 && !partial) {
@@ -157,8 +155,8 @@ function freshId(ids: ReadonlySet<string>, type: string): string {
  * `@state seats = 8 min=1 max=50 step=1`, `@state plan = "Pro" options=Basic|Pro|Team`.
  *
  * The kind follows from the initial value: a number, quoted text, true/false, or
- * an `options=` list. The older explicit kind word is still accepted anywhere on
- * the line.
+ * an `options=` list. Nothing else may follow the value but `min=`, `max=`,
+ * `step=`, and `options=`.
  */
 function parseState(line: string, number: number, diagnostics: Diagnostic[]): RawState | undefined {
   const body = line.slice('@state'.length).trim()
@@ -174,12 +172,16 @@ function parseState(line: string, number: number, diagnostics: Diagnostic[]): Ra
   }
   const raw: RawState = { key, init: scalar(first) }
   for (const token of tokens) {
-    if (token.name === undefined) {
-      if (!token.quoted && ['number', 'string', 'text', 'boolean', 'select'].includes(token.value)) raw.kind = token.value
-      continue
-    }
     if (token.name === 'min' || token.name === 'max' || token.name === 'step') raw[token.name] = scalar(token)
     else if (token.name === 'options') raw.options = optionList(token)
+    else {
+      diagnostics.push({
+        code: 'unknown_prop',
+        line: number,
+        message: `line ${number}: "${token.name === undefined ? token.value : `${token.name}=`}" is not part of a state declaration; it was ignored`,
+        repair: 'The kind follows from the value; a state line takes only min=, max=, step=, and options=, as in "@state seats = 8 min=1 max=50".',
+      })
+    }
   }
   return raw
 }
@@ -197,7 +199,7 @@ function parseCalc(line: string, number: number, diagnostics: Diagnostic[]): Raw
 }
 
 /**
- * `card "Team plan" padding=3`, `#m metric "Monthly" value=price in=#root`.
+ * `card "Team plan" padding=3`, `metric "Monthly" value=price unit=USD`.
  *
  * A bare quoted string fills the component's primary text prop. Values keep the
  * shape the JSON envelope uses: quoted text stays text (the compiler reads its
@@ -206,28 +208,18 @@ function parseCalc(line: string, number: number, diagnostics: Diagnostic[]): Raw
  * read by the prop's kind.
  */
 function parseNode(line: string, number: number, keys: ReadonlySet<string>, diagnostics: Diagnostic[]): RawNode | undefined {
-  const text = line.startsWith('<') ? line.slice(1).replace(/\/?>$/u, '') : line
-  const tokens = tokenizeLine(text)
-  let id: string | undefined
-  if (tokens[0]?.name === undefined && tokens[0]?.quoted === false && tokens[0].value.startsWith('#')) {
-    id = (tokens.shift() as Token).value.slice(1)
-  }
+  const tokens = tokenizeLine(line)
   const head = tokens.shift()
   if (head === undefined || head.name !== undefined || head.quoted || !/^[A-Za-z][\w-]*$/u.test(head.value)) {
-    return reject(number, 'Start a component line with its name: card "Title", slider "Seats" bind=seats.', diagnostics)
+    return reject(number, 'Start a component line with its name, without an id or angle brackets: card "Title", slider "Seats" bind=seats.', diagnostics)
   }
   const type = head.value
   const descriptor = CATALOG_BY_TYPE.get(type)
   // No prototype: a model-written prop named `__proto__` is just an unknown prop.
   const props = Object.create(null) as Record<string, unknown>
   const node: RawNode = { type, props, line: number }
-  if (id !== undefined && id !== '') node.id = id
   for (const token of tokens) {
     if (token.name === undefined) {
-      if (!token.quoted && token.value.startsWith('#') && node.id === undefined) {
-        node.id = token.value.slice(1)
-        continue
-      }
       const primary = descriptor?.primary
       // An unknown component is reported once, by the compiler; its text needs no second report.
       if (descriptor === undefined) continue
@@ -245,7 +237,12 @@ function parseNode(line: string, number: number, keys: ReadonlySet<string>, diag
       continue
     }
     if (token.name === 'in') {
-      node.parent = token.value.startsWith('#') ? token.value.slice(1) : token.value
+      diagnostics.push({
+        code: 'unknown_prop',
+        line: number,
+        message: `line ${number}: in= is not part of DIL; the line was placed by its indentation`,
+        repair: 'Nest a component by indenting it under its container, and leave out in=.',
+      })
       continue
     }
     props[token.name] = propValue(token, descriptor?.props[token.name]?.kind, keys)
@@ -357,7 +354,7 @@ function glueExpressions(tokens: Token[]): Token[] {
   let open: Token | undefined
   for (const token of tokens) {
     const continues = open !== undefined && token.name === undefined && !token.quoted && token.json === undefined
-      && !token.value.startsWith('#') && (OPERATOR_EDGE.test(token.value[0] ?? '') || OPERATOR_EDGE.test(open.value.at(-1) ?? ''))
+      && (OPERATOR_EDGE.test(token.value[0] ?? '') || OPERATOR_EDGE.test(open.value.at(-1) ?? ''))
     if (continues && open !== undefined) {
       open.value = `${open.value} ${token.value}`
       continue

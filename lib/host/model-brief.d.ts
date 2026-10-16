@@ -15,6 +15,8 @@ export declare const COMPARISON_EXAMPLE: string;
 export declare const QUIZ_EXAMPLE: string;
 /** Worked example: a calculus card the reader explores. */
 export declare const CALCULUS_EXAMPLE: string;
+/** Worked example: a process the reader plays, steps through, or scrubs. */
+export declare const ANIMATION_EXAMPLE: string;
 /** What the model must know before writing a program. */
 export declare const UI_TOOL_DESCRIPTION: string;
 /** Short reminder appended to a failed result so a repaired call keeps the contract in view. */

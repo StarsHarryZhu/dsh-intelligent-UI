@@ -26,8 +26,12 @@ export const TURN_DATA_KEY = PLUGIN_ID
 /** Locale namespace of the card chrome. */
 export const LOCALE_NS = PLUGIN_ID
 
-/** Version of the compiled program format. A client renders every version up to its own. */
-export const PROGRAM_VERSION = 3
+/**
+ * Version of the compiled program format, carried in the program's `version`
+ * field. A client renders every version up to its own; a program records the
+ * lowest version that can draw it.
+ */
+export const PROGRAM_VERSION = 1
 
-/** Version of the persisted `tool/result.meta` envelope. */
-export const UI_META_VERSION = 2
+/** Version of the persisted `tool/result.meta` envelope, carried in its `version` field. */
+export const UI_META_VERSION = 1

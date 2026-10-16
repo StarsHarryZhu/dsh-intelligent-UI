@@ -28,6 +28,9 @@ export const EXPR_FAILURE = Symbol('dsh-intelligent-ui.expr-failure')
 /** Maximum expression nesting accepted by validation and evaluation. */
 export const MAX_EXPR_DEPTH = 32
 
+/** Most options one `pick` chooses among. */
+export const MAX_PICK_OPTIONS = 32
+
 /** Most parts one `concat` accepts. */
 export const MAX_CONCAT_PARTS = 8
 
@@ -80,7 +83,7 @@ const ARITIES: Readonly<Record<string, readonly [number, number] | undefined>> =
   abs: [1, 1], floor: [1, 1], ceil: [1, 1],
   add: [2, 2], sub: [2, 2], mul: [2, 2], div: [2, 2], mod: [2, 2], pow: [2, 2], min: [2, 8], max: [2, 8],
   lt: [2, 2], gt: [2, 2], le: [2, 2], ge: [2, 2], eq: [2, 2], ne: [2, 2],
-  and: [2, 4], or: [2, 4], if: [3, 3], round: [2, 2], fmtNum: [1, 2], concat: undefined, fn: undefined,
+  and: [2, 4], or: [2, 4], if: [3, 3], pick: [3, MAX_PICK_OPTIONS + 1], round: [2, 2], fmtNum: [1, 2], concat: undefined, fn: undefined,
   integral: [4, 4], deriv: [3, 4], limit: [3, 4], sum: [4, 4], prod: [4, 4], solve: [4, 4], taylor: [5, 5],
 }
 
@@ -198,6 +201,18 @@ export function checkExpr(
         if (whenTrue === undefined || whenFalse === undefined) return undefined
         if (whenTrue !== whenFalse) return reject(here, 'if branches must produce the same type')
         return whenTrue
+      }
+      case 'pick': {
+        // The index is 1-based; every option must produce one type, as both branches of `if` do.
+        if (!numeric(args[0], `${here}[1]`, level, bound)) return undefined
+        let type: ExprType | undefined
+        for (const [index, option] of args.slice(1).entries()) {
+          const produced = check(option, `${here}[${index + 2}]`, level + 1, bound)
+          if (produced === undefined) return undefined
+          if (type !== undefined && produced !== type) return reject(here, `pick options must produce the same type, got ${type} and ${produced}`)
+          type = produced
+        }
+        return type
       }
       case 'fmtNum':
         if (!numeric(args[0], `${here}[1]`, level, bound)) return undefined
@@ -393,6 +408,14 @@ export function evalExpr(
         const test = evaluate(args[0], env, depth + 1)
         if (test === EXPR_FAILURE) return EXPR_FAILURE
         return evaluate(truthy(test) ? args[1] : args[2], env, depth + 1)
+      }
+      case 'pick': {
+        // Only the chosen option is evaluated; the index is floored and held inside the options.
+        const options = args.slice(1)
+        const at = evaluate(args[0], env, depth + 1)
+        if (typeof at !== 'number' || Number.isNaN(at) || options.length === 0) return EXPR_FAILURE
+        const index = Math.min(options.length, Math.max(1, Math.floor(at)))
+        return evaluate(options[index - 1], env, depth + 1)
       }
       case 'fmtNum': {
         const inner = evaluate(args[0], env, depth + 1)
@@ -603,23 +626,6 @@ export function evalExpr(
 /** Whether an expression is the `inf` constant. */
 function isInfinity(value: unknown): boolean {
   return Array.isArray(value) && value[0] === 'const' && value[1] === 'inf'
-}
-
-/**
- * Whether an expression tree uses the math vocabulary, which a format-2 client
- * would not evaluate correctly.
- * @param node - any JSON value; arrays are searched recursively.
- * @param operators - the operators that mark the newer format.
- * @returns true when an operator from the set appears, or min/max takes more than two arguments.
- */
-export function usesOperators(node: unknown, operators: ReadonlySet<string>): boolean {
-  if (Array.isArray(node)) {
-    const head = node[0]
-    if (typeof head === 'string' && (operators.has(head) || ((head === 'min' || head === 'max') && node.length > 3))) return true
-    return node.some(part => usesOperators(part, operators))
-  }
-  if (typeof node === 'object' && node !== null) return Object.values(node).some(part => usesOperators(part, operators))
-  return false
 }
 
 /** Truthiness for `and` / `or` / `if`: numbers count when non-zero, strings when non-empty. */
