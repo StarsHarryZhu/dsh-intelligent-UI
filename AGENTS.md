@@ -195,12 +195,41 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
   - disabling the plugin in Settings → Plugins and restarting left every session
     opening with no cards and no plugin event type in the logs; re-enabling
     restored the cards.
+- **Live verification on the macOS desktop app, 2026-10-16**, DeepSeek Harness
+  0.2.0-rc.2 (the app bundle) with DeepSeek-Flash, against Part 2 of
+  `docs/VERIFY.md`, run by the app's own agent:
+  - installed from the working checkout as a `link:` dependency, the way the
+    Plugin Manager's switch writes it, and accepted by the engine range;
+  - it activated without an app restart: `ui_render` joined the agent's tools,
+    the live `tool.call.toolview` slot took one occupant keyed `ui_render` and
+    `conversation.chat.turnTail` one entry `dsh-intelligent-ui`, and the skill
+    loaded;
+  - every card program compiled and its result carried the figures the web run
+    recorded (-0.242631 at degree 3, -3.64234e-10 at degree 15), a deliberately
+    malformed program reported its diagnostic instead of drawing, and a disable
+    and re-enable cycle removed and restored every registration while the page
+    stayed up;
+  - a settled card's compiled program was in the host's own `meta` field on its
+    ordinary `tool/result` event, and no session line held a plugin-owned event
+    type, so a reload loses nothing and an uninstall cannot strand a session.
+  - **the drawing failed.** Eight cards were written and none appeared in the
+    app's page, checked twice, although every registration was live. The app
+    bundle ships DeepSeek Harness 0.2.0-rc.2 while the browser half is built and
+    verified against 0.2.1-alpha.4, and the declared engine range admits both, so
+    that skew is the first thing to rule out; the cause was not established.
 
 **Not done.**
 
-- **Desktop verification.** The macOS and Windows desktop apps load the same
-  bundle through the same declaration, but neither has been run with this
-  build; `docs/VERIFY.md` carries their checklist.
+- **Desktop card display.** The macOS run recorded above proved installation,
+  activation, compilation, persistence, and the log invariants, and failed the
+  one thing the plugin exists for: no card was drawn in the app's page. Until
+  that is fixed, the drawing half of D3 and of steps 4, 5, 6, and 8 fails, and
+  the desktop apps cannot be called verified.
+- **Desktop verification, the interactive half.** The run above also leaves the
+  steps that need a person at the page (the console expressions of step 2, the
+  streaming preview and folded row of D3, the drag and network panel of step 5,
+  the clipboard and click of step 8, all of step 10, and the disable-and-restart
+  half of step 12) and the whole of Part 3 unrun.
 - **Infinite series.** `sum` and `prod` take finite bounds only.
 - **Image attachments.** `image` accepts only inline `data:image/…` sources; the
   conversation's attachment loader is not wired.
@@ -227,6 +256,13 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
 
 **Known defects.**
 
+- The macOS desktop app (0.2.0-rc.2) drew none of the eight cards a 2026-10-16
+  run wrote, although `ui_render`, the `tool.call.toolview` cell, the
+  `conversation.chat.turnTail` entry, and the skill were all live and the
+  programs were persisted. The registration failure the symptom fits — the
+  turn-data Definition — is swallowed into the console by design, so the page's
+  console is where to look next. Cause not established.
+
 - In the `verbose` transcript mode, and when a reader expands a folded turn, a
   card can appear both in its tool row and under the reply. Both copies share one
   state, so they never disagree.
@@ -240,5 +276,6 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
 - `{fmt(x, 4)}` rounds a tiny value to `0.0000`; `{x}` shows it in exponent form.
   The skill says so, but a model may still choose `fmt`.
 
-**Next goal.** Run the desktop section of `docs/VERIFY.md` on macOS and Windows
-and record the result here.
+**Next goal.** Finish the desktop section of `docs/VERIFY.md`: the interactive
+steps on macOS, then the whole of Part 3 on Windows, each appended to the recorded
+runs.
