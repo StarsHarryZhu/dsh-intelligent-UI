@@ -29,9 +29,10 @@ result's presentation metadata, and one skill, `dsh-intelligent-ui`, which
 teaches the model when and how to use the tool. The browser half draws the
 program in two places — in the tool row while the turn runs (with a live preview
 while the arguments stream), and under the reply once the turn has finished,
-because a finished turn folds its tool rows away. It supports the web UI of
-DeepSeek Harness 0.2.1-alpha.1 and later within 0.2.x; the desktop apps are not
-supported for now (see "Desktop apps: paused" below).
+because a finished turn folds its tool rows away. It supports DeepSeek Harness
+0.2.1-alpha.1 and later within 0.2.x on all three hosts it serves — the web UI,
+the macOS desktop app, and the Windows desktop app — through one `dsh.client`
+declaration, because the desktop apps wrap the same web client.
 
 ## 2. Constraints
 
@@ -82,16 +83,17 @@ browser storage in the browser half.
 three deep, and a value that cannot be computed reliably is shown as "—", never
 as a guess. A program can make a card show nothing; it cannot make the page stall.
 
-**Web UI only, for now.** `dsh.client.platform` is `"web"`, the only value the
-module registry serves, and `engines.dsh` is `>=0.2.1-alpha.1 <0.3.0-0`. The host
-blocks installation and activation outside that range, which today keeps out the
-desktop apps (the macOS app ships 0.2.0-rc.2). Desktop adaptation is paused: add no
-desktop-specific code and claim no desktop support until the desktop app ships
-0.2.1-alpha.1 or later and Part 2 of `docs/VERIFY.md` passes on it. Nothing in
-either half branches on the operating system. The package installs from a git
-checkout without a build step, so `lib/` is committed, no install-time script
-exists, line endings are pinned by `.gitattributes`, and the repository holds no
-symbolic link.
+**Three platforms, one registration.** The plugin must work on the web UI, the
+macOS desktop app, and the Windows desktop app. `dsh.client.platform` is `"web"`
+— the only value the module registry serves — and that one declaration is also
+what both desktop apps load, because they wrap the same web client; support is
+therefore a fact about this bundle, not a second build. `engines.dsh` is
+`>=0.2.1-alpha.1 <0.3.0-0`, the range the host enforces, so a desktop app below
+it refuses the plugin rather than running it unverified. Nothing in either half
+branches on the operating system, and a defect seen on one platform blocks a
+release the same way a web one does. The package installs from a git checkout
+without a build step, so `lib/` is committed, no install-time script exists, line
+endings are pinned by `.gitattributes`, and the repository holds no symbolic link.
 
 **No literal styling.** Every colour, radius, and font in `src/client/styles.css`
 comes from a host theme token, every selector is scoped under a `.dsh-iui-` class,
@@ -139,9 +141,9 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
 
 - `AGENTS.md` — this file: the project introduction and the rules for the tree.
 - `.gitignore` — what git must not carry: the client transpile scratch directory,
-  dependencies, test output, logs, local assistant memory, and editor and OS
-  noise. `lib/` is deliberately kept, because it is the published artifact and no
-  install step regenerates it.
+  dependencies, test output, logs, local assistant memory, the unpublished market
+  submission in `docs/market/`, and editor and OS noise. `lib/` is deliberately
+  kept, because it is the published artifact and no install step regenerates it.
 - `.gitattributes` — LF line endings in every checkout, Windows included.
 - `package.json` — the bundle manifest: entry points, the `dsh.bundle.patch` row,
   the `dsh.client` browser declaration, the supported harness range in
@@ -264,37 +266,25 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
   The skill says so, but a model may still choose `fmt`.
 - Developing on Windows (Part 3, W4 of `docs/VERIFY.md`: link the toolchain,
   build, run the suite) failed in the maintainer's 2026-10-16 run. The output was
-  not recorded, so the failing step is unknown. Using the plugin from the web UI
-  does not depend on it.
+  not recorded, so the failing step is unknown, and no later attempt has been
+  made. Using the plugin on any of the three hosts does not depend on it.
 
-**Desktop apps: paused.** Desktop adaptation is abandoned for now and resumes
-once the desktop app ships DeepSeek Harness 0.2.1-alpha.1 or later. Until then the
-engine range refuses the desktop app, and README, market entry, and this file say
-the desktop apps are not supported. What the 2026-10-16 runs found on 0.2.0-rc.2,
-the macOS app, installed from the working checkout as a `link:` dependency:
+**Desktop apps: verified on 0.2.1-rc.2.** The web UI, the macOS app, and the
+Windows app draw the same cards from one bundle. On 0.2.1-rc.2, Part 2 of
+`docs/VERIFY.md` passed on both apps — the card drew in the row while the turn ran
+and under the reply when it finished, controls recomputed with no request, and
+past conversations opened with the plugin loaded — and W1, W2, and W3 passed, W3
+at 100% and 150% display scaling, the macOS app loading the plugin from the
+working checkout as a `link:` and the Windows app installing it from the GitHub
+URL.
 
-- D1 passed: installed into the desktop profile, accepted by the engine range of
-  the time (`>=0.2.0-0 <0.3.0-0`), and active without an app restart.
-- D2 partly: `ui_render`, the `tool.call.toolview` cell keyed `ui_render`, the
-  `conversation.chat.turnTail` entry, and the skill were all live; the step-2
-  console expressions and the stylesheet count were not taken.
-- D3 and D4 failed: every program compiled and was persisted with its figures in
-  the host's own `meta` field, but no card was ever drawn in the page, under the
-  reply or in the row, so every visual and interactive check failed.
-- **With the plugin loaded, every past conversation in the desktop app failed to
-  open.** This is the reason for the pause: a plugin must never cost a reader
-  their history.
-- W2 passed on macOS (`git ls-files --eol` shows `w/lf`); W1 and W3 are
-  Windows-only and were not run; W4 failed on Windows (above).
+The earlier desktop run, on 0.2.0-rc.2, drew no card and, with the plugin loaded,
+**every past conversation failed to open**. That build is below the engine range
+and the plugin now refuses it, so the failure was never shipped; the version skew
+is the explanation that fits it, and the 0.2.1-rc.2 pass is what supersedes the
+record rather than a fix with a named cause. W4, developing on Windows, has still
+not passed.
 
-Cause not established. The first suspect is the version skew: the browser half is
-built and verified against 0.2.1-alpha.4, and on 0.2.0-rc.2 a registration that
-participates in replaying the transcript — the data-only turn-data Definition — is
-the one whose failure would fit both symptoms (no tail cards, history that will not
-open). When resuming: install on a desktop app of 0.2.1-alpha.1 or later with a
-throwaway session first, open the page's console, and run Part 2 of
-`docs/VERIFY.md` before opening any real conversation.
-
-**Next goal.** Submit the market entry in `docs/market/`. After that, resume the
-desktop apps once one ships 0.2.1-alpha.1 or later, starting with why history
-failed to open, and collect the output of W4 on Windows.
+**Next goal.** Rerun Part 2 of `docs/VERIFY.md` on each new desktop version, and
+collect the output of W4 on Windows. Then submit the market entry in
+`docs/market/`, which is git-ignored and stays in the working tree.

@@ -6,8 +6,9 @@
 
 | | |
 |---|---|
-| 版本要求 | DeepSeek Harness **>= 0.2.1-alpha.1**（低于 0.3.0），网页版 |
-| 桌面版 | **暂不支持。** 桌面版（0.2.0-rc.2）低于要求的版本，插件不会在其中安装或启用。等桌面版升级到 0.2.1-alpha.1 及以上后再适配。 |
+| 版本要求 | DeepSeek Harness **>= 0.2.1-alpha.1**（低于 0.3.0） |
+| 平台 | 网页版、macOS 桌面版、Windows 桌面版——同一份构建，两个桌面版加载的就是同一个网页客户端 |
+| 已验证 | 网页版 0.2.1-alpha.4；macOS 和 Windows 桌面版 0.2.1-rc.2 |
 | 安装 | 设置 → 插件 → 添加插件 → `https://github.com/StarsHarryZhu/dsh-intelligent-UI`（需要 `PATH` 里有 `git`），然后重启 harness 并刷新页面 |
 
 ## 27 个组件

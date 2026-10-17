@@ -110,4 +110,4 @@ The architecture, not the training. Each layer maps onto a mechanism DeepSeek Ha
 
 ## Not verified
 
-The behaviour above is proven by the unit suite in jsdom with real React, and on the web UI by the run recorded in `VERIFY.md`. The desktop apps are not supported for now: on the 0.2.0-rc.2 desktop app no card was drawn and past conversations failed to open with the plugin loaded, so `engines.dsh` starts at 0.2.1-alpha.1 and desktop work waits for a desktop app of that version.
+The behaviour above is proven by the unit suite in jsdom with real React, on the web UI by the run of 0.2.1-alpha.4 recorded in `VERIFY.md`, and on the macOS and Windows desktop apps by the run of 0.2.1-rc.2 recorded there. The desktop apps load the same `dsh.client` declaration and the same bundle as the web UI, so what the cards do on all three hosts is the same code. Two things are not proven: a desktop release newer than 0.2.1-rc.2, and the failure seen on 0.2.0-rc.2, which drew no card and kept past conversations from opening — that build is below the engine range, the plugin refuses it, and no root cause was ever named for it.

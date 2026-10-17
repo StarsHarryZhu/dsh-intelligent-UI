@@ -52,8 +52,9 @@ high-density screens without bloating the repository.
 
 **Not done.**
 
-- **No desktop capture.** The desktop apps are not supported for now (root
-  `AGENTS.md`), so there is nothing to capture there.
+- **No desktop capture yet.** Every image comes from the web UI. The macOS and
+  Windows apps draw the same cards (root `AGENTS.md`), so a capture from either is
+  possible now; none has been taken.
 
 **Known defects.**
 

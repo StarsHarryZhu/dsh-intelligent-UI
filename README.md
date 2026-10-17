@@ -7,8 +7,9 @@ Interactive cards in DeepSeek Harness chats. The model writes a small interface 
 
 | | |
 |---|---|
-| Requires | DeepSeek Harness **>= 0.2.1-alpha.1** (below 0.3.0), web UI |
-| Desktop apps | **Not supported yet.** The desktop app (0.2.0-rc.2) is below the required version, so the plugin does not install or activate there. Support will follow once the desktop app ships 0.2.1-alpha.1 or later. |
+| Requires | DeepSeek Harness **>= 0.2.1-alpha.1** (below 0.3.0) |
+| Platforms | Web UI, macOS desktop app, and Windows desktop app — one bundle, because both desktop apps load the same web client |
+| Verified | Web UI 0.2.1-alpha.4; macOS and Windows desktop apps 0.2.1-rc.2 |
 | Install | Settings → Plugins → Add plugin → `https://github.com/StarsHarryZhu/dsh-intelligent-UI` (needs `git` on `PATH`), then restart the harness and reload the page |
 
 ## The 27 components

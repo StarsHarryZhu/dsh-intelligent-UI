@@ -33,6 +33,13 @@ pnpm-debug.log*
 # Private notes for one machine's coding assistant; never part of the package.
 .claude/
 
+# --- Unpublished working notes ----------------------------------------------
+# The market submission (the list entry, the pre-flight checks, and the pull
+# request text) is prepared beside the code but is not published with it; it is
+# submitted to the list by hand. The folder stays in the working tree, and git
+# carries none of it.
+docs/market/
+
 # --- Local environment ------------------------------------------------------
 .env
 .env.*

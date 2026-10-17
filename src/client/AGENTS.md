@@ -79,10 +79,11 @@ theme tokens for every colour, radius, and font. The only inline styles are
 spacing steps and grid tracks computed from validated whole numbers. Typeset math
 spaces itself in em; layout spacing stays on the 4px grid.
 
-**Web UI only, no platform branches.** This bundle targets the web UI of
-0.2.1-alpha.1 and later. Desktop adaptation is paused (root `AGENTS.md`), so add
-no desktop-specific code here; nothing may branch on the platform, and the
-clipboard is the one optional browser feature, degrading as described above.
+**One bundle, three platforms, no platform branches.** This bundle serves the web
+UI and both desktop apps (macOS and Windows) of 0.2.1-alpha.1 and later; the apps
+load this same bundle, so add no platform-specific code here and let nothing
+branch on the operating system. The clipboard is the one optional browser
+feature, degrading as described above.
 
 **No harness client package.** Host controls are matched by copying their look
 into `styles.css`; requiring `@deepseek-ai/dsh-client-ui-primitives` or any other
@@ -149,9 +150,10 @@ client package is forbidden.
 - The `standard` transcript view collapses a running turn's tool rows; the
   streaming preview is then out of sight until the reader expands the step group,
   and the card appears when the turn finishes.
-- On the macOS desktop app (0.2.0-rc.2) no card was drawn and, with the plugin
-  loaded, past conversations would not open; the engine range now refuses that
-  host. Cause not established; the turn-data Definition is the first suspect.
+- On the macOS desktop app 0.2.0-rc.2, a build below the engine range, no card was
+  drawn and past conversations would not open. On 0.2.1-rc.2 both apps draw every
+  card and open history, so the earlier failure did not survive the version bump;
+  no root cause was ever named for it.
 
-**Next goal.** When the desktop app reaches 0.2.1-alpha.1, find why the Definition
-or the slots failed there, in a throwaway session, before claiming desktop support.
+**Next goal.** Keep the half free of platform branches as the desktop apps move
+through 0.2.x.

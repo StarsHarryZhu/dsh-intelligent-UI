@@ -1,10 +1,11 @@
 /**
- * The package installs the same way on every platform the web UI runs on.
+ * The package installs the same way on every host it serves: the web UI and the
+ * macOS and Windows desktop apps, which load the same browser bundle.
  *
- * The web UI loads one browser bundle through `dsh.client` with
- * `platform: "web"` and installs the package from a git checkout without
- * building it. The engine range keeps hosts older than 0.2.1-alpha.1 out, which
- * today includes the desktop apps. These specs pin what that requires.
+ * The web UI loads that one bundle through `dsh.client` with `platform: "web"`
+ * and installs the package from a git checkout without building it. The engine
+ * range keeps hosts older than 0.2.1-alpha.1 out, which today means every
+ * desktop app build still on 0.2.0. These specs pin what that requires.
  */
 
 import { existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs'
