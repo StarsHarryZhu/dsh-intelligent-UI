@@ -16,35 +16,167 @@ Interactive cards in DeepSeek Harness chats. The model writes a small interface 
 
 One card per component, drawn by this plugin in the host's light theme. The program behind each card is in [`docs/SAMPLES.md`](docs/SAMPLES.md).
 
-| Component | Group | What it shows | Screenshot |
-|---|---|---|---|
-| `card` | Layout | The framed root: optional title, padding, and gap. | <img src="assets/catalog/card.png" alt="card" width="360"> |
-| `col` | Layout | A vertical stack in reading order. | <img src="assets/catalog/col.png" alt="col" width="360"> |
-| `row` | Layout | Equal-width cells side by side; they wrap on a narrow screen. | <img src="assets/catalog/row.png" alt="row" width="360"> |
-| `grid` | Layout | An even grid of one to four columns. | <img src="assets/catalog/grid.png" alt="grid" width="360"> |
-| `title` | Text | A headline line in five sizes. | <img src="assets/catalog/title.png" alt="title" width="360"> |
-| `text` | Text | A sentence, with `{…}` live values. | <img src="assets/catalog/text.png" alt="text" width="360"> |
-| `badge` | Text | A one-word status label in five tones. | <img src="assets/catalog/badge.png" alt="badge" width="360"> |
-| `callout` | Text | One emphasized remark: an assumption, a caveat, a next step. | <img src="assets/catalog/callout.png" alt="callout" width="360"> |
-| `divider` | Text | A hairline separator. | <img src="assets/catalog/divider.png" alt="divider" width="360"> |
-| `link` | Text | A citation link, opened only when clicked. | <img src="assets/catalog/link.png" alt="link" width="360"> |
-| `image` | Text | An inline `data:` image with alt text and a caption. | <img src="assets/catalog/image.png" alt="image" width="360"> |
-| `metric` | Data | One prominent number that recomputes as controls move. | <img src="assets/catalog/metric.png" alt="metric" width="360"> |
-| `progress` | Data | A proportion bar. | <img src="assets/catalog/progress.png" alt="progress" width="360"> |
-| `table` | Data | A comparison table; `current=` highlights a row. | <img src="assets/catalog/table.png" alt="table" width="360"> |
-| `keys` | Data | Label and value pairs for exact figures. | <img src="assets/catalog/keys.png" alt="keys" width="360"> |
-| `list` | Data | A bulleted list; `current=` highlights an item. | <img src="assets/catalog/list.png" alt="list" width="360"> |
-| `steps` | Data | A numbered procedure; with `mono=true` and `current=`, a code listing with the running line highlighted. | <img src="assets/catalog/steps.png" alt="steps" width="360"> |
-| `chart` | Data | A bar or line chart. | <img src="assets/catalog/chart.png" alt="chart" width="360"> |
-| `plot` | Math | Curves of y = f(x) with a marked point, its tangent, and a shaded integral. | <img src="assets/catalog/plot.png" alt="plot" width="360"> |
-| `formula` | Math | A typeset expression with its live value. | <img src="assets/catalog/formula.png" alt="formula" width="360"> |
-| `slider` | Controls | A range slider bound to a number. | <img src="assets/catalog/slider.png" alt="slider" width="360"> |
-| `numberInput` | Controls | Exact number entry. | <img src="assets/catalog/numberInput.png" alt="numberInput" width="360"> |
-| `textInput` | Controls | A one-line text field. | <img src="assets/catalog/textInput.png" alt="textInput" width="360"> |
-| `select` | Controls | A dropdown choice. | <img src="assets/catalog/select.png" alt="select" width="360"> |
-| `checkbox` | Controls | An on/off switch. | <img src="assets/catalog/checkbox.png" alt="checkbox" width="360"> |
-| `button` | Action | Sends its text as your next message, then locks the card. | <img src="assets/catalog/button.png" alt="button" width="360"> |
-| `player` | Animation | A control bar at the bottom of the card: plays, pauses, steps, and scrubs a number at 0.5× to 2×; everything that reads it follows. | <img src="assets/catalog/player.png" alt="player" width="360"> |
+### `card` — Layout
+
+<img src="assets/catalog/card.png" alt="card" width="720">
+
+The framed root: optional title, padding, and gap.
+
+### `col` — Layout
+
+<img src="assets/catalog/col.png" alt="col" width="720">
+
+A vertical stack in reading order.
+
+### `row` — Layout
+
+<img src="assets/catalog/row.png" alt="row" width="720">
+
+Equal-width cells side by side; they wrap on a narrow screen.
+
+### `grid` — Layout
+
+<img src="assets/catalog/grid.png" alt="grid" width="720">
+
+An even grid of one to four columns.
+
+### `title` — Text
+
+<img src="assets/catalog/title.png" alt="title" width="720">
+
+A headline line in five sizes.
+
+### `text` — Text
+
+<img src="assets/catalog/text.png" alt="text" width="720">
+
+A sentence, with `{…}` live values.
+
+### `badge` — Text
+
+<img src="assets/catalog/badge.png" alt="badge" width="720">
+
+A one-word status label in five tones.
+
+### `callout` — Text
+
+<img src="assets/catalog/callout.png" alt="callout" width="720">
+
+One emphasized remark: an assumption, a caveat, a next step.
+
+### `divider` — Text
+
+<img src="assets/catalog/divider.png" alt="divider" width="720">
+
+A hairline separator.
+
+### `link` — Text
+
+<img src="assets/catalog/link.png" alt="link" width="720">
+
+A citation link, opened only when clicked.
+
+### `image` — Text
+
+<img src="assets/catalog/image.png" alt="image" width="720">
+
+An inline `data:` image with alt text and a caption.
+
+### `metric` — Data
+
+<img src="assets/catalog/metric.png" alt="metric" width="720">
+
+One prominent number that recomputes as controls move.
+
+### `progress` — Data
+
+<img src="assets/catalog/progress.png" alt="progress" width="720">
+
+A proportion bar.
+
+### `table` — Data
+
+<img src="assets/catalog/table.png" alt="table" width="720">
+
+A comparison table; `current=` highlights a row.
+
+### `keys` — Data
+
+<img src="assets/catalog/keys.png" alt="keys" width="720">
+
+Label and value pairs for exact figures.
+
+### `list` — Data
+
+<img src="assets/catalog/list.png" alt="list" width="720">
+
+A bulleted list; `current=` highlights an item.
+
+### `steps` — Data
+
+<img src="assets/catalog/steps.png" alt="steps" width="720">
+
+A numbered procedure; with `mono=true` and `current=`, a code listing with the running line highlighted.
+
+### `chart` — Data
+
+<img src="assets/catalog/chart.png" alt="chart" width="720">
+
+A bar or line chart.
+
+### `plot` — Math
+
+<img src="assets/catalog/plot.png" alt="plot" width="720">
+
+Curves of y = f(x) with a marked point, its tangent, and a shaded integral.
+
+### `formula` — Math
+
+<img src="assets/catalog/formula.png" alt="formula" width="720">
+
+A typeset expression with its live value.
+
+### `slider` — Controls
+
+<img src="assets/catalog/slider.png" alt="slider" width="720">
+
+A range slider bound to a number.
+
+### `numberInput` — Controls
+
+<img src="assets/catalog/numberInput.png" alt="numberInput" width="720">
+
+Exact number entry.
+
+### `textInput` — Controls
+
+<img src="assets/catalog/textInput.png" alt="textInput" width="720">
+
+A one-line text field.
+
+### `select` — Controls
+
+<img src="assets/catalog/select.png" alt="select" width="720">
+
+A dropdown choice.
+
+### `checkbox` — Controls
+
+<img src="assets/catalog/checkbox.png" alt="checkbox" width="720">
+
+An on/off switch.
+
+### `button` — Action
+
+<img src="assets/catalog/button.png" alt="button" width="720">
+
+Sends its text as your next message, then locks the card.
+
+### `player` — Animation
+
+<img src="assets/catalog/player.png" alt="player" width="720">
+
+A control bar at the bottom of the card: plays, pauses, steps, and scrubs a number at 0.5× to 2×; everything that reads it follows.
 
 ## How it works
 

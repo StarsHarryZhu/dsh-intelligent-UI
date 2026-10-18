@@ -15,35 +15,167 @@
 
 每个组件一张卡片，由本插件按宿主的浅色主题绘制。每张卡片的程序原文见 [`docs/SAMPLES.md`](docs/SAMPLES.md)。
 
-| 组件 | 分组 | 作用 | 截图 |
-|---|---|---|---|
-| `card` | 布局 | 带边框的根容器，可设标题、内边距和间距。 | <img src="assets/catalog/card.png" alt="card" width="360"> |
-| `col` | 布局 | 按阅读顺序垂直堆叠。 | <img src="assets/catalog/col.png" alt="col" width="360"> |
-| `row` | 布局 | 等宽并排，窄屏自动换行。 | <img src="assets/catalog/row.png" alt="row" width="360"> |
-| `grid` | 布局 | 1 到 4 列的等宽网格。 | <img src="assets/catalog/grid.png" alt="grid" width="360"> |
-| `title` | 文本 | 标题行，五种字号。 | <img src="assets/catalog/title.png" alt="title" width="360"> |
-| `text` | 文本 | 正文句子，可用 `{…}` 插入实时数值。 | <img src="assets/catalog/text.png" alt="text" width="360"> |
-| `badge` | 文本 | 状态词，五种色调。 | <img src="assets/catalog/badge.png" alt="badge" width="360"> |
-| `callout` | 文本 | 强调提示：假设、注意事项或下一步。 | <img src="assets/catalog/callout.png" alt="callout" width="360"> |
-| `divider` | 文本 | 细分隔线。 | <img src="assets/catalog/divider.png" alt="divider" width="360"> |
-| `link` | 文本 | 引用链接，读者点击才打开。 | <img src="assets/catalog/link.png" alt="link" width="360"> |
-| `image` | 文本 | 内联图片（只接受 `data:` 地址），带替代文字和说明。 | <img src="assets/catalog/image.png" alt="image" width="360"> |
-| `metric` | 数据 | 头条数字，控件一动就重算。 | <img src="assets/catalog/metric.png" alt="metric" width="360"> |
-| `progress` | 数据 | 占比条。 | <img src="assets/catalog/progress.png" alt="progress" width="360"> |
-| `table` | 数据 | 对比表；`current=` 高亮当前行。 | <img src="assets/catalog/table.png" alt="table" width="360"> |
-| `keys` | 数据 | 标签与数值对照。 | <img src="assets/catalog/keys.png" alt="keys" width="360"> |
-| `list` | 数据 | 无序列表；`current=` 高亮当前项。 | <img src="assets/catalog/list.png" alt="list" width="360"> |
-| `steps` | 数据 | 有序步骤；加上 `mono=true` 和 `current=` 就是高亮当前执行行的代码清单。 | <img src="assets/catalog/steps.png" alt="steps" width="360"> |
-| `chart` | 数据 | 柱状图或折线图。 | <img src="assets/catalog/chart.png" alt="chart" width="360"> |
-| `plot` | 数学 | 函数图像：标点、切线和积分阴影。 | <img src="assets/catalog/plot.png" alt="plot" width="360"> |
-| `formula` | 数学 | 排版好的公式，后面跟实时数值。 | <img src="assets/catalog/formula.png" alt="formula" width="360"> |
-| `slider` | 控件 | 绑定数值的范围滑块。 | <img src="assets/catalog/slider.png" alt="slider" width="360"> |
-| `numberInput` | 控件 | 精确数字输入。 | <img src="assets/catalog/numberInput.png" alt="numberInput" width="360"> |
-| `textInput` | 控件 | 单行文本输入。 | <img src="assets/catalog/textInput.png" alt="textInput" width="360"> |
-| `select` | 控件 | 下拉选择。 | <img src="assets/catalog/select.png" alt="select" width="360"> |
-| `checkbox` | 控件 | 开关。 | <img src="assets/catalog/checkbox.png" alt="checkbox" width="360"> |
-| `button` | 动作 | 把按钮文字作为你的下一条消息发出，随后锁定卡片。 | <img src="assets/catalog/button.png" alt="button" width="360"> |
-| `player` | 动画 | 固定在卡片底部的播放条：让一个数值随时间播放、暂停、单步和拖动，倍速 0.5× 到 2×；引用它的内容逐帧更新。 | <img src="assets/catalog/player.png" alt="player" width="360"> |
+### `card` — 布局
+
+<img src="assets/catalog/card.png" alt="card" width="720">
+
+带边框的根容器，可设标题、内边距和间距。
+
+### `col` — 布局
+
+<img src="assets/catalog/col.png" alt="col" width="720">
+
+按阅读顺序垂直堆叠。
+
+### `row` — 布局
+
+<img src="assets/catalog/row.png" alt="row" width="720">
+
+等宽并排，窄屏自动换行。
+
+### `grid` — 布局
+
+<img src="assets/catalog/grid.png" alt="grid" width="720">
+
+1 到 4 列的等宽网格。
+
+### `title` — 文本
+
+<img src="assets/catalog/title.png" alt="title" width="720">
+
+标题行，五种字号。
+
+### `text` — 文本
+
+<img src="assets/catalog/text.png" alt="text" width="720">
+
+正文句子，可用 `{…}` 插入实时数值。
+
+### `badge` — 文本
+
+<img src="assets/catalog/badge.png" alt="badge" width="720">
+
+状态词，五种色调。
+
+### `callout` — 文本
+
+<img src="assets/catalog/callout.png" alt="callout" width="720">
+
+强调提示：假设、注意事项或下一步。
+
+### `divider` — 文本
+
+<img src="assets/catalog/divider.png" alt="divider" width="720">
+
+细分隔线。
+
+### `link` — 文本
+
+<img src="assets/catalog/link.png" alt="link" width="720">
+
+引用链接，读者点击才打开。
+
+### `image` — 文本
+
+<img src="assets/catalog/image.png" alt="image" width="720">
+
+内联图片（只接受 `data:` 地址），带替代文字和说明。
+
+### `metric` — 数据
+
+<img src="assets/catalog/metric.png" alt="metric" width="720">
+
+头条数字，控件一动就重算。
+
+### `progress` — 数据
+
+<img src="assets/catalog/progress.png" alt="progress" width="720">
+
+占比条。
+
+### `table` — 数据
+
+<img src="assets/catalog/table.png" alt="table" width="720">
+
+对比表；`current=` 高亮当前行。
+
+### `keys` — 数据
+
+<img src="assets/catalog/keys.png" alt="keys" width="720">
+
+标签与数值对照。
+
+### `list` — 数据
+
+<img src="assets/catalog/list.png" alt="list" width="720">
+
+无序列表；`current=` 高亮当前项。
+
+### `steps` — 数据
+
+<img src="assets/catalog/steps.png" alt="steps" width="720">
+
+有序步骤；加上 `mono=true` 和 `current=` 就是高亮当前执行行的代码清单。
+
+### `chart` — 数据
+
+<img src="assets/catalog/chart.png" alt="chart" width="720">
+
+柱状图或折线图。
+
+### `plot` — 数学
+
+<img src="assets/catalog/plot.png" alt="plot" width="720">
+
+函数图像：标点、切线和积分阴影。
+
+### `formula` — 数学
+
+<img src="assets/catalog/formula.png" alt="formula" width="720">
+
+排版好的公式，后面跟实时数值。
+
+### `slider` — 控件
+
+<img src="assets/catalog/slider.png" alt="slider" width="720">
+
+绑定数值的范围滑块。
+
+### `numberInput` — 控件
+
+<img src="assets/catalog/numberInput.png" alt="numberInput" width="720">
+
+精确数字输入。
+
+### `textInput` — 控件
+
+<img src="assets/catalog/textInput.png" alt="textInput" width="720">
+
+单行文本输入。
+
+### `select` — 控件
+
+<img src="assets/catalog/select.png" alt="select" width="720">
+
+下拉选择。
+
+### `checkbox` — 控件
+
+<img src="assets/catalog/checkbox.png" alt="checkbox" width="720">
+
+开关。
+
+### `button` — 动作
+
+<img src="assets/catalog/button.png" alt="button" width="720">
+
+把按钮文字作为你的下一条消息发出，随后锁定卡片。
+
+### `player` — 动画
+
+<img src="assets/catalog/player.png" alt="player" width="720">
+
+固定在卡片底部的播放条：让一个数值随时间播放、暂停、单步和拖动，倍速 0.5× 到 2×；引用它的内容逐帧更新。
 
 ## 工作方式
 
