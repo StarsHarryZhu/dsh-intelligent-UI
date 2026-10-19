@@ -4,8 +4,8 @@
  *
  * The web UI loads that one bundle through `dsh.client` with `platform: "web"`
  * and installs the package from a git checkout without building it. The engine
- * range keeps hosts older than 0.2.1-alpha.1 out, which today means every
- * desktop app build still on 0.2.0. These specs pin what that requires.
+ * range keeps hosts older than 0.2.1-rc.1 out, on every host: the alpha builds of
+ * 0.2.1 and every desktop app build still on 0.2.0. These specs pin what that requires.
  */
 
 import { existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs'
@@ -139,10 +139,10 @@ describe('the versions it claims', () => {
   const engine = manifest.engines.dsh as string
   const peer = manifest.peerDependencies['@deepseek-ai/dsh-tools'] as string
 
-  it('passes the harness compatibility check from 0.2.1-alpha.1 and no later minor', () => {
-    expect(engine).toBe('>=0.2.1-alpha.1 <0.3.0-0')
-    for (const version of ['0.2.1-alpha.1', '0.2.1-alpha.4', '0.2.1', '0.2.9']) expect(satisfies(version, engine, true), version).toBe(true)
-    for (const version of ['0.1.9', '0.2.1-alpha.0', '0.3.0-alpha.1', '0.3.0']) expect(satisfies(version, engine, true), version).toBe(false)
+  it('passes the harness compatibility check from 0.2.1-rc.1 and no later minor', () => {
+    expect(engine).toBe('>=0.2.1-rc.1 <0.3.0-0')
+    for (const version of ['0.2.1-rc.1', '0.2.1-rc.2', '0.2.1', '0.2.9']) expect(satisfies(version, engine, true), version).toBe(true)
+    for (const version of ['0.1.9', '0.2.1-alpha.4', '0.2.1-rc.0', '0.3.0-alpha.1', '0.3.0']) expect(satisfies(version, engine, true), version).toBe(false)
   })
 
   it('refuses the desktop app build whose history failed to load with the plugin', () => {
@@ -151,8 +151,8 @@ describe('the versions it claims', () => {
   })
 
   it('declares a peer range that admits the harness prereleases under default semver', () => {
-    for (const version of ['0.2.1-alpha.1', '0.2.1-alpha.4', '0.2.3']) expect(satisfies(version, peer, false), version).toBe(true)
-    for (const version of ['0.2.0-rc.2', '0.3.0']) expect(satisfies(version, peer, false), version).toBe(false)
+    for (const version of ['0.2.1-rc.1', '0.2.1-rc.2', '0.2.3']) expect(satisfies(version, peer, false), version).toBe(true)
+    for (const version of ['0.2.1-alpha.4', '0.2.0-rc.2', '0.3.0']) expect(satisfies(version, peer, false), version).toBe(false)
     expect(manifest.devDependencies['@deepseek-ai/dsh-tools']).toBe(peer)
   })
 })

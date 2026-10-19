@@ -83,7 +83,7 @@ needs the build first: run `node build.js` before the suite.
   program it teaches compiling cleanly, and Windows line endings.
 - `manifest.test.ts` — the packaging contract: the client declaration, no
   install-time script, published files, no symbolic links, LF line endings, the
-  claimed harness versions (from 0.2.1-alpha.1, which refuses older desktop apps
+  claimed harness versions (from 0.2.1-rc.1, which refuses older desktop apps
   until they ship that version), and the screenshot list.
 - `isolation.test.ts` — the pluggability invariants of the root `AGENTS.md`.
 - `agents-md.test.ts` — the documentation rules this file describes.

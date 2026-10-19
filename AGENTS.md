@@ -30,7 +30,7 @@ teaches the model when and how to use the tool. The browser half draws the
 program in two places — in the tool row while the turn runs (with a live preview
 while the arguments stream), and under the reply once the turn has finished,
 because a finished turn folds its tool rows away. It supports DeepSeek Harness
-0.2.1-alpha.1 and later within 0.2.x on all three hosts it serves — the web UI,
+0.2.1-rc.1 and later within 0.2.x on all three hosts it serves — the web UI,
 the macOS desktop app, and the Windows desktop app — through one `dsh.client`
 declaration, because the desktop apps wrap the same web client.
 
@@ -88,7 +88,7 @@ macOS desktop app, and the Windows desktop app. `dsh.client.platform` is `"web"`
 — the only value the module registry serves — and that one declaration is also
 what both desktop apps load, because they wrap the same web client; support is
 therefore a fact about this bundle, not a second build. `engines.dsh` is
-`>=0.2.1-alpha.1 <0.3.0-0`, the range the host enforces, so a desktop app below
+`>=0.2.1-rc.1 <0.3.0-0`, the range the host enforces, so a desktop app below
 it refuses the plugin rather than running it unverified. Nothing in either half
 branches on the operating system, and a defect seen on one platform blocks a
 release the same way a web one does. The package installs from a git checkout

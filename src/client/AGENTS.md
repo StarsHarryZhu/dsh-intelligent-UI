@@ -88,7 +88,7 @@ spacing steps and grid tracks computed from validated whole numbers. Typeset mat
 spaces itself in em; layout spacing stays on the 4px grid.
 
 **One bundle, three platforms, no platform branches.** This bundle serves the web
-UI and both desktop apps (macOS and Windows) of 0.2.1-alpha.1 and later; the apps
+UI and both desktop apps (macOS and Windows) of 0.2.1-rc.1 and later; the apps
 load this same bundle, so add no platform-specific code here and let nothing
 branch on the operating system. The clipboard is the one optional browser
 feature, degrading as described above.

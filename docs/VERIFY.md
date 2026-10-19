@@ -2,7 +2,7 @@
 
 The unit suite proves the compiler, the math engine, the tool definition, the skill, and the browser half in jsdom with real React. It cannot prove what a reader sees in the running harness, because that needs the harness serving this bundle. This checklist closes that gap in three parts: the web UI, the desktop apps (macOS and Windows), and what only Windows can show. Work each part top to bottom; a later step assumes the earlier ones passed.
 
-The plugin requires DeepSeek Harness 0.2.1-alpha.1 or later (`engines.dsh` `>=0.2.1-alpha.1 <0.3.0-0`) and supports three hosts: the web UI, the macOS desktop app, and the Windows desktop app. All three parts are required. Part 1 passed on the web UI of 0.2.1-alpha.4, and Parts 2 and 3 passed on the macOS and Windows apps of 0.2.1-rc.2; the one step without a recorded pass is W4, developing on Windows.
+The plugin requires DeepSeek Harness 0.2.1-rc.1 or later (`engines.dsh` `>=0.2.1-rc.1 <0.3.0-0`) and supports three hosts: the web UI, the macOS desktop app, and the Windows desktop app. All three parts are required. Part 1 passed on the web UI of 0.2.1-alpha.4, a build below the current range, and Parts 2 and 3 passed on the macOS and Windows apps of 0.2.1-rc.2; the one step without a recorded pass is W4, developing on Windows.
 
 The prompts below cost a few model calls. Run them in a new session whose title marks it as a test, and keep it afterwards as a record.
 
@@ -154,7 +154,7 @@ On macOS the app's own command line does the same, with the app quit:
 "/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh" plugin --profile desktop add https://github.com/StarsHarryZhu/dsh-intelligent-UI
 ```
 
-Pass: the install reports success with no compatibility error (the plugin declares `engines.dsh` `>=0.2.1-alpha.1 <0.3.0-0`; a desktop app older than 0.2.1-alpha.1 is refused, which is expected). Restart the app, then open an existing conversation and confirm it still loads before going on.
+Pass: the install reports success with no compatibility error (the plugin declares `engines.dsh` `>=0.2.1-rc.1 <0.3.0-0`; a host older than 0.2.1-rc.1 is refused, which is expected). Restart the app, then open an existing conversation and confirm it still loads before going on.
 
 ## D2. The plugin is live
 

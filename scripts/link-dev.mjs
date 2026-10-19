@@ -26,6 +26,12 @@ const CHECKOUT = resolve(process.env.DSH_CHECKOUT ?? join(ROOT, '..', '..', 'dee
  * preference order. An anchor is a directory holding a `package.json`; the package
  * is found the way Node would find it from there.
  */
+/**
+ * A directory junction on Windows, which needs neither Developer Mode nor an
+ * administrator; an ordinary directory symlink everywhere else.
+ */
+const LINK_TYPE = process.platform === 'win32' ? 'junction' : 'dir'
+
 const PACKAGES = [
   ['typescript', ['.']],
   ['vitest', ['.']],
@@ -112,12 +118,6 @@ function link(name, target) {
   symlinkSync(target, path, LINK_TYPE)
   return 'linked'
 }
-
-/**
- * A directory junction on Windows, which needs neither Developer Mode nor an
- * administrator; an ordinary directory symlink everywhere else.
- */
-const LINK_TYPE = process.platform === 'win32' ? 'junction' : 'dir'
 
 /** Resolve a symlink, or undefined when it dangles. */
 function realpathOrUndefined(path) {
