@@ -30,7 +30,7 @@ carries every figure the card computes at its initial values, so the reply can
 quote them; `output.presentationMeta` selects what is persisted for the browser.
 The compiled program appears only in the metadata.
 
-**`presentationMeta` output is lossless JSON** with a format version `v`. The
+**`presentationMeta` output is lossless JSON** with a format version `version`. The
 harness snapshots it and rejects anything else.
 
 **The description is derived from the catalog and the function table,** and its

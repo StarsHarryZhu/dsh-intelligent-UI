@@ -37,7 +37,14 @@ element from a model-supplied name.
 **Read defensively.** A persisted program comes from a possibly different build:
 every field is guarded, every guard has a fallback, and the `version` fields of
 the envelope and the program decide whether it renders or shows its text. A
-program without them predates version 1 and shows its text.
+program without them predates the API version and shows its text, as does a
+program of an API version this build does not know.
+
+**What the reader sets on a component is card state, not program state.** The
+open tab, the ticked items of a checklist, and a table's sort live in the edits
+store under the node's id (`CardMemory.ui`), so both copies of a card agree; they
+are page-lifetime like every edit. A checklist reports only its count, and only
+through a bound number state, so the program's state kinds stay as they were.
 
 **The boundary sits above the renderer.** `Card` wraps `CardBody` in its failure
 boundary because a component's own render error is caught only by an ancestor;
@@ -70,7 +77,8 @@ before the compiler did.
 **Plots and formulas compute with the shared evaluator.** A plot samples its
 curves through `evalExpr` on one shared budget, takes its tangent's slope from an
 exact derivative and its shaded area from the integrator, and clips curves to the
-box arithmetically. A formula is typeset from the expression tree with this
+box arithmetically. A diagram lays itself out from its texts and arrows alone,
+estimating text width from the characters. A formula is typeset from the expression tree with this
 half's own spans, because React 18 cannot create MathML elements and the host's
 KaTeX is not a plugin dependency. Neither measures the DOM.
 
@@ -98,8 +106,9 @@ client package is forbidden.
 - `tail.tsx` — the turn-tail entry that draws a completed turn's cards.
 - `turn-data.ts` — the data-only Conversation Definition that collects cards per turn.
 - `card.tsx` — the card: values, edits, button sends, notices, and the boundaries.
-- `components.tsx` — the type-to-renderer registry, the number field, and the
-  animation player.
+- `components.tsx` — the type-to-renderer registry, the number field, the
+  animation player, tabs, the checklist, and table sorting.
+- `diagram.tsx` — flowcharts: the layered layout and its SVG drawing.
 - `chart.tsx` — bar and line charts as inline SVG.
 - `plot.tsx` — function plots: sampled curves, ranges, the marked point and
   tangent, the shaded area, the legend, and the readout.
@@ -123,13 +132,18 @@ client package is forbidden.
 - The tail draws only completed turns, follows the observable Turn data source,
   and shares edits with the row.
 - Buttons send once through the composer and never overwrite a draft.
-- Version-1 programs render; any other version, and programs from before the
+- API version 1 renders; any other version, and programs from before the
   version fields, show their text; a renderer failure degrades the card to its
   text and leaves the transcript intact.
 - The player plays to the end in its duration and stops, restarts from the
   beginning, steps one frame, pauses when scrubbed, stepped, or unmounted, and
   cycles 1×, 2×, and 0.5×; `current=` and `mono=` highlight and set code type
   (`tests/client.test.tsx`).
+- Tabs switch by click and arrow keys and keep their page in both copies; a
+  checklist counts into its bound state; a sortable table cycles ascending,
+  descending, and written order with the highlight on its row; a diagram
+  highlights the current box and lays out loops on a side lane
+  (`tests/client.test.tsx`). Not yet drawn in a live chat.
 - Plots break at asymptotes, label several curves, and print the point, slope,
   and area they draw; chart and plot dots stay round when the SVG stretches;
   formulas typeset fractions, radicals, scripts, integrals, sums, limits, and

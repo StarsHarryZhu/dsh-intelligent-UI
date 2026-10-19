@@ -1,7 +1,8 @@
-/** Bundled client modules (26):
+/** Bundled client modules (27):
  *   client/card.js
  *   client/chart.js
  *   client/components.js
+ *   client/diagram.js
  *   client/edits.js
  *   client/formula.js
  *   client/host.js

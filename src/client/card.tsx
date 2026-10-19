@@ -70,6 +70,10 @@ function CardBody(props: CardProps): ReactNode {
     const current = store.get(memoryKey) ?? UNTOUCHED
     store.set(memoryKey, { ...current, values: { ...current.values, [key]: accepted } })
   }
+  const setUi = (id: string, value: JsonValue): void => {
+    const current = store.get(memoryKey) ?? UNTOUCHED
+    store.set(memoryKey, { ...current, ui: { ...current.ui, [id]: value } })
+  }
   const press = (node: NodeRow, prompt: string): void => {
     const current = store.get(memoryKey) ?? UNTOUCHED
     if (current.sent !== undefined || prompt.trim() === '') return
@@ -100,6 +104,8 @@ function CardBody(props: CardProps): ReactNode {
     program,
     values,
     setValue,
+    ui: id => memory.ui?.[id],
+    setUi,
     text: value => renderText(value, values, program.constants),
     number: value => numberOf(value, values),
     press,

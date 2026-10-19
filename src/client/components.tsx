@@ -10,7 +10,7 @@
  * @module dsh-intelligent-ui/client/components
  */
 
-import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Fragment, isValidElement, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { SIZES, TONES } from '../lang/catalog.ts'
 import { isDataImage } from '../lang/compile.ts'
 import { evalExpr, formatNumber } from '../lang/expr.ts'
@@ -18,6 +18,7 @@ import { MAX_SPACE } from '../lang/limits.ts'
 import { formatSignificant } from '../lang/math.ts'
 import type { JsonValue } from '../lang/types.ts'
 import { renderChart } from './chart.tsx'
+import { DiagramFigure } from './diagram.tsx'
 import { renderFormula } from './formula.tsx'
 import type { CopyKey } from './locales.ts'
 import { PlotFigure } from './plot.tsx'
@@ -30,6 +31,10 @@ export interface RenderScope {
   values: ReadonlyMap<string, JsonValue>
   /** Change one bound state value. */
   setValue(key: string, value: JsonValue): void
+  /** What the reader set on one component itself, such as its open tab; shared by both copies of the card. */
+  ui(id: string): JsonValue | undefined
+  /** Remember what the reader set on one component. */
+  setUi(id: string, value: JsonValue): void
   /** Resolve a hoisted text value. */
   text(value: unknown): string
   /** Resolve a number or a numeric expression. */
@@ -109,6 +114,17 @@ export const REGISTRY: Readonly<Record<string, Renderer>> = {
     )
   },
   col: (node, children) => <div className="dsh-iui-col" style={{ gap: space(node, 'gap', 2) }}>{children}</div>,
+  tabs: (node, children, scope) => <Tabs node={node} pages={children} scope={scope} />,
+  tab: (node, children, scope) => {
+    const parent = node.parent === null ? undefined : scope.program.byId.get(node.parent)
+    // Inside tabs the switch shows the title; anywhere else the page heads itself.
+    return (
+      <div className="dsh-iui-col" style={{ gap: space(node, 'gap', 2) }}>
+        {parent?.type === 'tabs' ? null : <div className="dsh-iui-tab-title">{scope.text(node.props.title)}</div>}
+        {children}
+      </div>
+    )
+  },
   row: (node, children) => (
     <div className="dsh-iui-row" data-align={stringProp(node, 'align')} style={{ gap: space(node, 'gap', 2) }}>
       {children.map((child, index) => <div className="dsh-iui-cell" key={index}>{child}</div>)}
@@ -273,20 +289,47 @@ export const REGISTRY: Readonly<Record<string, Renderer>> = {
   },
   table: (node, _children, scope) => {
     const columns = list(node.props.columns, scope)
-    const rows = Array.isArray(node.props.rows) ? node.props.rows as unknown[] : []
+    const rows = (Array.isArray(node.props.rows) ? node.props.rows as unknown[] : [])
+      .map(row => (Array.isArray(row) ? row as unknown[] : []).map(cell => scope.text(cell)))
     const current = currentIndex(node, scope)
+    const sortable = flag(node, 'sortable', scope)
+    const sort = sortable ? readSort(scope.ui(node.id), columns.length) : undefined
+    const order = rows.map((_row, index) => index)
+    if (sort !== undefined) {
+      order.sort((a, b) => compareCells(rows[a]?.[sort.column] ?? '', rows[b]?.[sort.column] ?? '', sort.descending) || a - b)
+    }
+    // Ascending, then descending, then the order the program wrote.
+    const cycle = (column: number): void => {
+      const next = sort?.column !== column ? { column, descending: false } : sort.descending ? null : { column, descending: true }
+      scope.setUi(node.id, next)
+    }
     return (
       <figure className="dsh-iui-figure" data-mono={mono(node, scope)}>
         {node.props.caption === undefined ? null : <figcaption className="dsh-iui-caption">{scope.text(node.props.caption)}</figcaption>}
         <div className="dsh-iui-table-wrap">
           <table className="dsh-iui-table">
             {columns.length === 0 ? null : (
-              <thead><tr>{columns.map((column, index) => <th key={index} scope="col">{column}</th>)}</tr></thead>
+              <thead>
+                <tr>
+                  {columns.map((column, index) => {
+                    if (!sortable) return <th key={index} scope="col">{column}</th>
+                    const direction = sort?.column === index ? (sort.descending ? 'descending' : 'ascending') : undefined
+                    return (
+                      <th key={index} scope="col" aria-sort={direction ?? 'none'}>
+                        <button type="button" className="dsh-iui-table-sort" title={scope.tr('table.sort')} onClick={() => { cycle(index) }}>
+                          <span>{column}</span>
+                          {direction === undefined ? null : <Glyph path={direction === 'ascending' ? 'M6 3.5l3.5 5h-7z' : 'M6 8.5l3.5-5h-7z'} />}
+                        </button>
+                      </th>
+                    )
+                  })}
+                </tr>
+              </thead>
             )}
             <tbody>
-              {rows.map((row, rowIndex) => (
+              {order.map(rowIndex => (
                 <tr key={rowIndex} {...currentMark(rowIndex === current)}>
-                  {(Array.isArray(row) ? row as unknown[] : []).map((cell, cellIndex) => <td key={cellIndex}>{scope.text(cell)}</td>)}
+                  {(rows[rowIndex] ?? []).map((cell, cellIndex) => <td key={cellIndex}>{cell}</td>)}
                 </tr>
               ))}
             </tbody>
@@ -324,8 +367,39 @@ export const REGISTRY: Readonly<Record<string, Renderer>> = {
       </ol>
     )
   },
+  checklist: (node, _children, scope) => {
+    const items = list(node.props.items, scope)
+    const ticked = readTicked(scope.ui(node.id), items.length)
+    const toggle = (index: number, on: boolean): void => {
+      const next = new Set(ticked)
+      if (on) next.add(index)
+      else next.delete(index)
+      const value = [...next].sort((a, b) => a - b)
+      scope.setUi(node.id, value)
+      if (node.bind !== undefined) scope.setValue(node.bind, value.length)
+    }
+    return (
+      <div className="dsh-iui-field dsh-iui-checklist">
+        <span className="dsh-iui-field-head">
+          <span>{node.props.label === undefined ? '' : scope.text(node.props.label)}</span>
+          <span className="dsh-iui-field-value">{scope.tr('checklist.done', { done: ticked.size, total: items.length })}</span>
+        </span>
+        <ul className="dsh-iui-checklist-items">
+          {items.map((item, index) => (
+            <li key={index}>
+              <label className="dsh-iui-check" data-done={ticked.has(index) ? '' : undefined}>
+                <input type="checkbox" checked={ticked.has(index)} onChange={(event) => { toggle(index, event.currentTarget.checked) }} />
+                <span>{item}</span>
+              </label>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  },
   chart: (node, _children, scope) => renderChart(node, scope),
   plot: (node, _children, scope) => <PlotFigure node={node} scope={scope} />,
+  diagram: (node, _children, scope) => <DiagramFigure node={node} scope={scope} />,
   formula: (node, _children, scope) => renderFormula(node, scope),
   badge: (node, _children, scope) => <span className="dsh-iui-badge" data-tone={tone(node)}>{scope.text(node.props.text)}</span>,
   callout: (node, _children, scope) => <div className="dsh-iui-callout" data-tone={tone(node) ?? 'secondary'}>{scope.text(node.props.text)}</div>,
@@ -461,7 +535,7 @@ function Player(props: {
       </span>
       <span className="dsh-iui-player-bar">
         <button type="button" className="dsh-iui-player-button" aria-label={tr('player.prev')} title={tr('player.prev')} disabled={value <= min} onClick={() => { move(-step) }}>
-          <PlayerIcon path="M7.5 3.5v5L4 6z" />
+          <Glyph path="M7.5 3.5v5L4 6z" />
         </button>
         <button
           type="button"
@@ -473,10 +547,10 @@ function Player(props: {
           disabled={!(max > min)}
           onClick={() => { setPlaying(!playing) }}
         >
-          <PlayerIcon path={playing ? 'M3 2h2.2v8H3zM6.8 2H9v8H6.8z' : 'M3.5 1.8l6.5 4.2-6.5 4.2z'} />
+          <Glyph path={playing ? 'M3 2h2.2v8H3zM6.8 2H9v8H6.8z' : 'M3.5 1.8l6.5 4.2-6.5 4.2z'} />
         </button>
         <button type="button" className="dsh-iui-player-button" aria-label={tr('player.next')} title={tr('player.next')} disabled={value >= max} onClick={() => { move(step) }}>
-          <PlayerIcon path="M4.5 3.5v5L8 6z" />
+          <Glyph path="M4.5 3.5v5L8 6z" />
         </button>
         <input
           className="dsh-iui-range"
@@ -505,13 +579,123 @@ function Player(props: {
   )
 }
 
-/** One 12px glyph of the player, drawn in the text colour. */
-function PlayerIcon(props: { path: string }): ReactNode {
+/** One 12px glyph, such as a player button or a sort arrow, drawn in the text colour. */
+function Glyph(props: { path: string }): ReactNode {
   return (
-    <svg className="dsh-iui-player-icon" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false">
+    <svg className="dsh-iui-glyph" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false">
       <path d={props.path} fill="currentColor" />
     </svg>
   )
+}
+
+/**
+ * Pages the reader switches between. The open page is remembered by the card, so
+ * both copies of it show the same page; the closed pages are not drawn at all.
+ * A tabs container without tab pages draws its children as one stack.
+ */
+function Tabs(props: { node: NodeRow; pages: ReactNode[]; scope: RenderScope }): ReactNode {
+  const { node, pages, scope } = props
+  const base = `dsh-iui-tabs-${useId().replace(/[^\w-]/gu, '')}`
+  const buttons = useRef<Array<HTMLButtonElement | null>>([])
+  const gap = space(node, 'gap', 2)
+  const tabs = (scope.program.children.get(node.id) ?? [])
+    .map(id => scope.program.byId.get(id))
+    .filter((child): child is NodeRow => child?.type === 'tab')
+  if (tabs.length === 0) return <div className="dsh-iui-col" style={{ gap }}>{pages}</div>
+  const stored = scope.ui(node.id)
+  const open = typeof stored === 'number' && Number.isInteger(stored) ? Math.max(0, Math.min(tabs.length - 1, stored)) : 0
+  // Each child arrives keyed by its node id, which is how a page finds its tab.
+  const keyed = (page: ReactNode): string | undefined => (isValidElement(page) && page.key !== null ? String(page.key) : undefined)
+  const page = pages.find(entry => keyed(entry) === tabs[open]?.id)
+  const others = pages.filter(entry => !tabs.some(tab => tab.id === keyed(entry)))
+  const choose = (index: number, focus: boolean): void => {
+    scope.setUi(node.id, index)
+    if (focus) buttons.current[index]?.focus()
+  }
+  const keys = (event: KeyboardEvent): void => {
+    const last = tabs.length - 1
+    const next = event.key === 'ArrowRight' ? (open === last ? 0 : open + 1)
+      : event.key === 'ArrowLeft' ? (open === 0 ? last : open - 1)
+        : event.key === 'Home' ? 0
+          : event.key === 'End' ? last
+            : undefined
+    if (next === undefined) return
+    event.preventDefault()
+    choose(next, true)
+  }
+  return (
+    <div className="dsh-iui-tabs" style={{ gap }}>
+      <div className="dsh-iui-tabs-list" role="tablist" onKeyDown={keys}>
+        {tabs.map((tab, index) => (
+          <button
+            key={tab.id}
+            ref={(element) => { buttons.current[index] = element }}
+            type="button"
+            role="tab"
+            id={`${base}-${index}`}
+            className="dsh-iui-tabs-tab"
+            aria-selected={index === open}
+            aria-controls={`${base}-panel`}
+            tabIndex={index === open ? 0 : -1}
+            onClick={() => { choose(index, false) }}
+          >
+            {scope.text(tab.props.title)}
+          </button>
+        ))}
+      </div>
+      <div className="dsh-iui-tabs-panel" role="tabpanel" id={`${base}-panel`} aria-labelledby={`${base}-${open}`}>{page}</div>
+      {others}
+    </div>
+  )
+}
+
+/** The ticked items of a checklist, as 0-based indices inside the list. */
+function readTicked(value: JsonValue | undefined, count: number): Set<number> {
+  const ticked = new Set<number>()
+  if (!Array.isArray(value)) return ticked
+  for (const entry of value) {
+    if (typeof entry === 'number' && Number.isInteger(entry) && entry >= 0 && entry < count) ticked.add(entry)
+  }
+  return ticked
+}
+
+/** A table's sort, when the reader chose one for a column it has. */
+function readSort(value: JsonValue | undefined, columns: number): { column: number; descending: boolean } | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+  const { column, descending } = value
+  if (typeof column !== 'number' || !Number.isInteger(column) || column < 0 || column >= columns) return undefined
+  return { column, descending: descending === true }
+}
+
+/**
+ * Order two cells: as numbers when both read as one (a leading currency sign and
+ * thousands separators allowed), numbers before words, words in the reader's
+ * collation with digits compared by value. Empty cells always go last.
+ */
+export function compareCells(a: string, b: string, descending: boolean): number {
+  const blankA = a.trim() === ''
+  const blankB = b.trim() === ''
+  if (blankA || blankB) return blankA === blankB ? 0 : blankA ? 1 : -1
+  const numberA = cellNumber(a)
+  const numberB = cellNumber(b)
+  const order = numberA !== undefined && numberB !== undefined ? numberA - numberB
+    : numberA !== undefined ? -1
+      : numberB !== undefined ? 1
+        : a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+  return descending ? -order : order
+}
+
+/** The number a cell starts with, such as 89 in "$89" or 1200 in "1,200 kg". */
+function cellNumber(text: string): number | undefined {
+  const match = /^\s*[$€£¥￥]?\s*([-+−]?(?:\d[\d,]*(?:\.\d+)?|\.\d+))(?![\d.])/u.exec(text)
+  if (match === null) return undefined
+  const value = Number((match[1] as string).replace(/,/gu, '').replace('−', '-'))
+  return Number.isFinite(value) ? value : undefined
+}
+
+/** Whether a boolean expression prop is true right now. */
+function flag(node: NodeRow, name: string, scope: RenderScope): boolean {
+  return node.props[name] !== undefined && evalExpr(node.props[name], key => scope.values.get(key)) === true
 }
 
 /** Remove binary noise from a stepped value, so 0.1 + 0.2 shows as 0.3. */
@@ -520,7 +704,7 @@ function tidy(value: number): number {
 }
 
 /** The 0-based item a `current=` prop highlights, or -1 when it names none. */
-function currentIndex(node: NodeRow, scope: RenderScope): number {
+export function currentIndex(node: NodeRow, scope: RenderScope): number {
   if (node.props.current === undefined) return -1
   const value = scope.number(node.props.current)
   return value === undefined ? -1 : Math.floor(value) - 1
@@ -533,8 +717,7 @@ function currentMark(current: boolean): { className?: string; 'aria-current'?: '
 
 /** `data-mono` when the `mono=` prop is true. */
 function mono(node: NodeRow, scope: RenderScope): '' | undefined {
-  if (node.props.mono === undefined) return undefined
-  return evalExpr(node.props.mono, key => scope.values.get(key)) === true ? '' : undefined
+  return flag(node, 'mono', scope) ? '' : undefined
 }
 
 /**

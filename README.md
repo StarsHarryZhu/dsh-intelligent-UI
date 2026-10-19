@@ -12,7 +12,29 @@ Interactive cards in DeepSeek Harness chats. The model writes a small interface 
 | Verified | Web UI 0.2.1-alpha.4; macOS and Windows desktop apps 0.2.1-rc.2 |
 | Install | Settings → Plugins → Add plugin → `https://github.com/StarsHarryZhu/dsh-intelligent-UI` (needs `git` on `PATH`), then restart the harness and reload the page |
 
-## The 27 components
+
+## How it works
+
+- The plugin registers one tool, `ui_render`, and one skill, `dsh-intelligent-ui`, which teaches the model when a card beats prose. The model never writes HTML or JavaScript: its program is checked against the 31-component catalog and stored with the tool result.
+- A card draws in the tool row while the reply streams, and under the reply once it finishes. Moving a control recomputes every figure locally.
+- A `player` animates a card: code traced line by line, an algorithm's passes, a point moving along a curve. Playback runs in the browser and sends nothing to the model.
+- Cards compute integrals (including infinite bounds), derivatives, limits, sums and products, roots, and Taylor polynomials. A value that cannot be computed reliably shows "—", never a guess.
+- Uninstalling leaves every session opening as before; earlier calls show as ordinary tool rows.
+
+## Development
+
+```sh
+node scripts/link-dev.mjs   # link the toolchain from the sibling harness checkout
+node build.js               # type-check, build, and self-check the bundle
+node node_modules/vitest/vitest.mjs run
+```
+
+`AGENTS.md` holds the rules of the tree; `docs/VERIFY.md` is the live checklist.
+
+## License
+
+[MIT License](LICENSE) © 2026 Starfield.
+## The 31 components
 
 One card per component, drawn by this plugin in the host's light theme. The program behind each card is in [`docs/SAMPLES.md`](docs/SAMPLES.md).
 
@@ -39,6 +61,18 @@ Equal-width cells side by side; they wrap on a narrow screen.
 <img src="assets/catalog/grid.png" alt="grid" width="720">
 
 An even grid of one to four columns.
+
+### `tabs` — Layout
+
+<img src="assets/catalog/tabs.png" alt="tabs" width="720">
+
+Pages the reader switches between, by click or arrow key; only the open page is drawn.
+
+### `tab` — Layout
+
+<img src="assets/catalog/tab.png" alt="tab" width="720">
+
+One page of `tabs`, labelled by its title; pages share the card's state.
 
 ### `title` — Text
 
@@ -98,7 +132,7 @@ A proportion bar.
 
 <img src="assets/catalog/table.png" alt="table" width="720">
 
-A comparison table; `current=` highlights a row.
+A comparison table; `current=` highlights a row, and `sortable=true` lets the reader sort by any column.
 
 ### `keys` — Data
 
@@ -123,6 +157,12 @@ A numbered procedure; with `mono=true` and `current=`, a code listing with the r
 <img src="assets/catalog/chart.png" alt="chart" width="720">
 
 A bar or line chart.
+
+### `diagram` — Data
+
+<img src="assets/catalog/diagram.png" alt="diagram" width="720">
+
+A flowchart laid out in layers; loops return along the side, and `current=` highlights a box.
 
 ### `plot` — Math
 
@@ -166,6 +206,12 @@ A dropdown choice.
 
 An on/off switch.
 
+### `checklist` — Controls
+
+<img src="assets/catalog/checklist.png" alt="checklist" width="720">
+
+Items to tick off with a done count; `bind=` hands the count to the rest of the card.
+
 ### `button` — Action
 
 <img src="assets/catalog/button.png" alt="button" width="720">
@@ -178,24 +224,4 @@ Sends its text as your next message, then locks the card.
 
 A control bar at the bottom of the card: plays, pauses, steps, and scrubs a number at 0.5× to 2×; everything that reads it follows.
 
-## How it works
 
-- The plugin registers one tool, `ui_render`, and one skill, `dsh-intelligent-ui`, which teaches the model when a card beats prose. The model never writes HTML or JavaScript: its program is checked against the 27-component catalog and stored with the tool result.
-- A card draws in the tool row while the reply streams, and under the reply once it finishes. Moving a control recomputes every figure locally.
-- A `player` animates a card: code traced line by line, an algorithm's passes, a point moving along a curve. Playback runs in the browser and sends nothing to the model.
-- Cards compute integrals (including infinite bounds), derivatives, limits, sums and products, roots, and Taylor polynomials. A value that cannot be computed reliably shows "—", never a guess.
-- Uninstalling leaves every session opening as before; earlier calls show as ordinary tool rows.
-
-## Development
-
-```sh
-node scripts/link-dev.mjs   # link the toolchain from the sibling harness checkout
-node build.js               # type-check, build, and self-check the bundle
-node node_modules/vitest/vitest.mjs run
-```
-
-`AGENTS.md` holds the rules of the tree; `docs/VERIFY.md` is the live checklist.
-
-## License
-
-[MIT License](LICENSE) © 2026 Starfield.

@@ -17,6 +17,8 @@ export interface CardMemory {
   values: Readonly<Record<string, JsonValue>>
   /** The button whose prompt was sent, by node id. */
   sent?: string
+  /** What the reader set on a component itself, by node id: the open tab, ticked items, a sort. */
+  ui?: Readonly<Record<string, JsonValue>>
 }
 
 /** A small keyed store with change notification, so both copies of a card stay in step. */

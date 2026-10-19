@@ -1,6 +1,6 @@
 # The catalog, one sample per component
 
-A live tour of the catalog: one card per component, drawn in a real chat. Samples 1 to 24 were drawn on 2026-10-15 in the order the catalog had then; samples 25 and 26, the math components, and sample 27, the animation player, were written by the model itself on 2026-10-16.
+A live tour of the catalog: one card per component, drawn in a real chat. Samples 1 to 24 were drawn on 2026-10-15 in the order the catalog had then; samples 25 and 26, the math components, and sample 27, the animation player, were written by the model itself on 2026-10-16. Samples 28 to 31, the newest components, were written by hand on 2026-10-18 and compiled by the built tool; their results are that tool's output, and they have not yet been drawn in a live chat.
 
 Every block below is the exact `source` that was passed to `ui_render` and the exact result it reported, so this file doubles as a regression corpus — `tests/compile.test.ts` can compile any of them.
 
@@ -421,6 +421,127 @@ What a text-only reader sees:
 
 6 components, 1 control, zero repairs. Played in the web UI, the run went from frame 1 to frame 24 in its twelve seconds and stopped; stepping back, scrubbing to frame 5, and switching to 2× each did what they say, and the highlighted line, the bars, and the note followed every frame without a request.
 
+## 28. `tabs`
+
+Pages the reader switches between. Each `tab` child is one page, nested by indentation; only the open page is drawn, and the arrow keys move between tabs. The text view lists every page, so the model and a text-only reader see all of them.
+
+```dil
+card "tabs · 分页"
+  tabs
+    tab "概念"
+      text "导数是函数在一点附近的变化率：切线的斜率。"
+      formula "deriv(x^2, x, 3)" label="f(x) = x² 在 x = 3 处"
+    tab "例题"
+      text "求 f(x) = x³ 在 x = 2 处的导数：f'(x) = 3x²，所以 f'(2) = 12。"
+    tab "练习"
+      text "求 f(x) = sin x 在 x = 0 处的导数。"
+  text "读者点标签切换，只画打开的那一页；方向键也能切换。" tone="muted" size="sm"
+```
+
+Result:
+
+```
+The card is shown: 10 component(s), 0 control(s).
+What a text-only reader sees:
+## tabs · 分页
+  ### 概念
+    导数是函数在一点附近的变化率：切线的斜率。
+    f(x) = x² 在 x = 3 处: deriv(x^2, x, 3) = 6
+  ### 例题
+    求 f(x) = x³ 在 x = 2 处的导数：f'(x) = 3x²，所以 f'(2) = 12。
+  ### 练习
+    求 f(x) = sin x 在 x = 0 处的导数。
+  读者点标签切换，只画打开的那一页；方向键也能切换。
+```
+
+10 components, zero repairs.
+
+## 29. `tab`
+
+One page of `tabs`, labelled by its title. Pictured with its second page open: the slider there moves the point on the plot in the first page, because pages share the card's state.
+
+```dil
+@state a = 1.5 min=0 max=3 step=0.5
+card "tab · 单页"
+  tabs
+    tab "图像"
+      plot fn="x^2" from=-1 to=3 mark=a tangent=true
+    tab "数值"
+      slider "x" bind=a
+      keys items=["f(x) = x²: {a^2}", "切线斜率 2x: {2a}"]
+  text "每个 tab 是一页，内容缩进写在它下面；这里打开的是第二页。" tone="muted" size="sm"
+```
+
+Result:
+
+```
+The card is shown: 8 component(s), 1 control(s).
+What a text-only reader sees:
+## tab · 单页
+  ### 图像
+    Plot: y = x^2 for x from -1 to 3; point at x = 1.5: y = 2.25; tangent slope 3
+  ### 数值
+    x: 1.5 (0–3)
+    f(x) = x²: 2.25 · 切线斜率 2x: 3
+  每个 tab 是一页，内容缩进写在它下面；这里打开的是第二页。
+```
+
+8 components, 1 control, zero repairs.
+
+## 30. `checklist`
+
+Items the reader ticks off, with a done count. `bind=` is optional; when given, the bound number state receives how many items are ticked, so a progress bar or a calc can read it. Pictured with two items ticked.
+
+```dil
+@state done = 0
+card "checklist · 勾选清单"
+  checklist "出发前" items=["护照", "机票", "充电器", "雨伞"] bind=done
+  progress "准备进度" value=done max=4
+  text "bind= 收到已勾选的数量，别的组件可以引用它。" tone="muted" size="sm"
+```
+
+Result:
+
+```
+The card is shown: 4 component(s), 1 control(s).
+What a text-only reader sees:
+## checklist · 勾选清单
+  出发前 (0/4 done)
+  - [ ] 护照
+  - [ ] 机票
+  - [ ] 充电器
+  - [ ] 雨伞
+  准备进度: 0 / 4
+  bind= 收到已勾选的数量，别的组件可以引用它。
+```
+
+4 components, 1 control, zero repairs.
+
+## 31. `diagram`
+
+A flowchart of boxes and arrows, laid out in layers. An arrow names its ends by a node's exact text or its 1-based number, with an optional label after a colon; an arrow back to an earlier box returns along a lane at the side. `current=` highlights one box, so a slider or a `player` can walk the flow.
+
+```dil
+@state at = 2 min=1 max=5 step=1
+card "diagram · 流程图"
+  diagram nodes=["发送请求", "收到响应？", "解析数据", "等待重试", "完成"] edges=["发送请求 -> 收到响应？", "收到响应？ -> 解析数据: 是", "收到响应？ -> 等待重试: 否", "等待重试 -> 发送请求", "解析数据 -> 完成"] current=at
+  slider "当前步骤" bind=at
+  text "箭头按节点文字或序号连接；回到前面的箭头沿侧边绕回，current= 高亮当前框。" tone="muted" size="sm"
+```
+
+Result:
+
+```
+The card is shown: 4 component(s), 1 control(s).
+What a text-only reader sees:
+## diagram · 流程图
+  Diagram: 发送请求 → 收到响应？; 收到响应？ → 解析数据 (是); 收到响应？ → 等待重试 (否); 等待重试 → 发送请求; 解析数据 → 完成; current: 收到响应？
+  当前步骤: 2 (1–5)
+  箭头按节点文字或序号连接；回到前面的箭头沿侧边绕回，current= 高亮当前框。
+```
+
+4 components, 1 control, zero repairs.
+
 ## What this tour found
 
 **A bare `expr` value ended at the first space (fixed).** Sample 9 first read `metric "折合小时" value=mins / 60 unit="h"`, and the compiler kept `value=mins` while reporting the `/` and the `60` as stray tokens; the card showed `24 h` instead of `0.75 h`. Bare values now keep spaces inside brackets and rejoin pieces that start or follow an operator, so that line reads as written; `tests/dil.test.ts` pins it. Quoting an expression with spaces remains the documented form.
@@ -429,4 +550,4 @@ What a text-only reader sees:
 
 ## Status
 
-Samples 1 to 24 were drawn in one live session on 2026-10-15, in the `ui_render` tool row, with the compiler reporting zero repairs except the first attempt at sample 9. Samples 25 and 26 were drawn on 2026-10-16 in the tool row and then under the reply, and survived a page reload; that run is recorded in `VERIFY.md`. Sample 27 was drawn on 2026-10-16 after the program-version reset, and played as described above.
+Samples 1 to 24 were drawn in one live session on 2026-10-15, in the `ui_render` tool row, with the compiler reporting zero repairs except the first attempt at sample 9. Samples 25 and 26 were drawn on 2026-10-16 in the tool row and then under the reply, and survived a page reload; that run is recorded in `VERIFY.md`. Sample 27 was drawn on 2026-10-16 after the program-version reset, and played as described above. Samples 28 to 31 are compiled, tested, and drawn in the static gallery only; a live run in the web UI is still to do.

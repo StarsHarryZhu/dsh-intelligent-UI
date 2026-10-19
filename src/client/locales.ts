@@ -31,6 +31,9 @@ export const zh = {
   'player.prev': '上一步',
   'player.next': '下一步',
   'player.speed': '播放速度 {speed}×，点击切换',
+  'checklist.done': '已完成 {done}/{total}',
+  'table.sort': '按此列排序',
+  'diagram.label': '流程图',
 } satisfies Record<string, string>
 
 /** Every key the chrome uses. */
@@ -61,6 +64,9 @@ export const en = {
   'player.prev': 'Step back',
   'player.next': 'Step forward',
   'player.speed': 'Speed {speed}×; click to change',
+  'checklist.done': '{done} of {total} done',
+  'table.sort': 'Sort by this column',
+  'diagram.label': 'Diagram',
 } satisfies Record<CopyKey, string>
 
 /**

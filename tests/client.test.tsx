@@ -17,6 +17,8 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CALCULUS_EXAMPLE, COMPARISON_EXAMPLE, ESTIMATE_EXAMPLE, QUIZ_EXAMPLE } from '../src/host/model-brief.ts'
 import { buildPresentationMeta, createUIRenderTool } from '../src/host/tool.ts'
+import { compareCells } from '../src/client/components.tsx'
+import { layoutDiagram } from '../src/client/diagram.tsx'
 
 type Component = (props: Record<string, unknown>) => React.ReactNode
 
@@ -688,5 +690,141 @@ describe('animation', () => {
     expect(speed().textContent).toBe('0.5×')
     act(() => { fireEvent.click(speed()) })
     expect(speed().textContent).toBe('1×')
+  })
+})
+
+describe('pages, checklists, sorting, and diagrams', () => {
+  async function draw(source: string, callId: string, client = loadClient()) {
+    const meta = await settle(source)
+    const { ToolView } = client
+    return { meta, view: render(<ToolView phase="result" block={resultBlock(meta)} callId={callId} useDisclosure={useHostDisclosure} {...kit()} />) }
+  }
+
+  it('shows one page at a time, by click or arrow key, the same in both copies', async () => {
+    const client = loadClient()
+    const source = 'card "Course"\n  tabs\n    tab "Idea"\n      text "A rate."\n    tab "Example"\n      text "2x"\n    tab "Practice"\n      text "Try 3x^2."'
+    const { meta } = await draw(source, 'tabs-1', client)
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs.map(tab => tab.getAttribute('aria-selected'))).toEqual(['true', 'false', 'false'])
+    expect(screen.getByText('A rate.')).toBeTruthy()
+    expect(screen.queryByText('2x')).toBeNull()
+    act(() => { fireEvent.click(tabs[1] as HTMLElement) })
+    expect(screen.getByRole('tabpanel').textContent).toBe('2x')
+    act(() => { fireEvent.keyDown(screen.getByRole('tablist'), { key: 'ArrowRight' }) })
+    expect(screen.getByRole('tabpanel').textContent).toBe('Try 3x^2.')
+    expect(document.activeElement?.textContent).toBe('Practice')
+    act(() => { fireEvent.keyDown(screen.getByRole('tablist'), { key: 'ArrowRight' }) })
+    expect(screen.getByRole('tabpanel').textContent).toBe('A rate.')
+    act(() => { fireEvent.keyDown(screen.getByRole('tablist'), { key: 'End' }) })
+    cleanup()
+    const turn = { turn: 1, end: { data: { reason: { kind: 'completed' } } }, data: { get: () => ({ cards: [{ seq: 3, callId: 'tabs-1', meta }] }) } }
+    render(<client.Tail turn={turn} seq={9} {...kit()} />)
+    expect(screen.getByRole('tabpanel').textContent).toBe('Try 3x^2.')
+  })
+
+  it('counts ticked items into its bound state', async () => {
+    await draw('@state done = 0\ncard\n  checklist "Packing" items=["Passport", "Tickets", "Charger"] bind=done\n  progress "Ready" value=done max=3', 'check-1')
+    expect(screen.getByText('0 of 3 done')).toBeTruthy()
+    act(() => { fireEvent.click(screen.getByRole('checkbox', { name: 'Tickets' })) })
+    act(() => { fireEvent.click(screen.getByRole('checkbox', { name: 'Charger' })) })
+    expect(screen.getByText('2 of 3 done')).toBeTruthy()
+    expect(screen.getByText('2 / 3')).toBeTruthy()
+    act(() => { fireEvent.click(screen.getByRole('checkbox', { name: 'Tickets' })) })
+    expect(screen.getByText('1 / 3')).toBeTruthy()
+    expect(screen.getByRole('checkbox', { name: 'Charger' }).closest('label')?.hasAttribute('data-done')).toBe(true)
+  })
+
+  it('sorts by a column ascending, then descending, then back, keeping the highlight on its row', async () => {
+    const { view } = await draw('card\n  table columns=["City", "Price"] rows=[["Oslo", "$1,200"], ["Rome", "$89"], ["Lima", ""], ["Bonn", "$300"]] sortable=true current=2', 'sort-1')
+    const cities = (): string[] => [...view.container.querySelectorAll('tbody tr')].map(row => row.firstElementChild?.textContent ?? '')
+    const header = (name: string): HTMLElement => screen.getByRole('button', { name })
+    expect(cities()).toEqual(['Oslo', 'Rome', 'Lima', 'Bonn'])
+    act(() => { fireEvent.click(header('Price')) })
+    expect(cities()).toEqual(['Rome', 'Bonn', 'Oslo', 'Lima'])
+    expect(header('Price').closest('th')?.getAttribute('aria-sort')).toBe('ascending')
+    expect(view.container.querySelector('[aria-current="step"]')?.firstElementChild?.textContent).toBe('Rome')
+    act(() => { fireEvent.click(header('Price')) })
+    expect(cities()).toEqual(['Oslo', 'Bonn', 'Rome', 'Lima'])
+    act(() => { fireEvent.click(header('Price')) })
+    expect(cities()).toEqual(['Oslo', 'Rome', 'Lima', 'Bonn'])
+    act(() => { fireEvent.click(header('City')) })
+    expect(cities()).toEqual(['Bonn', 'Lima', 'Oslo', 'Rome'])
+  })
+
+  it('leaves a table without sortable= as written', async () => {
+    await draw(COMPARISON_EXAMPLE, 'sort-2')
+    expect(screen.queryByRole('button', { name: 'Operator' })).toBeNull()
+  })
+
+  it('compares cells as numbers when both are numbers, words otherwise', () => {
+    expect(compareCells('$89', '$1,200', false)).toBeLessThan(0)
+    expect(compareCells('-3', '2', false)).toBeLessThan(0)
+    expect(compareCells('item 2', 'item 10', false)).toBeLessThan(0)
+    expect(compareCells('7', 'seven', false)).toBeLessThan(0)
+    expect(compareCells('', 'a', true)).toBeGreaterThan(0)
+    expect(compareCells('1', '2', true)).toBeGreaterThan(0)
+  })
+
+  it('draws a diagram with its arrows and highlights the current box as it moves', async () => {
+    const source = [
+      '@state step = 1 min=1 max=3',
+      'card',
+      '  diagram "Retry" nodes=["Send", "Answered?", "Done"] edges=["Send -> Answered?", "Answered? -> Done: yes", "Answered? -> Send: no"] current=step',
+      '  slider "Step" bind=step',
+    ].join('\n')
+    const { view } = await draw(source, 'diagram-1')
+    const svg = view.container.querySelector('svg.dsh-iui-diagram-svg') as SVGElement
+    expect(svg.getAttribute('aria-label')).toBe('Retry; Send → Answered?; Answered? → Done (yes); Answered? → Send (no); ▶ Send')
+    expect(svg.querySelectorAll('.dsh-iui-diagram-node')).toHaveLength(3)
+    expect(svg.querySelectorAll('.dsh-iui-diagram-line')).toHaveLength(3)
+    expect(svg.querySelectorAll('.dsh-iui-diagram-label')).toHaveLength(2)
+    const current = (): string => svg.querySelector('[data-current] text')?.textContent ?? ''
+    expect(current()).toBe('Send')
+    act(() => { fireEvent.change(screen.getByRole('slider', { name: 'Step' }), { target: { value: '2' } }) })
+    expect(current()).toBe('Answered?')
+  })
+})
+
+describe('diagram layout', () => {
+  it('puts each box one layer past the boxes that lead to it, and returns loops along a lane', () => {
+    const layout = layoutDiagram(['A', 'B', 'C', 'D'], [{ from: 0, to: 1 }, { from: 1, to: 2 }, { from: 0, to: 2 }, { from: 2, to: 0 }, { from: 3, to: 3 }], 'down')
+    const [a, b, c, d] = layout.boxes
+    expect(a!.y).toBeLessThan(b!.y)
+    expect(b!.y).toBeLessThan(c!.y)
+    expect(d!.y).toBe(a!.y)
+    expect(layout.arrows).toHaveLength(5)
+    // Three forward arrows first, then the loop back to A along a lane, then D's loop to itself.
+    expect(layout.arrows[3]!.path).toMatch(/H[\d.]+Q/u)
+    expect(layout.arrows[4]!.path).toMatch(/C/u)
+    const right = Math.max(...layout.boxes.map(box => box.x + box.w))
+    expect(layout.width).toBeGreaterThan(right)
+    for (const box of layout.boxes) {
+      expect(box.x).toBeGreaterThanOrEqual(0)
+      expect(box.y + box.h).toBeLessThanOrEqual(layout.height)
+    }
+  })
+
+  it('flows left to right on request, and orders a layer to follow its parents', () => {
+    const layout = layoutDiagram(['root', 'left', 'right', 'under right', 'under left'], [
+      { from: 0, to: 1 }, { from: 0, to: 2 }, { from: 2, to: 3 }, { from: 1, to: 4 },
+    ], 'right')
+    const [root, left, right, underRight, underLeft] = layout.boxes
+    expect(root!.x).toBeLessThan(left!.x)
+    expect(left!.x + left!.w / 2).toBe(right!.x + right!.w / 2)
+    expect(underLeft!.y < underRight!.y).toBe(left!.y < right!.y)
+  })
+
+  it('wraps long text to three lines at most, ending in an ellipsis', () => {
+    const layout = layoutDiagram(['检查输入是否合法并且记录每一次失败的原因然后决定是否重试以及等待多久再发送下一次请求直到成功为止'], [], 'down')
+    const lines = layout.boxes[0]!.lines
+    expect(lines).toHaveLength(3)
+    expect(lines[2]!.endsWith('…')).toBe(true)
+    expect(layout.boxes[0]!.w).toBeLessThanOrEqual(180)
+  })
+
+  it('draws an empty diagram as an empty drawing', () => {
+    const layout = layoutDiagram([], [], 'down')
+    expect(layout.boxes).toEqual([])
+    expect(layout.width).toBeGreaterThan(0)
   })
 })

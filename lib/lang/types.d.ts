@@ -28,21 +28,12 @@ export type ExprOperand = ExprNode | number | boolean;
 export type ExprNode = ['lit', string | number | boolean] | ['ref', string] | ['num', number] | ['const', string] | ['neg', ExprOperand] | ['add' | 'sub' | 'mul' | 'div' | 'mod' | 'pow', ExprOperand, ExprOperand] | ['min' | 'max', ...ExprOperand[]] | ['lt' | 'gt' | 'le' | 'ge' | 'eq' | 'ne', ExprOperand, ExprOperand] | ['and' | 'or', ...ExprOperand[]] | ['not', ExprOperand] | ['if', ExprOperand, ExprOperand, ExprOperand] | ['pick', ExprOperand, ...ExprOperand[]] | ['abs' | 'floor' | 'ceil', ExprOperand] | ['round', ExprOperand, number] | ['fn', string, ...ExprOperand[]] | ['integral' | 'sum' | 'prod' | 'solve', string, ExprOperand, ExprOperand, ExprOperand] | ['deriv', string, ExprOperand, ExprOperand, ExprOperand?] | ['limit', string, ExprOperand, ExprOperand, number?] | ['taylor', string, ExprOperand, ExprOperand, ExprOperand, ExprOperand] | ['concat', ...(ExprOperand | string)[]] | ['fmtNum', ExprOperand, number?];
 /** Calculus operators: `[operator, variable, body, …bounds]`. */
 export declare const BINDING_OPERATORS: ReadonlySet<string>;
-/**
- * The program version that introduced each operator. A compiled program records
- * the highest version among everything it uses, so a client renders exactly the
- * programs whose vocabulary it has. An operator added later takes the next
- * version and raises `PROGRAM_VERSION` with it.
- */
-export declare const OPERATOR_SINCE: Readonly<Record<string, number>>;
 /** Every operator the evaluator accepts, as a lookup for structural validation. */
 export declare const EXPR_OPERATORS: ReadonlySet<string>;
 /** Operators whose result is always a number, so `concat` may receive them. */
 export declare const NUMERIC_OPERATORS: ReadonlySet<string>;
 /** How a declared piece of state is seeded, and which control should edit it. */
 export type StateKind = 'number' | 'string' | 'boolean' | 'select';
-/** The program version that introduced each state kind; see {@link OPERATOR_SINCE}. */
-export declare const STATE_KIND_SINCE: Readonly<Record<StateKind, number>>;
 /** One declared interactive value. `key` is stable across recompiles. */
 export interface StateDeclaration {
     key: string;
@@ -103,12 +94,9 @@ export interface Diagnostic {
 export type DiagnosticCode = 'unknown_component' | 'unknown_prop' | 'invalid_literal' | 'invalid_expression' | 'duplicate_id' | 'missing_root' | 'orphan_node' | 'limit_exceeded' | 'unterminated_line' | 'unparseable';
 /** The compiled program: persisted as `tool/result` presentation metadata. */
 export interface UIProgram {
-    /**
-     * The lowest program version that can draw this program: the highest `since`
-     * among its components, props, operators, and state kinds.
-     */
+    /** The API version the program was compiled for; see `API_VERSION` in identity.ts. */
     version: number;
-    catalogVersion: string;
+    /** Digest of the catalog's semantics, for telling builds apart in diagnostics. */
     catalogHash: string;
     state: StateDeclaration[];
     calc: CalcDeclaration[];

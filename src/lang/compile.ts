@@ -14,16 +14,16 @@
  * @module dsh-intelligent-ui/lang/compile
  */
 
-import { CATALOG_BY_TYPE, CATALOG_VERSION, catalogHash, SIZES, TONES, type ComponentDescriptor, type PropSpec } from './catalog.ts'
+import { CATALOG_BY_TYPE, catalogHash, SIZES, TONES, type ComponentDescriptor, type PropSpec } from './catalog.ts'
 import { parseDil, type Envelope, type RawCalc, type RawNode, type RawState } from './dil.ts'
 import { checkExpr, evalExpr, type ExprType } from './expr.ts'
+import { API_VERSION } from './identity.ts'
 import { asNode, parseInfix } from './infix.ts'
 import { LIMITS, MAX_SPACE } from './limits.ts'
 import { formatSignificant, isMathConstant, MATH_CONSTANTS } from './math.ts'
 import { printExpr } from './print.ts'
 import { parseTemplate, renderText, valueText } from './text.ts'
 import {
-  OPERATOR_SINCE, STATE_KIND_SINCE,
   type CalcDeclaration, type Diagnostic, type ExprNode, type JsonValue, type StateDeclaration, type StateKind,
   type TextTemplate, type UINode, type UIProgram,
 } from './types.ts'
@@ -155,11 +155,11 @@ export function compileEnvelope(envelope: Envelope, inherited: Diagnostic[] = []
     return { ok: false, diagnostics }
   }
   connect(nodes, ids, diagnostics)
+  arrangeTabs(nodes, ids, diagnostics)
   dockPlayers(nodes)
 
   const program: UIProgram = {
-    version: programVersion(state, calc, nodes),
-    catalogVersion: CATALOG_VERSION,
+    version: API_VERSION,
     catalogHash: HASH,
     state,
     calc,
@@ -171,47 +171,6 @@ export function compileEnvelope(envelope: Envelope, inherited: Diagnostic[] = []
   }
   program.fallback = buildFallback(program)
   return { ok: true, program }
-}
-
-/**
- * The lowest program version that can draw a program: the highest `since` among
- * the state kinds, components, props, and operators it uses. A client of that
- * version or newer renders it; an older one shows its text.
- */
-function programVersion(state: readonly StateDeclaration[], calc: readonly CalcDeclaration[], nodes: readonly UINode[]): number {
-  let version = 1
-  const raise = (since: number | undefined): void => {
-    if (since !== undefined && since > version) version = since
-  }
-  for (const row of state) raise(STATE_KIND_SINCE[row.kind])
-  for (const row of calc) raise(expressionSince(row.expr))
-  for (const node of nodes) {
-    const descriptor = CATALOG_BY_TYPE.get(node.type)
-    raise(descriptor?.since)
-    if (node.bind !== undefined) raise(descriptor?.props.bind?.since)
-    for (const [name, value] of Object.entries(node.props)) {
-      raise(descriptor?.props[name]?.since)
-      raise(expressionSince(value))
-    }
-  }
-  return version
-}
-
-/** The highest `since` among the operators anywhere inside a prop or expression value. */
-function expressionSince(value: unknown): number {
-  let version = 1
-  const visit = (part: unknown, depth: number): void => {
-    if (depth > LIMITS.maxDepth * 8) return
-    if (Array.isArray(part)) {
-      const head: unknown = part[0]
-      if (typeof head === 'string' && Object.hasOwn(OPERATOR_SINCE, head)) version = Math.max(version, OPERATOR_SINCE[head] as number)
-      for (const child of part) visit(child, depth + 1)
-    } else if (typeof part === 'object' && part !== null) {
-      for (const child of Object.values(part)) visit(child, depth + 1)
-    }
-  }
-  visit(value, 0)
-  return version
 }
 
 /** The diagnostic for a declaration that takes a constant's name. */
@@ -474,6 +433,9 @@ function readNode(raw: RawNode, context: NodeContext, diagnostics: Diagnostic[])
     for (const note of outcome.notes ?? []) {
       diagnostics.push({ code: 'invalid_expression', ...where(`nodes.${id}.${name}`), message: note, repair: 'Interpolate only declared names, for example "{price}".' })
     }
+    for (const problem of outcome.problems ?? []) {
+      diagnostics.push({ code: 'invalid_literal', ...where(`nodes.${id}.${name}`), message: `<${type}> ${name}: ${problem.message}`, repair: problem.repair })
+    }
     if (outcome.bind !== undefined) bind = outcome.bind
     else props[name] = outcome.value
   }
@@ -513,8 +475,8 @@ function freshId(ids: ReadonlySet<string>, type: string): string {
 
 /** One prop read: a value, a binding, or the reason it was rejected. */
 type PropOutcome =
-  | { ok: true; value: JsonValue; bind?: undefined; notes?: string[] }
-  | { ok: true; bind: NonNullable<UINode['bind']>; value?: undefined; notes?: undefined }
+  | { ok: true; value: JsonValue; bind?: undefined; notes?: string[]; problems?: Array<{ message: string; repair: string }> }
+  | { ok: true; bind: NonNullable<UINode['bind']>; value?: undefined; notes?: undefined; problems?: undefined }
   | { ok: false; message: string; repair: string; code?: Diagnostic['code'] }
 
 /** Context a single prop read needs. */
@@ -604,6 +566,9 @@ function readProp(
     case 'options': {
       if (!Array.isArray(value)) return bad('must be a list such as ["first","second"]', `Write ${name}=["first","second"].`)
       if (value.length > LIMITS.maxItems) return bad(`has more than ${LIMITS.maxItems} entries`, 'Keep the list shorter.', 'limit_exceeded')
+      if (context.descriptor.type === 'diagram' && value.length > MAX_DIAGRAM_NODES) {
+        return bad(`has more than ${MAX_DIAGRAM_NODES} boxes`, 'Merge steps, or split the flow into two diagrams.', 'limit_exceeded')
+      }
       const entries: JsonValue[] = []
       const notes: string[] = []
       for (const entry of value) {
@@ -677,6 +642,32 @@ function readProp(
       }
       return { ok: true, value: expr as JsonValue }
     }
+    case 'edges': {
+      const entries = Array.isArray(value) ? value : [value]
+      if (entries.length > MAX_DIAGRAM_EDGES) return bad(`has more than ${MAX_DIAGRAM_EDGES} arrows`, 'Keep the flow smaller.', 'limit_exceeded')
+      const names = diagramNames(rawProps.nodes)
+      const edges: JsonValue[] = []
+      const notes: string[] = []
+      const problems: Array<{ message: string; repair: string }> = []
+      for (const entry of entries) {
+        const read = readEdge(entry, names)
+        if (read === undefined) {
+          problems.push({
+            message: `"${typeof entry === 'string' ? entry : JSON.stringify(entry)}" does not join two of its nodes; the arrow was left out`,
+            repair: `Write each arrow as "From -> To" or "From -> To: label", naming nodes by their exact text or by number 1 to ${Array.isArray(rawProps.nodes) ? rawProps.nodes.length : 0}.`,
+          })
+          continue
+        }
+        if (read.label === undefined) {
+          edges.push([read.from, read.to])
+          continue
+        }
+        const label = readText(read.label, context)
+        edges.push(label === undefined ? [read.from, read.to] : [read.from, read.to, label.value])
+        if (label !== undefined) notes.push(...label.notes)
+      }
+      return { ok: true, value: edges, ...(notes.length > 0 ? { notes } : {}), ...(problems.length > 0 ? { problems } : {}) }
+    }
     case 'variable': {
       const text = typeof value === 'string' ? value.trim() : ''
       if (!PLOT_VARIABLE.test(text) || isMathConstant(text)) return bad('must be a short name such as x or t, and not pi, e, tau, or inf', `Write ${name}=x.`)
@@ -705,6 +696,61 @@ function readProp(
 
 /** Most curves one plot draws. */
 const MAX_CURVES = 4
+
+/** Most boxes one diagram lays out. */
+const MAX_DIAGRAM_NODES = 40
+
+/** Most arrows one diagram draws. */
+const MAX_DIAGRAM_EDGES = 80
+
+/** A diagram's node texts as written, each mapped to its 1-based number; the first of two equal texts wins. */
+function diagramNames(value: unknown): Map<string, number> {
+  const names = new Map<string, number>()
+  if (!Array.isArray(value)) return names
+  for (const [index, entry] of value.entries()) {
+    const text = typeof entry === 'string' || typeof entry === 'number' ? String(entry).trim() : ''
+    if (text !== '' && !names.has(text)) names.set(text, index + 1)
+  }
+  // Numbers name nodes too, but never shadow a node whose text is that number.
+  for (let number = 1; number <= (value as unknown[]).length; number += 1) {
+    if (!names.has(String(number))) names.set(String(number), number)
+  }
+  return names
+}
+
+/**
+ * Read one arrow: `"From -> To"`, `"From -> To: label"`, or `[from, to, label?]`,
+ * each end a node's exact text or its 1-based number.
+ */
+function readEdge(entry: unknown, names: ReadonlyMap<string, number>): { from: number; to: number; label?: string } | undefined {
+  const end = (part: unknown): number | undefined =>
+    (typeof part === 'string' || typeof part === 'number' ? names.get(String(part).trim()) : undefined)
+  if (Array.isArray(entry)) {
+    const from = end(entry[0])
+    const to = end(entry[1])
+    if (from === undefined || to === undefined) return undefined
+    const label = typeof entry[2] === 'string' || typeof entry[2] === 'number' ? String(entry[2]).trim() : ''
+    return label === '' ? { from, to } : { from, to, label }
+  }
+  if (typeof entry !== 'string') return undefined
+  const text = entry.trim()
+  // Every arrow sign is a candidate split, so a node text may itself contain ">".
+  for (const arrow of text.matchAll(/\s*(?:->|=>|→|>)\s*/gu)) {
+    const from = end(text.slice(0, arrow.index))
+    if (from === undefined) continue
+    const rest = text.slice((arrow.index as number) + arrow[0].length).trim()
+    const whole = end(rest)
+    if (whole !== undefined) return { from, to: whole }
+    // A label follows the first colon whose left side names a node.
+    for (const colon of rest.matchAll(/[:：]/gu)) {
+      const to = end(rest.slice(0, colon.index))
+      if (to === undefined) continue
+      const label = rest.slice((colon.index as number) + 1).trim()
+      return label === '' ? { from, to } : { from, to, label }
+    }
+  }
+  return undefined
+}
 
 /** A name a component may bind for its curves. */
 const PLOT_VARIABLE = /^[A-Za-z_]\w{0,11}$/u
@@ -817,6 +863,65 @@ function connect(nodes: UINode[], ids: Set<string>, diagnostics: Diagnostic[]): 
 }
 
 /**
+ * Give every tab a tabs container and every tabs container only tabs.
+ *
+ * A run of sibling tabs written without their `tabs` line gets one, and a
+ * component written straight inside `tabs` joins the tab before it (or the first
+ * tab, when it comes before them all). Each repair is reported. A `tabs` with no
+ * tab at all draws its children as one stack.
+ */
+function arrangeTabs(nodes: UINode[], ids: Set<string>, diagnostics: Diagnostic[]): void {
+  if (!nodes.some(node => node.type === 'tab')) return
+  const byId = new Map(nodes.map(node => [node.id, node]))
+  const childrenOf = (parent: string | null): UINode[] => nodes.filter(node => node.parent === parent)
+  const parents = new Set(nodes.filter(node => node.type === 'tab').map(node => node.parent))
+  for (const parent of parents) {
+    if (parent !== null && byId.get(parent)?.type === 'tabs') continue
+    let group: UINode | undefined
+    for (const child of childrenOf(parent)) {
+      if (child.type !== 'tab') {
+        group = undefined
+        continue
+      }
+      if (group === undefined) {
+        const id = freshId(ids, 'tabs')
+        ids.add(id)
+        group = { id, type: 'tabs', parent, props: {} }
+        nodes.splice(nodes.indexOf(child), 0, group)
+        byId.set(id, group)
+        diagnostics.push({
+          code: 'orphan_node',
+          path: `nodes.${child.id}`,
+          message: '<tab> sits outside tabs; a tabs container was added around it and the tabs beside it',
+          repair: 'Write a tabs line and indent every tab under it.',
+        })
+      }
+      child.parent = group.id
+    }
+  }
+  for (const group of nodes.filter(node => node.type === 'tabs')) {
+    const kids = childrenOf(group.id)
+    const first = kids.find(kid => kid.type === 'tab')
+    if (first === undefined) continue
+    let last: UINode | undefined
+    for (const kid of kids) {
+      if (kid.type === 'tab') {
+        last = kid
+        continue
+      }
+      const home = last ?? first
+      kid.parent = home.id
+      diagnostics.push({
+        code: 'orphan_node',
+        path: `nodes.${kid.id}`,
+        message: `<${kid.type}> sits directly in tabs, which holds only tab pages; it was placed in the tab ${last === undefined ? 'after' : 'before'} it`,
+        repair: 'Indent it under one of the tab lines.',
+      })
+    }
+  }
+}
+
+/**
  * Put every player at the bottom of the card that holds it, as the card's control
  * bar, wherever the source wrote it. It joins the outermost card above it and
  * follows every other node, so it is that card's last child; players keep their
@@ -919,6 +1024,8 @@ export function fallbackLines(program: Pick<UIProgram, 'nodes' | 'constants' | '
     const bound = node.bind?.key ?? ''
     switch (node.type) {
       case 'card': return node.props.title === undefined ? undefined : `## ${text(node, 'title')}`
+      case 'tabs': return undefined
+      case 'tab': return `### ${text(node, 'title')}`
       case 'title': return `# ${text(node, 'text')}`
       case 'text': return text(node, 'text')
       case 'callout': return `Note: ${text(node, 'text')}`
@@ -947,6 +1054,12 @@ export function fallbackLines(program: Pick<UIProgram, 'nodes' | 'constants' | '
       case 'list': return list(node.props.items).map(item => `- ${item}`).join('\n')
       case 'steps': return list(node.props.items).map((step, index) => `${index + 1}. ${step}`).join('\n')
       case 'table': return tableText(node)
+      case 'checklist': {
+        const items = list(node.props.items)
+        const head = node.props.label === undefined ? `Checklist (0/${items.length} done)` : `${text(node, 'label')} (0/${items.length} done)`
+        return [head, ...items.map(item => `- [ ] ${item}`)].join('\n')
+      }
+      case 'diagram': return diagramText(node)
       case 'chart': return chartText(node)
       default: return undefined
     }
@@ -1001,6 +1114,28 @@ export function fallbackLines(program: Pick<UIProgram, 'nodes' | 'constants' | '
     const rows = Array.isArray(node.props.rows) ? node.props.rows : []
     const body = rows.map(row => (Array.isArray(row) ? row.map(cell => renderText(cell, values, program.constants)).join(' | ') : '')).join('\n')
     return [head, body].filter(part => part !== '').join('\n')
+  }
+
+  /** Every arrow as "From → To (label)", then any box no arrow touches, then the highlighted box. */
+  function diagramText(node: UINode): string {
+    const names = list(node.props.nodes)
+    const edges = Array.isArray(node.props.edges) ? node.props.edges : []
+    const touched = new Set<number>()
+    const parts: string[] = []
+    for (const edge of edges) {
+      if (!Array.isArray(edge) || typeof edge[0] !== 'number' || typeof edge[1] !== 'number') continue
+      const [from, to] = [edge[0], edge[1]]
+      touched.add(from).add(to)
+      const label = edge[2] === undefined ? '' : ` (${renderText(edge[2], values, program.constants)})`
+      parts.push(`${names[from - 1] ?? '?'} → ${names[to - 1] ?? '?'}${label}`)
+    }
+    for (const [index, name] of names.entries()) {
+      if (!touched.has(index + 1)) parts.push(name)
+    }
+    const caption = node.props.caption === undefined ? 'Diagram' : `Diagram "${text(node, 'caption')}"`
+    const current = node.props.current === undefined ? undefined : evalExpr(node.props.current, key => values.get(key))
+    const highlighted = typeof current === 'number' ? names[Math.floor(current) - 1] : undefined
+    return `${caption}: ${parts.join('; ')}${highlighted === undefined ? '' : `; current: ${highlighted}`}`
   }
 
   function chartText(node: UINode): string {
@@ -1072,8 +1207,9 @@ function tryParse(text: string): Envelope | undefined {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
     const record = value as Record<string, unknown>
     // A bare component tree is accepted as the envelope's only node, with any
-    // declarations written beside it.
-    if (typeof record.type === 'string' && record.nodes === undefined) {
+    // declarations written beside it. A diagram's own `nodes` are texts, never components.
+    const components = Array.isArray(record.nodes) && record.nodes.some(entry => typeof entry === 'object' && entry !== null)
+    if (typeof record.type === 'string' && !components) {
       const { states, calcs, state, calc, ...node } = record
       return { states: states ?? state, calcs: calcs ?? calc, nodes: [node] }
     }

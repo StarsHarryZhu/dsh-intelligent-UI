@@ -20,10 +20,9 @@ export declare const TURN_DATA_KEY = "dsh-intelligent-ui";
 /** Locale namespace of the card chrome. */
 export declare const LOCALE_NS = "dsh-intelligent-ui";
 /**
- * Version of the compiled program format, carried in the program's `version`
- * field. A client renders every version up to its own; a program records the
- * lowest version that can draw it.
+ * The API version: the `version` field of every compiled program and of the
+ * persisted `tool/result.meta` envelope. A client draws what carries a version
+ * it knows and shows the text of anything else. The plugin's release version is
+ * the package's and the tag's, kept by the maintainer, and is independent of it.
  */
-export declare const PROGRAM_VERSION = 1;
-/** Version of the persisted `tool/result.meta` envelope, carried in its `version` field. */
-export declare const UI_META_VERSION = 1;
+export declare const API_VERSION = 1;

@@ -15,7 +15,7 @@
  * @module dsh-intelligent-ui/host/tool
  */
 import { type ToolDefinition } from '@deepseek-ai/dsh-tools';
-import { catalogHash, CATALOG_VERSION } from '../lang/catalog.ts';
+import { catalogHash } from '../lang/catalog.ts';
 import { UI_TOOL_NAME } from '../lang/identity.ts';
 import type { Diagnostic, JsonValue } from '../lang/types.ts';
 /** What the model receives when the program is usable. */
@@ -67,5 +67,5 @@ export declare function renderForModel(value: unknown): string;
 export declare function buildPresentationMeta(args: {
     title?: string | undefined;
 }, value: unknown): JsonValue;
-/** Re-exported so the host entry and tests share one catalog generation. */
-export { catalogHash, CATALOG_VERSION, UI_TOOL_NAME };
+/** Re-exported so the host entry and tests share one catalog hash. */
+export { catalogHash, UI_TOOL_NAME };

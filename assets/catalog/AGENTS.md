@@ -2,10 +2,11 @@
 
 ## 1. Role
 
-One picture per catalog component, twenty-seven in all, for the README's component
+One picture per catalog component, thirty-one in all, for the README's component
 gallery. Each is the card that one sample program of `docs/SAMPLES.md` draws,
 cropped to the card's frame. Samples 1 to 24 were first drawn in a live chat on
-2026-10-15 and samples 25 to 27 on 2026-10-16; these pictures redraw the same
+2026-10-15 and samples 25 to 27 on 2026-10-16; samples 28 to 31 were written on
+2026-10-18 and have not been drawn in a live chat yet. These pictures redraw the
 programs with the current build, so the gallery shows the cards as they look
 today.
 
@@ -18,7 +19,8 @@ built stylesheets from `apps/web/dist` of the sibling harness checkout and the
 light-theme token values read from a card in the running web UI. Headless Chrome
 crops each card at twice its CSS size, 600 CSS pixels wide. The `player` card is
 stepped forward to frame 10 with its own button first, so it shows a run in
-progress. The calculus card was
+progress; the `tab` card has its second page opened and the `checklist` card two
+items ticked the same way. The calculus card was
 compared with a live capture of the same card (`calculus-light.png` in the
 parent folder) and matches it.
 
@@ -62,13 +64,18 @@ the parent folder cover the dark theme.
 - `checkbox.png` — the `checkbox` sample.
 - `button.png` — the `button` sample.
 - `player.png` — the `player` sample, at frame 10 of 24.
+- `tabs.png` — the `tabs` sample, first page open.
+- `tab.png` — the `tab` sample, second page open.
+- `checklist.png` — the `checklist` sample, two of four items ticked.
+- `diagram.png` — the `diagram` sample, the second box highlighted.
 
 ## 4. Progress
 
 **Done.**
 
 - All twenty-seven components, regenerated on 2026-10-16 after `player` was
-  added and code-type lists got their wider gutter.
+  added and code-type lists got their wider gutter; `tabs`, `tab`, `checklist`,
+  and `diagram` added on 2026-10-18.
 
 **Not done.**
 

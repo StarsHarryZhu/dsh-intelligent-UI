@@ -64,7 +64,8 @@ proven.
   check that costs no model call: a persisted card, and a card from before the
   version fields showing its text. The web part was run on 2026-10-16 and the
   desktop parts on 2026-10-17; both are recorded there.
-- `SAMPLES.md` carries all twenty-seven components as they were actually drawn, and
+- `SAMPLES.md` carries all thirty-one components: samples 1 to 27 as they were
+  actually drawn, samples 28 to 31 as compiled by the built tool, and
   doubles as a compile corpus: `tests/compile.test.ts` compiles the two math
   samples a live model wrote.
 - Screenshots of rendered cards live in the repository's `assets/`.

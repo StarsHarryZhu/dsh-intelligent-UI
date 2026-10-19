@@ -11,7 +11,7 @@
 | 已验证 | 网页版 0.2.1-alpha.4；macOS 和 Windows 桌面版 0.2.1-rc.2 |
 | 安装 | 设置 → 插件 → 添加插件 → `https://github.com/StarsHarryZhu/dsh-intelligent-UI`（需要 `PATH` 里有 `git`），然后重启 harness 并刷新页面 |
 
-## 27 个组件
+## 31 个组件
 
 每个组件一张卡片，由本插件按宿主的浅色主题绘制。每张卡片的程序原文见 [`docs/SAMPLES.md`](docs/SAMPLES.md)。
 
@@ -38,6 +38,18 @@
 <img src="assets/catalog/grid.png" alt="grid" width="720">
 
 1 到 4 列的等宽网格。
+
+### `tabs` — 布局
+
+<img src="assets/catalog/tabs.png" alt="tabs" width="720">
+
+读者点击或用方向键切换的分页，只画打开的那一页。
+
+### `tab` — 布局
+
+<img src="assets/catalog/tab.png" alt="tab" width="720">
+
+`tabs` 里的一页，以标题作标签；各页共用卡片的状态。
 
 ### `title` — 文本
 
@@ -97,7 +109,7 @@
 
 <img src="assets/catalog/table.png" alt="table" width="720">
 
-对比表；`current=` 高亮当前行。
+对比表；`current=` 高亮当前行，`sortable=true` 让读者按任意列排序。
 
 ### `keys` — 数据
 
@@ -122,6 +134,12 @@
 <img src="assets/catalog/chart.png" alt="chart" width="720">
 
 柱状图或折线图。
+
+### `diagram` — 数据
+
+<img src="assets/catalog/diagram.png" alt="diagram" width="720">
+
+分层排布的流程图；回到前面的箭头沿侧边绕回，`current=` 高亮当前框。
 
 ### `plot` — 数学
 
@@ -165,6 +183,12 @@
 
 开关。
 
+### `checklist` — 控件
+
+<img src="assets/catalog/checklist.png" alt="checklist" width="720">
+
+可勾选的清单，显示完成数；`bind=` 把完成数交给卡片里的其他组件。
+
 ### `button` — 动作
 
 <img src="assets/catalog/button.png" alt="button" width="720">
@@ -179,7 +203,7 @@
 
 ## 工作方式
 
-- 插件注册一个工具 `ui_render` 和一个技能 `dsh-intelligent-ui`，技能教模型什么时候用卡片比用文字好。模型不写 HTML 或 JavaScript：它写的程序按 27 个组件的目录校验，随工具结果一起保存。
+- 插件注册一个工具 `ui_render` 和一个技能 `dsh-intelligent-ui`，技能教模型什么时候用卡片比用文字好。模型不写 HTML 或 JavaScript：它写的程序按 31 个组件的目录校验，随工具结果一起保存。
 - 回复生成时，卡片显示在工具行里；回复结束后，卡片显示在回复下方。调整控件时，所有数字都在本地重算。
 - `player` 让卡片动起来：逐行演示代码执行、算法的每一轮、点沿曲线移动。播放在浏览器里进行，不会发消息给模型。
 - 卡片能算定积分（含无穷积分限）、导数、极限、求和与连乘、方程求根和泰勒多项式。算不准的值显示“—”，不会给出猜测的数。

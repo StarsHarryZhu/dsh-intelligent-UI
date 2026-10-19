@@ -130,6 +130,14 @@ Keep the Browser window in view: a hidden page paints no animation frames, so pl
 
 Pass: the program compiles with no repair and uses `player`, `pick`, and `steps … current= mono=true`. The player sits at the bottom of the card, wherever the program wrote it. Play runs from the first frame to the last in the card's `duration` and stops; pressing play again starts over. Step back and step forward move one frame; dragging the bar jumps and pauses; the speed button cycles 1×, 2×, 0.5×, and 2× halves the run. The highlighted line, the variables, and anything else bound to the frame follow every frame, with no request in the network panel.
 
+## 14. Pages, a checklist, a sortable table, and a flowchart
+
+Send:
+
+> 用一张卡片讲 HTTP 请求重试：分成“流程”“清单”“对比”三页。流程页画出发送请求、判断是否收到响应、成功解析或等待后重试的流程图，并能用滑块高亮当前步骤；清单页列出上线前要检查的 4 项，勾选后显示完成进度；对比页用表格比较三种重试策略的等待时间和适用场景，读者可以按列排序。
+
+Pass: the program compiles with no repair and uses `tabs`, `checklist`, `table … sortable=true`, and `diagram`. Clicking a tab and the left and right arrow keys switch pages, and the open page is the same in the tool row and under the reply. Ticking items updates the done count and anything bound to it. A column header sorts ascending, then descending, then back to the written order. The flowchart's loop returns along the side without crossing a box, and the slider moves the highlight. No request appears in the network panel while doing any of this.
+
 # Part 2 — Desktop apps (macOS and Windows)
 
 **Passed on 0.2.1-rc.2, on both apps.** D1 to D4 passed on the macOS app and on the Windows app of DeepSeek Harness 0.2.1-rc.2, installed on macOS from the working checkout as a `link:` dependency and on Windows through W1. The failure of 2026-10-16 on 0.2.0-rc.2 — no card drawn, and past conversations that would not open with the plugin loaded — did not recur on this build. Run this part again on any new desktop version, in a throwaway session first, before claiming that version.

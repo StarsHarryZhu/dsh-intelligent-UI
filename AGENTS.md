@@ -107,13 +107,12 @@ returns, inside `ctx.effect`. Unloading the plugin must remove every contributio
 unexpected host prop, or a client-side defect degrades that one card to readable
 text or to nothing. The surrounding transcript is not this plugin's to break.
 
-**Every field records the version that introduced it.** Programs and their
-envelope carry a `version` field, and version 1 is the first and only format:
-nothing persisted before it is read, and such a card shows its text. Every
-component, prop, operator, and state kind is dated with `since`; a program's
-version is the highest `since` it uses. Anything new takes the next version and
-raises `PROGRAM_VERSION` in the same change, so a client keeps drawing every
-program whose vocabulary it has. See `src/lang/AGENTS.md`.
+**One API version.** Programs and their envelope carry a `version` field set to
+`API_VERSION` (`src/lang/identity.ts`), currently 1. A client draws an API
+version it knows and shows the text of anything else, including cards persisted
+before the field existed. Fields are not dated one by one. The release version
+in `package.json` and the git tags is the maintainer's, and is independent of the
+API version. See `src/lang/AGENTS.md`.
 
 **Naming.** `name` in `package.json` is the cordis row id, the client module id,
 the skill name, and the `__ModuleLoader__.load({ id })` key: one string,
@@ -198,9 +197,14 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
 - Animation: `player` plays, pauses, steps, and scrubs a number state, with a
   duration and a reader-chosen speed; `pick` and the `current=` and `mono=`
   props let a card trace code line by line (`tests/client.test.tsx`).
-- Programs and envelopes carry a `version` field and every field is dated;
-  version 1 renders, any other version and anything persisted before the field
-  existed shows its text; an unknown component is skipped and counted.
+- Pages, checklists, sortable tables, and flowcharts:
+  `tabs` and `tab` switch pages by click or arrow key, `checklist` counts ticked
+  items into an optional bound state, `table sortable=true` sorts by any column,
+  and `diagram` lays out boxes and arrows in layers with loops on a side lane
+  (`tests/compile.test.ts`, `tests/client.test.tsx`). Not yet drawn in a live chat.
+- Programs and envelopes carry the API version; API version 1 renders, any
+  other version and anything persisted before the field existed shows its text;
+  an unknown component is skipped and counted.
 - The pluggability and packaging invariants are checked mechanically
   (`tests/isolation.test.ts`, `tests/manifest.test.ts`), and the harness checkout
   is unchanged.

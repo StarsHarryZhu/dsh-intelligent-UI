@@ -16,9 +16,9 @@
  */
 
 import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'
-import { catalogHash, CATALOG_VERSION } from '../lang/catalog.ts'
+import { catalogHash } from '../lang/catalog.ts'
 import { compileSource } from '../lang/compile.ts'
-import { UI_META_VERSION, UI_TOOL_NAME } from '../lang/identity.ts'
+import { API_VERSION, UI_TOOL_NAME } from '../lang/identity.ts'
 import { LIMITS } from '../lang/limits.ts'
 import type { Diagnostic, JsonValue, UIProgram } from '../lang/types.ts'
 import { REPAIR_HINT, UI_TOOL_DESCRIPTION } from './model-brief.ts'
@@ -182,7 +182,7 @@ function formatDiagnostic(diagnostic: Diagnostic): string {
  */
 export function buildPresentationMeta(args: { title?: string | undefined }, value: unknown): JsonValue {
   const candidate = (typeof value === 'object' && value !== null ? value : {}) as Partial<UIRenderSuccess> & Partial<UIRenderFailure>
-  const meta: Record<string, JsonValue> = { version: UI_META_VERSION }
+  const meta: Record<string, JsonValue> = { version: API_VERSION }
   if (typeof args.title === 'string' && args.title.trim() !== '') meta.title = args.title.trim().slice(0, 120)
   if (candidate.ok === true && candidate.program !== undefined) {
     meta.ok = true
@@ -198,5 +198,5 @@ export function buildPresentationMeta(args: { title?: string | undefined }, valu
   return meta
 }
 
-/** Re-exported so the host entry and tests share one catalog generation. */
-export { catalogHash, CATALOG_VERSION, UI_TOOL_NAME }
+/** Re-exported so the host entry and tests share one catalog hash. */
+export { catalogHash, UI_TOOL_NAME }

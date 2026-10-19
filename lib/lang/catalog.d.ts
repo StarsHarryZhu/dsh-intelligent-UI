@@ -8,8 +8,6 @@
  * @module dsh-intelligent-ui/lang/catalog
  */
 import type { StateKind } from './types.ts';
-/** Bumped whenever a descriptor's props or kinds change. */
-export declare const CATALOG_VERSION = "1";
 /** Tone tokens map to theme aliases, never to literal colours. */
 export declare const TONES: readonly ["primary", "secondary", "muted", "success", "warn", "error"];
 /** A tone name from {@link TONES}. */
@@ -27,12 +25,7 @@ export type Size = (typeof SIZES)[number];
  * optional prop that fails is dropped on its own and reported, so a bad
  * `padding` never costs the reader the whole card.
  */
-export type PropSpec = PropKind & {
-    /** The program version that introduced this prop; see `OPERATOR_SINCE` in types.ts. */
-    since: number;
-};
-/** The kind-specific half of a {@link PropSpec}. */
-export type PropKind = {
+export type PropSpec = {
     kind: 'expr';
     required?: boolean;
     of: 'number' | 'string' | 'boolean';
@@ -97,13 +90,16 @@ export type PropKind = {
     kind: 'variable';
     required?: boolean;
     default?: string;
+}
+/** Arrows between the entries of the component's `nodes`, named by text or 1-based number. */
+ | {
+    kind: 'edges';
+    required?: boolean;
 };
 /** One catalog entry. */
 export interface ComponentDescriptor {
     /** Tag name the model writes. */
     type: string;
-    /** The program version that introduced this component; see `OPERATOR_SINCE` in types.ts. */
-    since: number;
     /** One-line model-facing purpose. Kept short: the whole catalog travels in the tool description. */
     description: string;
     /** Whether the component may contain children. */
@@ -122,7 +118,7 @@ export declare const CATALOG: readonly ComponentDescriptor[];
 export declare const CATALOG_BY_TYPE: ReadonlyMap<string, ComponentDescriptor>;
 /**
  * Stable hash of the catalog's semantics: component names, containment, and prop
- * names, kinds, and requiredness, each with the version that introduced it.
+ * names, kinds, and requiredness.
  * Descriptions are excluded, so rewording the model-facing text never makes a
  * persisted program look foreign.
  * @returns a short hex digest.

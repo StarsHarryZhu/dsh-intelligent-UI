@@ -94,7 +94,7 @@ The architecture, not the training. Each layer maps onto a mechanism DeepSeek Ha
 
 **The model sees what it built.** The tool result tells the model what a text-only reader sees, with the figures computed, and lists what the compiler repaired, so the next call is cleaner — the original's diagnostics never reached its model.
 
-**The catalog is scoped to what the host can style natively.** Twenty-seven components rather than seventy, each drawn from theme tokens. A smaller catalog the model uses correctly is worth more than a large one it half-remembers.
+**The catalog is scoped to what the host can style natively.** Thirty-one components rather than seventy, each drawn from theme tokens. A smaller catalog the model uses correctly is worth more than a large one it half-remembers.
 
 **Mathematics is computed, not written.** The original's cards show figures the model computed. Here a card can carry the computation itself: integrals (adaptive Gauss–Kronrod, with infinite bounds), derivatives (exact, by Taylor-mode automatic differentiation over the expression tree), limits (extrapolated, refusing when the sides disagree), finite sums and products, roots (Brent's method), and Taylor polynomials, with `plot` and `formula` to show them. A figure the engine cannot vouch for is shown as "—" rather than guessed, and the tool result hands the model the computed figures, so the reply and the card agree. Formulas are typeset by the plugin's own spans: React 18 cannot create MathML, and the host's KaTeX is not a plugin dependency.
 

@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { CATALOG_BY_TYPE, CATALOG_VERSION, catalogHash } from '../src/lang/catalog.ts'
+import { catalogHash } from '../src/lang/catalog.ts'
 import { compileSource, initialValues, isDataImage } from '../src/lang/compile.ts'
 import { renderText } from '../src/lang/text.ts'
-import { OPERATOR_SINCE, STATE_KIND_SINCE, type Diagnostic, type UINode, type UIProgram } from '../src/lang/types.ts'
+import { API_VERSION } from '../src/lang/identity.ts'
+import type { Diagnostic, UINode, UIProgram } from '../src/lang/types.ts'
 
 /** The estimate every grammar should agree on. */
 const TEAM_PLAN_DIL = [
@@ -62,10 +63,11 @@ describe('the canonical estimate', () => {
     expect(slider.props).not.toHaveProperty('bind')
   })
 
-  it('stamps the program version and the catalog generation', () => {
-    expect(program.version).toBe(1)
+  it('stamps the API version and the catalog hash', () => {
+    expect(API_VERSION).toBe(1)
+    expect(program.version).toBe(API_VERSION)
     expect(program).not.toHaveProperty('v')
-    expect(program.catalogVersion).toBe(CATALOG_VERSION)
+    expect(program).not.toHaveProperty('catalogVersion')
     expect(program.catalogHash).toBe(catalogHash())
   })
 
@@ -355,26 +357,6 @@ describe('math', () => {
     expect(lines).toContain('Exact: 0.333333')
   })
 
-  it('records the highest version among the fields a program uses', () => {
-    const programs = [
-      ok(TEAM_PLAN_DIL),
-      ok(calculus),
-      ok('@state t = 0 min=0 max=3\ncard\n  player "t" bind=t\n  steps items=["a","b"] current=t mono=true\n  text "{pick(t + 1, \"x\", \"y\")}"'),
-    ]
-    for (const program of programs) {
-      const used = [
-        ...program.state.map(row => STATE_KIND_SINCE[row.kind]),
-        ...program.nodes.flatMap((node) => {
-          const descriptor = CATALOG_BY_TYPE.get(node.type)
-          return [descriptor?.since ?? 1, ...Object.keys(node.props).map(name => descriptor?.props[name]?.since ?? 1)]
-        }),
-        ...[...JSON.stringify([program.calc, program.nodes]).matchAll(/\["([A-Za-z]+)"/gu)]
-          .map(match => OPERATOR_SINCE[match[1] as string] ?? 1),
-      ]
-      expect(program.version).toBe(Math.max(...used))
-    }
-  })
-
   it('binds a plot variable of its own, shadowing nothing outside the curves', () => {
     const program = ok('@state t0 = 1\ncard\n  plot fn=["sin(t)", "t0 * t"] var=t from=0 to=tau')
     expect(first(program, 'plot').props.var).toBe('t')
@@ -480,5 +462,93 @@ describe('the player docks at the bottom of its card', () => {
     expect(children).toEqual(['row', 'text', 'player', 'player'])
     expect(program.nodes.filter(node => node.type === 'player').map(node => textOf(program, node, 'label'))).toEqual(['first', 'nested'])
     expect(program.fallback.split('\n').map(line => line.trim()).slice(-2)).toEqual(['first: 0 (0–3)', 'nested: 0 (0–3)'])
+  })
+})
+
+describe('pages, checklists, sortable tables, and diagrams', () => {
+  const PAGES = [
+    'card "Course"',
+    '  tabs',
+    '    tab "Idea"',
+    '      text "A derivative is a rate."',
+    '    tab "Example"',
+    '      text "d/dx x^2 = 2x"',
+  ].join('\n')
+
+  it('belongs to the same API version as everything else', () => {
+    expect(ok(PAGES).version).toBe(API_VERSION)
+    expect(ok('card\n  table columns=["a"] rows=[["1"]] sortable=true').version).toBe(API_VERSION)
+  })
+
+  it('nests pages by indentation and lists every page in the text view', () => {
+    const program = ok(PAGES)
+    expect(program.diagnostics).toEqual([])
+    const tabs = first(program, 'tabs')
+    expect(program.nodes.filter(node => node.type === 'tab').every(node => node.parent === tabs.id)).toBe(true)
+    expect(program.fallback).toBe('## Course\n  ### Idea\n    A derivative is a rate.\n  ### Example\n    d/dx x^2 = 2x')
+  })
+
+  it('adds the tabs line a source left out, and reports it', () => {
+    const program = ok('card\n  tab "One"\n    text "a"\n  tab "Two"\n    text "b"\n  text "after"')
+    const tabs = program.nodes.filter(node => node.type === 'tabs')
+    expect(tabs).toHaveLength(1)
+    expect(program.nodes.filter(node => node.type === 'tab').map(node => node.parent)).toEqual([tabs[0]?.id, tabs[0]?.id])
+    expect(first(program, 'tabs').parent).toBe(first(program, 'card').id)
+    const after = program.nodes.find(node => node.type === 'text' && textOf(program, node, 'text') === 'after')
+    expect(after?.parent).toBe(first(program, 'card').id)
+    expect(program.diagnostics.map(entry => entry.code)).toEqual(['orphan_node'])
+    expect(program.diagnostics[0]?.repair).toContain('tabs line')
+  })
+
+  it('moves a component written straight inside tabs into the page beside it', () => {
+    const program = ok('card\n  tabs\n    text "before"\n    tab "One"\n      text "a"\n    text "loose"\n    tab "Two"')
+    const [one, two] = program.nodes.filter(node => node.type === 'tab')
+    const parents = program.nodes.filter(node => node.type === 'text').map(node => node.parent)
+    expect(parents).toEqual([one?.id, one?.id, one?.id])
+    expect(two).toBeDefined()
+    expect(program.diagnostics.filter(entry => entry.code === 'orphan_node')).toHaveLength(2)
+  })
+
+  it('reads a checklist with and without a bound count', () => {
+    const program = ok('@state done = 0\ncard\n  checklist "Before you go" items=["Passport", "Tickets"] bind=done\n  checklist items=["One"]')
+    expect(program.diagnostics).toEqual([])
+    const [bound, free] = program.nodes.filter(node => node.type === 'checklist')
+    expect(bound?.bind).toEqual({ key: 'done', kind: 'number' })
+    expect(free?.bind).toBeUndefined()
+    expect(program.fallback).toBe('Before you go (0/2 done)\n- [ ] Passport\n- [ ] Tickets\nChecklist (0/1 done)\n- [ ] One')
+    // A count bound to text state is dropped on its own; the list still draws.
+    const text = ok('@state done = "x"\ncard\n  checklist items=["a"] bind=done')
+    expect(first(text, 'checklist').bind).toBeUndefined()
+    expect(text.diagnostics[0]?.message).toContain('binds number state')
+  })
+
+  it('resolves arrows by text or number, keeps labels, and reports a dangling one', () => {
+    const program = ok([
+      '@state at = 2',
+      'card',
+      '  diagram "Login" nodes=["Start", "x > 0?", "Done"] edges=["Start -> x > 0?", "x > 0? -> Done: yes", "2 -> 1: no", "Start -> Nowhere"] current=at',
+    ].join('\n'))
+    const diagram = first(program, 'diagram')
+    const edges = diagram.props.edges as unknown[]
+    expect(edges.slice(0, 2)).toEqual([[1, 2], [2, 3, expect.any(Array)]])
+    expect((edges[2] as unknown[]).slice(0, 2)).toEqual([2, 1])
+    expect(edges).toHaveLength(3)
+    expect(program.diagnostics).toHaveLength(1)
+    expect(program.diagnostics[0]?.message).toContain('"Start -> Nowhere"')
+    expect(program.diagnostics[0]?.repair).toContain('1 to 3')
+    expect(program.fallback).toBe('Diagram "Login": Start → x > 0?; x > 0? → Done (yes); x > 0? → Start (no); current: x > 0?')
+  })
+
+  it('accepts arrows written as lists, and a diagram in a bare JSON tree', () => {
+    const program = ok(JSON.stringify({ type: 'diagram', nodes: ['A', 'B'], edges: [['A', 'B', 'go'], [2, 1]] }))
+    expect(first(program, 'diagram').props.edges).toEqual([[1, 2, expect.any(Array)], [2, 1]])
+    expect(program.fallback).toContain('A → B (go); B → A')
+  })
+
+  it('bounds the boxes and arrows of one diagram', () => {
+    const boxes = JSON.stringify(Array.from({ length: 41 }, (_, index) => `n${index}`))
+    const program = ok(`card\n  text "x"\n  diagram nodes=${boxes}`)
+    expect(program.nodes.some(node => node.type === 'diagram')).toBe(false)
+    expect(program.diagnostics.some(entry => entry.code === 'limit_exceeded')).toBe(true)
   })
 })

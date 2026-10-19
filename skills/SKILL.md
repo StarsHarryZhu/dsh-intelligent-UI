@@ -103,6 +103,18 @@ reads the state recomputes on every frame, in the browser, without calling you.
 - In your reply, say what the reader will see when they press play; the text
   view you receive shows the first frame only.
 
+## Pages, checklists, and flows
+
+- Split a long card into `tabs` with one indented `tab "Title"` per page, such as
+  idea, worked example, practice. Every page shares the card's state, and you
+  still read all pages in the result.
+- Use `checklist items=[…]` for steps the reader ticks off; add `bind=done` with
+  `@state done = 0` when another figure should follow the count.
+- Add `sortable=true` to a `table` the reader may want to rank.
+- Draw a process or decision flow with `diagram nodes=[…] edges=["A -> B", "B -> C: yes"]`.
+  Name arrow ends by a node's exact text or its number; `current=` highlights a
+  box, so a `player` can walk the flow.
+
 ## When the call fails
 
 The result lists each problem with a repair. Apply every repair and call

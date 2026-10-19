@@ -60,6 +60,25 @@
 .dsh-iui-row { display: flex; flex-wrap: wrap; align-items: flex-start; min-width: 0; }
 .dsh-iui-row[data-align='center'] { align-items: center; }
 .dsh-iui-row[data-align='end'] { align-items: flex-end; }
+.dsh-iui-tabs { display: flex; flex-direction: column; min-width: 0; }
+.dsh-iui-tabs-list { display: flex; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: thin; border-bottom: 0.5px solid var(--dsw-alias-border-l2); }
+.dsh-iui-tabs-tab {
+  flex: none;
+  margin-bottom: -0.5px;
+  padding: 6px 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xs-13);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.dsh-iui-tabs-tab:hover { color: var(--dsw-alias-label-primary); }
+.dsh-iui-tabs-tab[aria-selected='true'] { border-bottom-color: var(--dsw-alias-brand-primary); color: var(--dsw-alias-label-primary); font: var(--dsw-font-xs-strong-13); }
+.dsh-iui-tabs-panel { display: flex; flex-direction: column; min-width: 0; }
+.dsh-iui-tab-title { font: var(--dsw-font-s-strong-14); color: var(--dsw-alias-label-primary); }
 .dsh-iui-cell { flex: 1 1 140px; display: flex; flex-direction: column; min-width: 0; }
 .dsh-iui-grid { display: grid; min-width: 0; }
 
@@ -126,7 +145,7 @@
 .dsh-iui-player-button:hover:not(:disabled), .dsh-iui-player-speed:hover { background: var(--dsw-alias-interactive-bg-hover); }
 .dsh-iui-player-button[data-primary]:hover:not(:disabled) { background: var(--dsw-alias-button-primary-hover); }
 .dsh-iui-player-button:disabled { cursor: default; opacity: 0.4; }
-.dsh-iui-player-icon { display: block; }
+.dsh-iui-glyph { display: block; flex: none; }
 .dsh-iui-input-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .dsh-iui-unit { flex: none; font: var(--dsw-font-xxs-12); color: var(--dsw-alias-label-secondary); }
 .dsh-iui-input, .dsh-iui-select {
@@ -142,12 +161,16 @@
   font: var(--dsw-font-xs-13);
 }
 .dsh-iui-input:focus-visible, .dsh-iui-select:focus-visible, .dsh-iui-range:focus-visible, .dsh-iui-button:focus-visible, .dsh-iui-check input:focus-visible,
-.dsh-iui-player-button:focus-visible, .dsh-iui-player-speed:focus-visible {
+.dsh-iui-player-button:focus-visible, .dsh-iui-player-speed:focus-visible, .dsh-iui-tabs-tab:focus-visible, .dsh-iui-table-sort:focus-visible {
   outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 1px;
 }
 .dsh-iui-check { display: inline-flex; align-items: center; gap: 8px; font: var(--dsw-font-xs-13); color: var(--dsw-alias-label-primary); cursor: pointer; }
 .dsh-iui-check input { margin: 0; accent-color: var(--dsw-alias-brand-primary); }
+.dsh-iui-checklist-items { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.dsh-iui-checklist .dsh-iui-check { align-items: flex-start; }
+.dsh-iui-checklist .dsh-iui-check input { margin-top: 2px; }
+.dsh-iui-check[data-done] > span { color: var(--dsw-alias-label-tertiary); text-decoration: line-through; }
 
 .dsh-iui-figure { display: flex; flex-direction: column; gap: 6px; min-width: 0; margin: 0; }
 .dsh-iui-caption { font: var(--dsw-font-xxs-12); color: var(--dsw-alias-label-secondary); }
@@ -156,6 +179,8 @@
 .dsh-iui-table th { padding: 6px 12px 6px 0; border-bottom: 0.5px solid var(--dsw-alias-border-l2); color: var(--dsw-alias-label-secondary); font-weight: 500; text-align: left; white-space: nowrap; }
 .dsh-iui-table td { padding: 6px 12px 6px 0; border-bottom: 0.5px solid var(--dsw-alias-border-l1); text-align: left; vertical-align: top; font-variant-numeric: tabular-nums; }
 .dsh-iui-table tbody tr:last-child td { border-bottom: 0; }
+.dsh-iui-table-sort { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.dsh-iui-table-sort:hover { color: var(--dsw-alias-label-primary); }
 
 .dsh-iui-keys { display: flex; flex-direction: column; gap: 0; margin: 0; }
 .dsh-iui-keys-row { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 0.5px solid var(--dsw-alias-border-l1); font: var(--dsw-font-xs-13); }
@@ -203,6 +228,17 @@
 .dsh-iui-plot-key { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
 .dsh-iui-plot-swatch { flex: none; width: 12px; border-top: 2px solid var(--dsw-alias-brand-primary); }
 .dsh-iui-plot-readout { font: var(--dsw-font-xxs-12); color: var(--dsw-alias-label-secondary); font-variant-numeric: tabular-nums; }
+
+.dsh-iui-diagram-wrap { min-width: 0; overflow-x: auto; scrollbar-width: thin; }
+.dsh-iui-diagram-svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+.dsh-iui-diagram-node rect { fill: var(--dsw-alias-bg-layer-2); stroke: var(--dsw-alias-border-l3); stroke-width: 1; transition: fill 160ms ease-out, stroke 160ms ease-out; }
+.dsh-iui-diagram-node[data-current] rect { fill: var(--dsw-alias-interactive-bg-active); stroke: var(--dsw-alias-brand-primary); stroke-width: 1.5; }
+.dsh-iui-diagram-node text { fill: var(--dsw-alias-label-primary); font: var(--dsw-font-xs-13); }
+.dsh-iui-diagram-node[data-current] text { font: var(--dsw-font-xs-strong-13); }
+.dsh-iui-diagram-line { fill: none; stroke: var(--dsw-alias-label-tertiary); stroke-width: 1.2; }
+.dsh-iui-diagram-head { fill: var(--dsw-alias-label-tertiary); stroke: none; }
+.dsh-iui-diagram-label-back { fill: var(--dsw-alias-bg-layer-1); stroke: none; }
+.dsh-iui-diagram-label { fill: var(--dsw-alias-label-secondary); font: var(--dsw-font-xxs-12); }
 
 .dsh-iui-formula { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; color: var(--dsw-alias-label-primary); }
 .dsh-iui-formula-label { font: var(--dsw-font-xs-13); color: var(--dsw-alias-label-secondary); }
@@ -312,6 +348,7 @@
 @keyframes dsh-iui-pulse { 50% { opacity: 0.45; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .dsh-iui-row-head, .dsh-iui-button, .dsh-iui-player-button, .dsh-iui-player-speed, .dsh-iui-progress-fill, .dsh-iui-chart-bar { transition: none; }
+  .dsh-iui-row-head, .dsh-iui-button, .dsh-iui-player-button, .dsh-iui-player-speed, .dsh-iui-progress-fill, .dsh-iui-chart-bar,
+  .dsh-iui-tabs-tab, .dsh-iui-diagram-node rect { transition: none; }
   .dsh-iui-row-head[data-state='running'] .dsh-iui-row-status { animation: none; }
 }

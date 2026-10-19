@@ -63,17 +63,19 @@ needs the build first: run `node build.js` before the suite.
   old forms, primary text, quoting, declarations, comments, fences, and streaming.
 - `compile.test.ts` — both grammars end to end, interpolation in lists and
   tables, choices, every repair the compiler makes, what still fails, real model
-  sources, content safety, streaming compiles, the program version, and the
-  animation props.
+  sources, content safety, streaming compiles, the API version, the
+  animation props, and the newest components: tabs and their repairs,
+  checklists, sortable tables, and diagram arrows.
 - `limits.test.ts` — each bound at its limit and one past it, and bounded JSON
   recovery.
 - `catalog.test.ts` — the catalog and the render registry in both directions,
-  each descriptor's internal consistency, and the version every field records.
+  and each descriptor's internal consistency.
 - `tool.test.ts` — the tool definition's wire shape, its result schema, what the
   model is told, and the persisted metadata.
 - `client.test.tsx` — the browser half through its real registration: the row's
   stages, buttons, the turn data Definition, the tail, shared edits, the player,
-  and every degradation path.
+  tabs, checklists, sorting, diagrams and their layout, and every degradation
+  path.
 - `math.test.ts` — the quadrature rule's constants, integrals, derivatives,
   limits, sums, products, roots, Taylor polynomials, special functions,
   precedence, the work budget, and number display, each against known values.

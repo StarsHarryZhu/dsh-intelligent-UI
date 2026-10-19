@@ -3,15 +3,15 @@
  *
  * The program in `tool/result.meta` was persisted by a possibly different build,
  * so nothing here trusts the compiler's types. Every field is guarded, every
- * guard has a fallback, and nothing throws. A program whose `version` is 1 to
- * {@link PROGRAM_VERSION} renders; any other one, newer or from before version
- * fields existed, is shown as its text stand-in.
+ * guard has a fallback, and nothing throws. A program and envelope whose
+ * `version` is an API version this build knows render; any other one, newer or
+ * from before version fields existed, is shown as its text stand-in.
  * @module dsh-intelligent-ui/client/program
  */
 
 import { compileSource, dockPlayers } from '../lang/compile.ts'
 import { evalExpr } from '../lang/expr.ts'
-import { PROGRAM_VERSION, UI_META_VERSION } from '../lang/identity.ts'
+import { API_VERSION } from '../lang/identity.ts'
 import type { JsonValue } from '../lang/types.ts'
 
 /** One declared state value, as read. */
@@ -62,7 +62,7 @@ export type CardMeta =
 export function readMeta(meta: unknown): CardMeta | undefined {
   const record = asRecord(meta)
   const title = typeof record.title === 'string' && record.title.trim() !== '' ? { title: record.title.trim() } : {}
-  if (!knownVersion(record.version, UI_META_VERSION)) {
+  if (!knownVersion(record.version)) {
     // An envelope this build cannot read still shows the text its program carries.
     const fallback = asRecord(record.program).fallback
     return record.ok === true && typeof fallback === 'string' && fallback !== ''
@@ -137,7 +137,7 @@ export function readProgram(value: unknown): Program | undefined {
     .filter(raw => typeof raw.key === 'string')
     .map(raw => ({ key: raw.key as string, expr: raw.expr }))
   return {
-    supported: knownVersion(record.version, PROGRAM_VERSION),
+    supported: knownVersion(record.version),
     state,
     calc,
     nodes,
@@ -205,9 +205,9 @@ export function acceptEdit(row: StateRow, value: unknown): JsonValue | undefined
   }
 }
 
-/** Whether a version field names a version this build reads: a whole number from 1 to `newest`. */
-function knownVersion(value: unknown, newest: number): boolean {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= newest
+/** Whether a version field names an API version this build reads: a whole number from 1 to {@link API_VERSION}. */
+function knownVersion(value: unknown): boolean {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= API_VERSION
 }
 
 /** A program that only shows its text stand-in. */
