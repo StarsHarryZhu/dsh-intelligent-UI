@@ -11,6 +11,24 @@
 | 已验证 | 网页版 0.2.1-alpha.4；macOS 和 Windows 桌面版 0.2.1-rc.2 |
 | 安装 | 设置 → 插件 → 添加插件 → `https://github.com/StarsHarryZhu/dsh-intelligent-UI`（需要 `PATH` 里有 `git`），然后重启 harness 并刷新页面 |
 
+## 工作方式
+
+- 插件注册一个工具 `ui_render` 和一个技能 `dsh-intelligent-ui`，技能教模型什么时候用卡片比用文字好。模型不写 HTML 或 JavaScript：它写的程序按 31 个组件的目录校验，随工具结果一起保存。
+- 回复生成时，卡片显示在工具行里；回复结束后，卡片显示在回复下方。调整控件时，所有数字都在本地重算。
+- `player` 让卡片动起来：逐行演示代码执行、算法的每一轮、点沿曲线移动。播放在浏览器里进行，不会发消息给模型。
+- 卡片能算定积分（含无穷积分限）、导数、极限、求和与连乘、方程求根和泰勒多项式。算不准的值显示“—”，不会给出猜测的数。
+- 卸载后，所有会话照常打开，之前的调用显示为普通工具行。
+
+## 开发
+
+```sh
+node scripts/link-dev.mjs   # 从同级 harness checkout 链接工具链
+node build.js               # 类型检查、构建并自检 bundle
+node node_modules/vitest/vitest.mjs run
+```
+
+目录规则见 `AGENTS.md`，线上验证清单见 `docs/VERIFY.md`。
+
 ## 31 个组件
 
 每个组件一张卡片，由本插件按宿主的浅色主题绘制。每张卡片的程序原文见 [`docs/SAMPLES.md`](docs/SAMPLES.md)。
@@ -200,24 +218,6 @@
 <img src="assets/catalog/player.png" alt="player" width="720">
 
 固定在卡片底部的播放条：让一个数值随时间播放、暂停、单步和拖动，倍速 0.5× 到 2×；引用它的内容逐帧更新。
-
-## 工作方式
-
-- 插件注册一个工具 `ui_render` 和一个技能 `dsh-intelligent-ui`，技能教模型什么时候用卡片比用文字好。模型不写 HTML 或 JavaScript：它写的程序按 31 个组件的目录校验，随工具结果一起保存。
-- 回复生成时，卡片显示在工具行里；回复结束后，卡片显示在回复下方。调整控件时，所有数字都在本地重算。
-- `player` 让卡片动起来：逐行演示代码执行、算法的每一轮、点沿曲线移动。播放在浏览器里进行，不会发消息给模型。
-- 卡片能算定积分（含无穷积分限）、导数、极限、求和与连乘、方程求根和泰勒多项式。算不准的值显示“—”，不会给出猜测的数。
-- 卸载后，所有会话照常打开，之前的调用显示为普通工具行。
-
-## 开发
-
-```sh
-node scripts/link-dev.mjs   # 从同级 harness checkout 链接工具链
-node build.js               # 类型检查、构建并自检 bundle
-node node_modules/vitest/vitest.mjs run
-```
-
-目录规则见 `AGENTS.md`，线上验证清单见 `docs/VERIFY.md`。
 
 ## 许可证
 

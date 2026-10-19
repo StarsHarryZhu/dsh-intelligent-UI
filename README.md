@@ -4,14 +4,12 @@ Interactive cards in DeepSeek Harness chats. The model writes a small interface 
 
 [中文](README-zh.md)
 
-
 | | |
 |---|---|
 | Requires | DeepSeek Harness **>= 0.2.1-alpha.1** (below 0.3.0) |
 | Platforms | Web UI, macOS desktop app, and Windows desktop app — one bundle, because both desktop apps load the same web client |
 | Verified | Web UI 0.2.1-alpha.4; macOS and Windows desktop apps 0.2.1-rc.2 |
 | Install | Settings → Plugins → Add plugin → `https://github.com/StarsHarryZhu/dsh-intelligent-UI` (needs `git` on `PATH`), then restart the harness and reload the page |
-
 
 ## How it works
 
@@ -31,9 +29,6 @@ node node_modules/vitest/vitest.mjs run
 
 `AGENTS.md` holds the rules of the tree; `docs/VERIFY.md` is the live checklist.
 
-## License
-
-[MIT License](LICENSE) © 2026 Starfield.
 ## The 31 components
 
 One card per component, drawn by this plugin in the host's light theme. The program behind each card is in [`docs/SAMPLES.md`](docs/SAMPLES.md).
@@ -224,4 +219,6 @@ Sends its text as your next message, then locks the card.
 
 A control bar at the bottom of the card: plays, pauses, steps, and scrubs a number at 0.5× to 2×; everything that reads it follows.
 
+## License
 
+[MIT License](LICENSE) © 2026 Starfield.
