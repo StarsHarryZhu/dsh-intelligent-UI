@@ -1,6 +1,6 @@
 # The catalog, one sample per component
 
-A live tour of the catalog: one card per component, drawn in a real chat. Samples 1 to 24 were drawn on 2026-10-15 in the order the catalog had then; samples 25 and 26, the math components, and sample 27, the animation player, were written by the model itself on 2026-10-16. Samples 28 to 31, the newest components, were written by hand on 2026-10-18 and compiled by the built tool; their results are that tool's output, and they have not yet been drawn in a live chat.
+A live tour of the catalog: one card per component, drawn in a real chat. Samples 1 to 24 were drawn on 2026-10-15 in the order the catalog had then; samples 25 and 26, the math components, and sample 27, the animation player, were written by the model itself on 2026-10-16. Samples 28 to 31, the newest components, were written by hand on 2026-10-18 and compiled by the built tool; their results are that tool's output. On 2026-10-19 one card using all four — tabs, a checklist, a sortable table, and a diagram — drew in the web UI.
 
 Every block below is the exact `source` that was passed to `ui_render` and the exact result it reported, so this file doubles as a regression corpus — `tests/compile.test.ts` can compile any of them.
 

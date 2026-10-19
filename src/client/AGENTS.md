@@ -143,7 +143,8 @@ client package is forbidden.
   checklist counts into its bound state; a sortable table cycles ascending,
   descending, and written order with the highlight on its row; a diagram
   highlights the current box and lays out loops on a side lane
-  (`tests/client.test.tsx`). Not yet drawn in a live chat.
+  (`tests/client.test.tsx`); one card using all four drew in the web UI on
+  2026-10-19.
 - Plots break at asymptotes, label several curves, and print the point, slope,
   and area they draw; chart and plot dots stay round when the SVG stretches;
   formulas typeset fractions, radicals, scripts, integrals, sums, limits, and

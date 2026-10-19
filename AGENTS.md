@@ -201,7 +201,8 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
   `tabs` and `tab` switch pages by click or arrow key, `checklist` counts ticked
   items into an optional bound state, `table sortable=true` sorts by any column,
   and `diagram` lays out boxes and arrows in layers with loops on a side lane
-  (`tests/compile.test.ts`, `tests/client.test.tsx`). Not yet drawn in a live chat.
+  (`tests/compile.test.ts`, `tests/client.test.tsx`); one card using all four
+  drew in the web UI on 2026-10-19.
 - Programs and envelopes carry the API version; API version 1 renders, any
   other version and anything persisted before the field existed shows its text;
   an unknown component is skipped and counted.
