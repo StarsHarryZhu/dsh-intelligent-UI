@@ -78,8 +78,21 @@ describe('one browser declaration', () => {
     expect(existsSync(join(ROOT, 'lib', 'client.js'))).toBe(true)
     expect(manifest.dsh.bundle.patch).toBe('./cordis.patch.yml')
     const patch = readFileSync(join(ROOT, 'cordis.patch.yml'), 'utf8')
-    expect(patch).toContain('id: dsh-intelligent-ui')
-    expect(patch).toContain('name: dsh-intelligent-ui')
+    const rows = [...patch.matchAll(/- id: (\S+)\n\s+name: (\S+)/gu)].map(match => [match[1], match[2]])
+    expect(rows).toEqual([['dsh-intelligent-ui', 'dsh-intelligent-ui'], ['dsh-intelligent-ui-skill', 'dsh-intelligent-ui/skill']])
+  })
+
+  it('exports the skill row and its own display text, so the Plugin Manager lists it as a part', () => {
+    expect(manifest.exports['./skill'].default).toBe('./lib/skill.js')
+    expect(existsSync(join(ROOT, 'lib', 'skill.js'))).toBe(true)
+    // The host reads a row's title from `<specifier>/locale/<language>.json` and its icon from `<specifier>/icon`.
+    expect(manifest.exports['./skill/locale/*.json']).toBe('./locale/skill/*.json')
+    expect(manifest.exports['./skill/icon']).toBe('./icon.svg')
+    for (const language of ['en', 'zh']) {
+      const meta = JSON.parse(readFileSync(join(ROOT, 'locale', 'skill', `${language}.json`), 'utf8')).meta
+      expect(typeof meta.title, language).toBe('string')
+      expect(typeof meta.description, language).toBe('string')
+    }
   })
 })
 
@@ -92,8 +105,8 @@ describe('installing from a git checkout', () => {
   })
 
   it('publishes every file the host half, the browser half, and the skill read at runtime', () => {
-    for (const entry of ['lib', 'skills', 'cordis.patch.yml', 'locale/*.json', 'icon.svg']) expect(manifest.files).toContain(entry)
-    for (const file of ['lib/index.js', 'lib/host/skill.js', 'skills/SKILL.md', 'icon.svg']) expect(existsSync(join(ROOT, file)), file).toBe(true)
+    for (const entry of ['lib', 'skills', 'cordis.patch.yml', 'locale/*.json', 'locale/skill/*.json', 'icon.svg']) expect(manifest.files).toContain(entry)
+    for (const file of ['lib/index.js', 'lib/skill.js', 'lib/host/skill.js', 'skills/dsh-intelligent-ui/SKILL.md', 'icon.svg']) expect(existsSync(join(ROOT, file)), file).toBe(true)
   })
 
   it('carries display metadata in both languages', () => {

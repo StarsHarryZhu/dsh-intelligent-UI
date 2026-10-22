@@ -189,3 +189,93 @@ describe('streaming', () => {
     expect(parse('card\n@state = \n  text "x"\n', true).diagnostics.filter(entry => entry.line === undefined)).toEqual([])
   })
 })
+
+describe('text blocks', () => {
+  const Q = '"""'
+
+  it('takes the lines up to a closing """ as the primary text, without their shared indentation', () => {
+    const { nodes, diagnostics } = parse([
+      'card "Demo"',
+      `  code lang=python ${Q}`,
+      '    def f(x):',
+      '        if x {}}:',
+      '            return 1',
+      '',
+      '    # done',
+      `  ${Q}`,
+      '  text "after"',
+    ].join('\n'))
+    expect(diagnostics).toEqual([])
+    expect(nodes.map(node => node.type)).toEqual(['card', 'code', 'text'])
+    expect(nodes[1]?.props).toEqual({ lang: 'python', text: 'def f(x):\n    if x {}}:\n        return 1\n\n# done' })
+    // The block's lines are never statements, and the line after it nests as usual.
+    expect(nodes[2]?.parent).toBe('card1')
+    expect(nodes[2]?.line).toBe(9)
+  })
+
+  it('fills the prop the opener names, and reads a block written on one line', () => {
+    const { nodes } = parse([
+      'card',
+      `  code caption="a.txt" text=${Q}`,
+      '    first',
+      `  ${Q}`,
+      `  code ${Q}x = 1${Q}`,
+    ].join('\n'))
+    expect(nodes[1]?.props).toEqual({ caption: 'a.txt', text: 'first' })
+    expect(nodes[2]?.props).toEqual({ text: 'x = 1' })
+  })
+
+  it('keeps lines that look like statements, comments, or fences as text', () => {
+    const { nodes } = parse(['card', `  code ${Q}`, '  // not a comment', '  @state x = 1', '  ```', `  ${Q}`].join('\n'))
+    expect(nodes).toHaveLength(2)
+    expect(nodes[1]?.props).toEqual({ text: '// not a comment\n@state x = 1\n```' })
+  })
+
+  it('runs an unclosed block to the end and reports it once the source is complete', () => {
+    const complete = parse(['card', `  code ${Q}`, '    a', '    b'].join('\n'))
+    expect(complete.nodes[1]?.props).toEqual({ text: 'a\nb' })
+    expect(complete.diagnostics.map(diagnostic => [diagnostic.code, diagnostic.line])).toEqual([['unterminated_line', 2]])
+    expect(complete.diagnostics[0]?.repair).toContain(Q)
+  })
+
+  it('shows the lines that have arrived while streaming, and reports nothing', () => {
+    const streaming = parse(['card', `  code ${Q}`, '    a', '    b'].join('\n'), true)
+    expect(streaming.nodes[1]?.props).toEqual({ text: 'a' })
+    expect(streaming.diagnostics).toEqual([])
+  })
+
+  it('reports a block on a declaration, or a second value for the same prop', () => {
+    const declared = parse([`@state note = ${Q}`, '  hi', Q, 'card', '  text "x"'].join('\n'))
+    expect(declared.diagnostics.some(diagnostic => /declaration/u.test(diagnostic.message))).toBe(true)
+    expect(declared.nodes.map(node => node.type)).toEqual(['card', 'text'])
+    const twice = parse(['card', `  code "inline" ${Q}`, '    block', `  ${Q}`].join('\n'))
+    expect(twice.nodes[1]?.props).toEqual({ text: 'block' })
+    expect(twice.diagnostics.some(diagnostic => /given twice/u.test(diagnostic.message))).toBe(true)
+  })
+
+  it('gives a block opened on a line of its own to the component above it, and says so', () => {
+    const { nodes, diagnostics } = parse([
+      'card',
+      '  code lang=python numbers=true caption="fib.py"',
+      `    ${Q}`,
+      '    a, b = 0, 1',
+      '    for _ in range(5):',
+      '        a, b = b, a + b',
+      `    ${Q}`,
+      '  text "after"',
+    ].join('\n'))
+    expect(nodes.map(node => node.type)).toEqual(['card', 'code', 'text'])
+    expect(nodes[1]?.props).toEqual({ lang: 'python', numbers: true, caption: 'fib.py', text: 'a, b = 0, 1\nfor _ in range(5):\n    a, b = b, a + b' })
+    expect(nodes[2]?.parent).toBe('card1')
+    expect(diagnostics).toHaveLength(1)
+    expect(diagnostics[0]?.message).toContain('given to <code> on line 2')
+    const orphan = parse([Q, 'x', Q, 'card'].join('\n'))
+    expect(orphan.diagnostics[0]?.message).toContain('no component above it')
+  })
+
+  it('does not read quoted text that merely ends in quotes as an opener', () => {
+    const { nodes, diagnostics } = parse(['card', '  text "say ""', '  text "next"'].join('\n'))
+    expect(nodes.map(node => node.type)).toEqual(['card', 'text', 'text'])
+    expect(diagnostics.filter(diagnostic => diagnostic.code === 'unterminated_line')).toEqual([])
+  })
+})

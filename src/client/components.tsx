@@ -18,6 +18,7 @@ import { MAX_SPACE } from '../lang/limits.ts'
 import { formatSignificant } from '../lang/math.ts'
 import type { JsonValue } from '../lang/types.ts'
 import { renderChart } from './chart.tsx'
+import { CodeFigure } from './code.tsx'
 import { DiagramFigure } from './diagram.tsx'
 import { renderFormula } from './formula.tsx'
 import type { CopyKey } from './locales.ts'
@@ -400,6 +401,7 @@ export const REGISTRY: Readonly<Record<string, Renderer>> = {
   chart: (node, _children, scope) => renderChart(node, scope),
   plot: (node, _children, scope) => <PlotFigure node={node} scope={scope} />,
   diagram: (node, _children, scope) => <DiagramFigure node={node} scope={scope} />,
+  code: (node, _children, scope) => <CodeFigure node={node} scope={scope} />,
   formula: (node, _children, scope) => renderFormula(node, scope),
   badge: (node, _children, scope) => <span className="dsh-iui-badge" data-tone={tone(node)}>{scope.text(node.props.text)}</span>,
   callout: (node, _children, scope) => <div className="dsh-iui-callout" data-tone={tone(node) ?? 'secondary'}>{scope.text(node.props.text)}</div>,

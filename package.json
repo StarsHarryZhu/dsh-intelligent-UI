@@ -31,8 +31,14 @@
     "./client": {
       "default": "./lib/client.js"
     },
+    "./skill": {
+      "types": "./lib/skill.d.ts",
+      "default": "./lib/skill.js"
+    },
     "./locale/*.json": "./locale/*.json",
+    "./skill/locale/*.json": "./locale/skill/*.json",
     "./icon": "./icon.svg",
+    "./skill/icon": "./icon.svg",
     "./package.json": "./package.json"
   },
   "files": [
@@ -41,6 +47,7 @@
     "skills",
     "cordis.patch.yml",
     "locale/*.json",
+    "locale/skill/*.json",
     "icon.svg",
     "README.md",
     "README-zh.md",

@@ -97,6 +97,13 @@ feature, degrading as described above.
 into `styles.css`; requiring `@deepseek-ai/dsh-client-ui-primitives` or any other
 client package is forbidden.
 
+**A code block scrolls itself, never the page.** When `current=` moves, the
+block sets its own `scrollTop` so the line stays in view; it never calls
+`scrollIntoView`, which would move the chat. Its colours are the host's syntax
+tokens (`--shiki-token-*`), each with a `--dsw-` theme fallback, so a listing
+reads like the host's own code blocks in both themes; the stylesheet test
+accepts no other non-theme colour. Copying writes the block's exact text.
+
 ## 3. Contents
 
 - `AGENTS.md` — this file: what the browser half may do and what it must not.
@@ -106,9 +113,13 @@ client package is forbidden.
 - `tail.tsx` — the turn-tail entry that draws a completed turn's cards.
 - `turn-data.ts` — the data-only Conversation Definition that collects cards per turn.
 - `card.tsx` — the card: values, edits, button sends, notices, and the boundaries.
+- `clipboard.ts` — the page clipboard, shared by the button fallback and the
+  code block's copy button.
 - `components.tsx` — the type-to-renderer registry, the number field, the
   animation player, tabs, the checklist, and table sorting.
 - `diagram.tsx` — flowcharts: the layered layout and its SVG drawing.
+- `code.tsx` — code blocks: coloured lines, line numbers, the current line kept
+  in view, and copying.
 - `chart.tsx` — bar and line charts as inline SVG.
 - `plot.tsx` — function plots: sampled curves, ranges, the marked point and
   tangent, the shaded area, the legend, and the readout.
@@ -145,6 +156,10 @@ client package is forbidden.
   highlights the current box and lays out loops on a side lane
   (`tests/client.test.tsx`); one card using all four drew in the web UI on
   2026-10-19.
+- Code blocks colour their syntax with the host's tokens, number their lines,
+  move the highlight with a player while scrolling only themselves, follow a
+  text state through `value=`, and copy their exact text, saying so when the
+  page refuses (`tests/client.test.tsx`).
 - Plots break at asymptotes, label several curves, and print the point, slope,
   and area they draw; chart and plot dots stay round when the SVG stretches;
   formulas typeset fractions, radicals, scripts, integrals, sums, limits, and

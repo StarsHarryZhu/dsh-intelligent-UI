@@ -70,6 +70,15 @@ end of the outermost card above it (`dockPlayers` in `compile.ts`), whatever lin
 the source wrote it on, and the browser applies the same rule to every program it
 reads, so the card, the preview, and the text view agree.
 
+**Code is shown as written.** A `code` block's text is a prop of kind `code`:
+never interpolated, line ends normalised, trailing empty lines dropped, and cut
+at `maxCodeLines` and `maxCodeChars` with the cut reported. A `"""` text block
+in DIL is the only statement that spans lines; its lines are never parsed as
+statements and lose only the indentation they share. A block opened on a line
+of its own belongs to the component above it, and the repair is reported. Colouring
+(`highlight.ts`) is lossless — the tokens of a line always join back into that
+line — so it can never change what the reader sees or copies.
+
 **Literal text is hoisted.** Static text moves into the program's `constants`
 table, interned, so the structure stays fixed while content varies.
 
@@ -92,7 +101,10 @@ https, images must be inline `data:image/…` rasters.
 - `types.ts` — the wire vocabulary: expressions, declarations, nodes, templates,
   diagnostics, the program, and the operator set.
 - `dil.ts` — the DIL line parser: declarations, indentation nesting, primary
-  text, and bare expression values, producing the JSON envelope.
+  text, bare expression values, and `"""` text blocks, producing the JSON
+  envelope.
+- `highlight.ts` — code colouring for the `code` component: one small scanner
+  per language family, lossless, never throwing.
 - `infix.ts` — the readable expression syntax and its lowering: powers,
   factorials, implicit products, typeset symbols, constants, function and calculus
   calls.
@@ -107,8 +119,8 @@ https, images must be inline `data:image/…` rasters.
 - `print.ts` — expressions printed back as readable infix text, for text views and
   accessible names.
 - `compile.ts` — grammar detection, prop validation against the catalog,
-  hoisting, tree repair, tabs and diagram arrows, fallback text, and bounded JSON
-  recovery.
+  hoisting, tree repair, tabs and diagram arrows, code text and its limits,
+  fallback text, and bounded JSON recovery.
 - `limits.ts` — the vocabulary bounds and the spacing grid maximum.
 - `identity.ts` — the plugin id, the tool name, the slot names, and the API
   version. Imports nothing.
@@ -117,12 +129,15 @@ https, images must be inline `data:image/…` rasters.
 
 **Done.**
 
-- Thirty-one components, `player`, `tabs`, `tab`, `checklist`, and `diagram`
-  among them; the catalog drives validation, the description, and the registry
+- Thirty-two components, `player`, `tabs`, `tab`, `checklist`, `diagram`, and
+  `code` among them; the catalog drives validation, the description, and the registry
   check (`tests/catalog.test.ts`).
 - DIL nests by indentation, fills primary text from a bare quoted string, infers
-  state kinds, keeps a spaced bare expression whole, and refuses the old explicit
-  form with a repair (`tests/dil.test.ts`).
+  state kinds, keeps a spaced bare expression whole, reads `"""` text blocks,
+  and refuses the old explicit form with a repair (`tests/dil.test.ts`).
+- `code` keeps its text as written, colours fifteen languages without ever
+  changing the text, and writes a fenced block in the text view
+  (`tests/highlight.test.ts`, `tests/compile.test.ts`).
 - `pick(i, a, b, …)` chooses the i-th option lazily, floored and held inside the
   options, and `current=` and `mono=` give `steps`, `list`, and `table` a
   highlighted item and code type (`tests/expr.test.ts`, `tests/compile.test.ts`).

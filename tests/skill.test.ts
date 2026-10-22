@@ -1,8 +1,8 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { loadSkill, parseSkill, SKILL_DIRECTORY, SKILL_FILE, SKILL_NAME } from '../src/host/skill.ts'
+import { BUNDLED_SKILL_RANK, createSkillProvider, parseSkill, readSkillCandidate, SKILL_DIRECTORY, SKILL_FILE, SKILL_NAME } from '../src/host/skill.ts'
 import { compileSource } from '../src/lang/compile.ts'
 
 /** The bundled skill's files: the instructions and the references they name. */
@@ -50,10 +50,37 @@ describe('the bundled skill', () => {
     expect(count).toBeGreaterThanOrEqual(12)
   })
 
-  it('loads into a registration whose base directory holds the references', () => {
-    const skill = loadSkill()
-    expect(skill).toMatchObject({ name: SKILL_NAME, source: 'runtime', path: SKILL_FILE, resourceBase: { kind: 'directory', path: SKILL_DIRECTORY } })
+  it('sits in the skills/<name>/SKILL.md layout the host\'s own skill packages use', () => {
+    expect(SKILL_FILE).toBe(join(SKILL_DIRECTORY, 'SKILL.md'))
+    expect(SKILL_DIRECTORY.endsWith(`${join('skills', SKILL_NAME)}${SKILL_DIRECTORY.at(-1) as string}`)).toBe(true)
+  })
+
+  it('lists as a bundled catalog entry whose base directory holds the references', () => {
+    const entry = readSkillCandidate()
+    expect('candidate' in entry).toBe(true)
+    if (!('candidate' in entry)) return
+    expect(entry.candidate).toMatchObject({
+      name: SKILL_NAME,
+      source: 'bundled',
+      rank: BUNDLED_SKILL_RANK,
+      path: SKILL_FILE,
+      locator: SKILL_FILE,
+      resourceBase: { kind: 'directory', path: SKILL_DIRECTORY },
+    })
+    expect(entry.candidate.description).toBe(parseSkill(read('SKILL.md'))?.description)
     for (const name of ['math.md', 'recipes.md']) expect(() => readFileSync(join(SKILL_DIRECTORY, name))).not.toThrow()
+  })
+
+  it('loads the body fresh on every get, without the provider\'s private fields', async () => {
+    const entry = readSkillCandidate()
+    if (!('candidate' in entry)) throw new Error(entry.problem)
+    const provider = createSkillProvider(entry.candidate)
+    const [listed] = await provider.list()
+    const loaded = await provider.get(listed as typeof entry.candidate)
+    expect(loaded?.content).toBe(parseSkill(read('SKILL.md'))?.content)
+    expect(loaded).toMatchObject({ name: SKILL_NAME, source: 'bundled', provider: SKILL_NAME })
+    expect(loaded).not.toHaveProperty('rank')
+    expect(loaded).not.toHaveProperty('locator')
   })
 })
 
@@ -72,13 +99,23 @@ describe('reading a skill file', () => {
     expect(parseSkill('# no frontmatter')).toBeUndefined()
   })
 
-  it('gives up on an unreadable or foreign file instead of throwing', () => {
+  it('gives up on an unreadable or foreign file with a reason instead of throwing', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'dsh-iui-skill-'))
     try {
-      expect(loadSkill(join(directory, 'missing.md'))).toBeUndefined()
+      const missing = readSkillCandidate(join(directory, 'missing.md'))
+      expect('problem' in missing && missing.problem).toContain('cannot be read')
       const foreign = join(directory, 'SKILL.md')
       writeFileSync(foreign, '---\nname: someone-else\ndescription: Use when.\n---\nbody')
-      expect(loadSkill(foreign)).toBeUndefined()
+      const other = readSkillCandidate(foreign)
+      expect('problem' in other && other.problem).toContain('"someone-else"')
+      // A body that disappears after listing loads as nothing, not as an error.
+      const own = join(directory, 'own.md')
+      writeFileSync(own, `---\nname: ${SKILL_NAME}\ndescription: Use when.\n---\nbody`)
+      const entry = readSkillCandidate(own)
+      if (!('candidate' in entry)) throw new Error(entry.problem)
+      expect(entry.candidate.resourceBase.path).toBe(`${directory}${sep}`)
+      rmSync(own)
+      expect(await createSkillProvider(entry.candidate).get(entry.candidate)).toBeUndefined()
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }

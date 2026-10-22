@@ -12,8 +12,20 @@
  *
  * One statement per line, so a streamed program can be compiled from the lines
  * that have arrived. Indentation nests a component inside the container above it,
- * and is the only way to nest one. The parser only produces the JSON envelope;
- * the compiler validates it against the catalog.
+ * and is the only way to nest one. The one exception to one-line statements is a
+ * text block: a component line that ends in `"""` takes the lines after it, up
+ * to a line holding only `"""`, as one multi-line value, written as is:
+ *
+ * ```
+ * code lang=python """
+ *   total = 0
+ *   for i in range(4):
+ *       total += i
+ * """
+ * ```
+ *
+ * The parser only produces the JSON envelope; the compiler validates it against
+ * the catalog.
  * @module dsh-intelligent-ui/lang/dil
  */
 
@@ -79,11 +91,47 @@ export function parseDil(source: string, diagnostics: Diagnostic[], partial = fa
   let unread = 0
   const lines = source.split(/\r?\n/u)
   if (partial && !/\n$/u.test(source)) lines.pop()
-  for (const [index, rawLine] of lines.entries()) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const rawLine = lines[index] as string
     const number = index + 1
     const indent = indentation(rawLine)
-    const line = rawLine.trim()
+    let line = rawLine.trim()
     if (line === '' || line.startsWith('//') || line.startsWith('```') || line === '#' || line.startsWith('# ')) continue
+    // A text block: the statement ends in """, and the lines up to a closing """ are one value.
+    let block: TextBlock | undefined
+    const opened = openBlock(line)
+    if (opened !== undefined) {
+      line = opened.statement
+      if (opened.inline !== undefined) block = { prop: opened.prop, value: opened.inline }
+      else {
+        const read = readBlock(lines, index + 1)
+        block = { prop: opened.prop, value: read.value }
+        if (!read.closed && !partial) {
+          diagnostics.push({
+            code: 'unterminated_line',
+            line: number,
+            message: `line ${number}: the text block opened with \"\"\" never closes, so it runs to the end of the source`,
+            repair: 'End a text block with a line holding only """.',
+          })
+        }
+        index = read.next - 1
+      }
+      // A block opened on a line of its own belongs to the component above it,
+      // the way a docstring sits under its definition.
+      if (line === '') {
+        attachLooseBlock(nodes.at(-1), block, number, diagnostics)
+        continue
+      }
+      if (line.startsWith('@')) {
+        diagnostics.push({
+          code: 'unknown_prop',
+          line: number,
+          message: `line ${number}: a text block belongs to a component's text, not to a declaration; it was ignored`,
+          repair: 'Write a multi-line value after a component, as in code lang=python """ … """.',
+        })
+        block = undefined
+      }
+    }
     if (line.startsWith('@state')) {
       const state = parseState(line, number, diagnostics)
       if (state === undefined) unread += 1
@@ -107,6 +155,7 @@ export function parseDil(source: string, diagnostics: Diagnostic[], partial = fa
       unread += 1
       continue
     }
+    if (block !== undefined) attachBlock(node, block, number, diagnostics)
     const id = freshId(ids, node.type as string)
     node.id = id
     ids.add(id)
@@ -131,6 +180,97 @@ export function parseDil(source: string, diagnostics: Diagnostic[], partial = fa
   }
   if (nodes.length === 0 && states.length === 0 && calcs.length === 0) return undefined
   return { states, calcs, nodes }
+}
+
+/** A text block read from the lines after its statement. */
+interface TextBlock {
+  /** The prop it fills; the component's primary text when the line did not name one. */
+  prop: string | undefined
+  value: string
+}
+
+/**
+ * Whether a statement ends in a text block, and what remains of it.
+ *
+ * `code lang=python """` opens a block on the following lines; `name="""`
+ * names the prop it fills; `code """x = 1"""` is a block written on one line.
+ * The opener must stand apart from the text before it, so a quoted string that
+ * merely ends in quotes is never read as one.
+ */
+function openBlock(line: string): { statement: string; prop: string | undefined; inline?: string } | undefined {
+  const inline = /(^|\s)(?:([A-Za-z_$][\w$-]*)=)?"""(.*?)"""$/u.exec(line)
+  if (inline !== null && !(inline[3] as string).includes('"""')) {
+    return { statement: line.slice(0, inline.index + (inline[1] as string).length).trimEnd(), prop: inline[2], inline: inline[3] as string }
+  }
+  const open = /(^|\s)(?:([A-Za-z_$][\w$-]*)=)?"""$/u.exec(line)
+  if (open === null) return undefined
+  return { statement: line.slice(0, open.index + (open[1] as string).length).trimEnd(), prop: open[2] }
+}
+
+/**
+ * Read a block's lines up to its closing line, without the indentation they share.
+ * @param lines - every source line.
+ * @param start - index of the first line inside the block.
+ * @returns the value, whether a closing line was found, and the index after the block.
+ */
+function readBlock(lines: readonly string[], start: number): { value: string; closed: boolean; next: number } {
+  const body: string[] = []
+  let index = start
+  while (index < lines.length && (lines[index] as string).trim() !== '"""') {
+    body.push(lines[index] as string)
+    index += 1
+  }
+  const closed = index < lines.length
+  const margins = body.filter(text => text.trim() !== '').map(text => /^[ \t]*/u.exec(text)?.[0].length ?? 0)
+  const margin = margins.length === 0 ? 0 : Math.min(...margins)
+  const value = body.map(text => (text.trim() === '' ? '' : text.slice(margin).trimEnd())).join('\n')
+  return { value, closed, next: closed ? index + 1 : index }
+}
+
+/** Attach a block written on a line of its own to the component above it, and say so. */
+function attachLooseBlock(node: RawNode | undefined, block: TextBlock, number: number, diagnostics: Diagnostic[]): void {
+  if (node === undefined) {
+    diagnostics.push({
+      code: 'unknown_prop',
+      line: number,
+      message: `line ${number}: the text block has no component above it; it was ignored`,
+      repair: 'End the component line with """, as in code lang=python """, and write the text on the lines below.',
+    })
+    return
+  }
+  diagnostics.push({
+    code: 'unknown_prop',
+    line: number,
+    message: `line ${number}: the text block opened on a line of its own; it was given to <${String(node.type)}> on line ${String(node.line)}`,
+    repair: 'End the component line itself with """, as in code lang=python """.',
+  })
+  attachBlock(node, block, number, diagnostics)
+}
+
+/** Put a block's value into the prop it names, or the component's primary text. */
+function attachBlock(node: RawNode, block: TextBlock, number: number, diagnostics: Diagnostic[]): void {
+  const descriptor = CATALOG_BY_TYPE.get(node.type as string)
+  if (descriptor === undefined) return
+  const prop = block.prop ?? descriptor.primary
+  const props = node.props as Record<string, unknown>
+  if (prop === undefined) {
+    diagnostics.push({
+      code: 'unknown_prop',
+      line: number,
+      message: `line ${number}: the text block is not attached to a prop`,
+      repair: `Name the prop before the block, as in text="""; <${node.type as string}> takes ${Object.keys(descriptor.props).join(', ') || 'no props'}.`,
+    })
+    return
+  }
+  if (prop in props) {
+    diagnostics.push({
+      code: 'unknown_prop',
+      line: number,
+      message: `line ${number}: ${prop} was given twice; the text block replaced the value on the line`,
+      repair: `Give ${prop} either on the line or in the block, not both.`,
+    })
+  }
+  props[prop] = block.value
 }
 
 /** Leading whitespace width, counting a tab as {@link TAB_WIDTH} spaces. */

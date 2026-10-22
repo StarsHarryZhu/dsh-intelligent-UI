@@ -7,6 +7,8 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { apply as applyHost, inject as hostInject, name as hostName } from '../src/index.ts'
+import type { SkillCandidateLike, SkillProviderLike } from '../src/host/skill.ts'
+import { apply as applySkill, inject as skillInject, name as skillName } from '../src/skill.ts'
 import { LOCALE_NS, PLUGIN_ID, TURN_DATA_KEY, UI_TOOL_NAME } from '../src/lang/identity.ts'
 
 const ROOT = join(import.meta.dirname, '..')
@@ -48,7 +50,7 @@ describe('only the published plugin contract is used', () => {
 
   it('imports no harness package at runtime except the tool definition helper', () => {
     // The host half may also read its own bundled skill file with Node built-ins.
-    const hostAllowed = ['@deepseek-ai/dsh-tools', 'node:fs', 'node:url']
+    const hostAllowed = ['@deepseek-ai/dsh-tools', 'node:fs', 'node:fs/promises', 'node:url']
     for (const file of sources(['src'])) {
       for (const { specifier, typeOnly } of imports(file.text)) {
         if (specifier.startsWith('.') || typeOnly) continue
@@ -72,35 +74,57 @@ describe('only the published plugin contract is used', () => {
     expect(bundle).toContain(`id: "${PLUGIN_ID}"`)
   })
 
-  /** A host context with the tool registry and, optionally, the skill registry. */
-  function hostContext(withSkills: boolean) {
+  /** A host context with the tool registry and the skill registry. */
+  function hostContext() {
     const tools: string[] = []
-    const skills: Array<{ name: string; resourceBase: { kind: string; path: string } }> = []
-    const services: Record<string, unknown> = {
+    const providers: Array<() => SkillProviderLike> = []
+    const runtime: unknown[] = []
+    const warnings: string[] = []
+    const ctx = {
       tools: { register: (tool: { name: string }) => { tools.push(tool.name); return () => undefined } },
-      ...(withSkills ? { skills: { register: (skill: (typeof skills)[number]) => { skills.push(skill); return () => undefined } } } : {}),
+      skills: {
+        registerProvider: (create: () => SkillProviderLike) => { providers.push(create); return () => undefined },
+        register: (skill: unknown) => { runtime.push(skill); return () => undefined },
+      },
+      logger: { warn: (text: string) => { warnings.push(text) } },
     }
-    const ctx: Record<string, unknown> = {
-      ...services,
-      inject: (deps: string[], callback: (scope: unknown) => void) => { if (deps.every(dep => services[dep] !== undefined)) callback(ctx) },
-    }
-    return { ctx, tools, skills }
+    return { ctx, tools, providers, runtime, warnings }
   }
 
-  it('registers exactly one host tool and one skill, under the plugin\'s own names', () => {
+  it('registers exactly one host tool, and nothing else, from the tool row', () => {
     expect(hostInject).toEqual(['tools'])
-    const host = hostContext(true)
+    const host = hostContext()
     applyHost(host.ctx as never)
     expect(host.tools).toEqual([UI_TOOL_NAME])
-    expect(host.skills.map(skill => skill.name)).toEqual([PLUGIN_ID])
-    expect(host.skills[0]?.resourceBase).toEqual({ kind: 'directory', path: `${join(ROOT, 'skills')}${sep}` })
+    expect(host.providers).toEqual([])
+    expect(host.runtime).toEqual([])
   })
 
-  it('still registers the tool where the host composes no skill registry', () => {
-    const host = hostContext(false)
-    applyHost(host.ctx as never)
-    expect(host.tools).toEqual([UI_TOOL_NAME])
-    expect(host.skills).toEqual([])
+  it('registers the skill from its own row as one bundled provider', async () => {
+    expect(skillName).toBe(`${PLUGIN_ID}-skill`)
+    expect(skillInject).toEqual(['skills'])
+    const host = hostContext()
+    applySkill(host.ctx as never)
+    expect(host.tools).toEqual([])
+    expect(host.runtime).toEqual([])
+    expect(host.warnings).toEqual([])
+    expect(host.providers).toHaveLength(1)
+    const provider = (host.providers[0] as () => SkillProviderLike)()
+    expect(provider.name).toBe(PLUGIN_ID)
+    const [candidate] = await provider.list()
+    const directory = `${join(ROOT, 'skills', PLUGIN_ID)}${sep}`
+    expect(candidate).toMatchObject({
+      name: PLUGIN_ID,
+      provider: PLUGIN_ID,
+      source: 'bundled',
+      rank: 600,
+      invocation: { modelInvocable: true, userInvocable: true },
+      resourceBase: { kind: 'directory', path: directory },
+    })
+    const loaded = await provider.get(candidate as SkillCandidateLike)
+    expect(loaded?.content.startsWith('# ')).toBe(true)
+    expect(loaded).not.toHaveProperty('rank')
+    expect(loaded).not.toHaveProperty('locator')
   })
 })
 
@@ -153,7 +177,9 @@ describe('the stylesheet stays inside the card', () => {
     expect(css).not.toMatch(/\b(?:rgb|rgba|hsl|hsla|oklch|color-mix)\(/iu)
     for (const match of css.matchAll(/(?:^|[;{\s])(color|background|border-color|fill|stroke|accent-color)\s*:\s*([^;}]+)/gmu)) {
       const value = (match[2] as string).trim()
-      expect(['transparent', 'inherit', 'none'].includes(value) || value.startsWith('var(--dsw-'), `${match[1]}: ${value}`).toBe(true)
+      // The host's syntax tokens colour code like its own code blocks; each falls back to a theme token.
+      const syntax = /^var\(--shiki-[\w-]+, var\(--dsw-[\w-]+\)\)$/u.test(value)
+      expect(['transparent', 'inherit', 'none'].includes(value) || value.startsWith('var(--dsw-') || syntax, `${match[1]}: ${value}`).toBe(true)
     }
   })
 

@@ -34,6 +34,10 @@ export const zh = {
   'checklist.done': '已完成 {done}/{total}',
   'table.sort': '按此列排序',
   'diagram.label': '流程图',
+  'code.label': '代码',
+  'code.copy': '复制',
+  'code.copied': '已复制',
+  'code.copyFailed': '无法复制',
 } satisfies Record<string, string>
 
 /** Every key the chrome uses. */
@@ -67,6 +71,10 @@ export const en = {
   'checklist.done': '{done} of {total} done',
   'table.sort': 'Sort by this column',
   'diagram.label': 'Diagram',
+  'code.label': 'Code',
+  'code.copy': 'Copy',
+  'code.copied': 'Copied',
+  'code.copyFailed': 'Copy failed',
 } satisfies Record<CopyKey, string>
 
 /**

@@ -1,6 +1,6 @@
 ---
 name: dsh-intelligent-ui
-description: Use when the ui_render tool is available and an answer would be clearer as an interactive card - an estimate the reader adjusts, a comparison, a chart or function plot, a formula with live values, a short form, a multiple-choice question answered by clicking, or a process the reader plays step by step. Covers choosing a card over prose, designing one, math cards, animation, and repairing a failed call.
+description: Use when the ui_render tool is available and an answer would be clearer as an interactive card - an estimate the reader adjusts, a comparison, a chart or function plot, a formula with live values, a short form, a multiple-choice question answered by clicking, or a process the reader plays step by step. Covers choosing a card over prose, designing one, math cards, code blocks, animation, and repairing a failed call.
 ---
 
 # Answering with interactive cards
@@ -95,9 +95,9 @@ reads the state recomputes on every frame, in the browser, without calling you.
   each variable, a sentence about what just happened. All options of one
   `pick` share a type, and one `pick` takes at most 32 options; compute longer
   runs from `frame` with arithmetic instead.
-- Show code as `steps items=[…] mono=true current=line`: numbered lines, code
-  type with its indentation kept, and the running line highlighted. A `table`
-  or `keys` beside it shows the variables of that frame.
+- Show code as a `code` block with `current=line numbers=true`: the running
+  line is highlighted and the block scrolls to it. A `table` or `keys` beside
+  it shows the variables of that frame.
 - `duration=` is seconds for one run at 1×; without it a run takes one second
   per step, between two and ten seconds.
 - In your reply, say what the reader will see when they press play; the text
@@ -114,6 +114,20 @@ reads the state recomputes on every frame, in the browser, without calling you.
 - Draw a process or decision flow with `diagram nodes=[…] edges=["A -> B", "B -> C: yes"]`.
   Name arrow ends by a node's exact text or its number; `current=` highlights a
   box, so a `player` can walk the flow.
+
+## Code and preformatted text
+
+- Put code, command output, a log, or any text whose spacing matters in `code`,
+  written as a text block: end the line with `"""`, write the lines, and close
+  with a line of only `"""`. The text is kept exactly as written: no `{…}`, no
+  escapes, indentation measured from the block's left edge.
+- Set `lang=` for syntax colours; leave it out for prose-like text, which wraps.
+  `caption=` names the file, `numbers=true` adds line numbers, and `current=`
+  highlights one line.
+- For text that changes, such as what the reader typed into a `textInput`,
+  write `value=name` with a text state or calc instead of a literal.
+- Show only the lines the answer is about; the reader can copy the block.
+- Keep `steps mono=true` for numbered instructions, not for code.
 
 ## When the call fails
 

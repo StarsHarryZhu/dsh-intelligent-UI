@@ -13,6 +13,7 @@ import { evalExpr } from '../lang/expr.ts'
 import { renderText } from '../lang/text.ts'
 import type { JsonValue } from '../lang/types.ts'
 import { renderNode, unrenderable, type RenderScope } from './components.tsx'
+import { copyText } from './clipboard.ts'
 import type { CardMemory, EditsStore } from './edits.ts'
 import type { InputStateLike, SessionKit } from './host.ts'
 import { translator, type CopyKey } from './locales.ts'
@@ -156,22 +157,6 @@ function numberOf(value: unknown, values: ReadonlyMap<string, JsonValue>): numbe
   if (typeof produced === 'number') return Number.isFinite(produced) ? produced : undefined
   if (typeof produced === 'string' && produced.trim() !== '' && Number.isFinite(Number(produced))) return Number(produced)
   return undefined
-}
-
-/**
- * Put text on the clipboard where the page allows it.
- * @param text - the text to copy.
- * @returns whether the clipboard accepted it; false on a page without one.
- */
-export async function copyText(text: string): Promise<boolean> {
-  try {
-    const clipboard = (globalThis as { navigator?: { clipboard?: { writeText?: (value: string) => Promise<void> } } }).navigator?.clipboard
-    if (typeof clipboard?.writeText !== 'function') return false
-    await clipboard.writeText(text)
-    return true
-  } catch {
-    return false
-  }
 }
 
 /** The program's plain-text stand-in, with the reason it is shown. */

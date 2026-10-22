@@ -13,7 +13,7 @@ Interactive cards in DeepSeek Harness chats. The model writes a small interface 
 
 ## How it works
 
-- The plugin registers one tool, `ui_render`, and one skill, `dsh-intelligent-ui`, which teaches the model when a card beats prose. The model never writes HTML or JavaScript: its program is checked against the 31-component catalog and stored with the tool result.
+- The plugin registers one tool, `ui_render`, and one skill, `dsh-intelligent-ui`, which teaches the model when a card beats prose. The skill is its own part of the plugin: the Plugin Manager lists it with its own switch, and installing the plugin installs it. The model never writes HTML or JavaScript: its program is checked against the 32-component catalog and stored with the tool result.
 - A card draws in the tool row while the reply streams, and under the reply once it finishes. Moving a control recomputes every figure locally.
 - A `player` animates a card: code traced line by line, an algorithm's passes, a point moving along a curve. Playback runs in the browser and sends nothing to the model.
 - Cards compute integrals (including infinite bounds), derivatives, limits, sums and products, roots, and Taylor polynomials. A value that cannot be computed reliably shows "—", never a guess.
@@ -29,7 +29,7 @@ node node_modules/vitest/vitest.mjs run
 
 `AGENTS.md` holds the rules of the tree; `docs/VERIFY.md` is the live checklist.
 
-## The 31 components
+## The 32 components
 
 One card per component, drawn by this plugin in the host's light theme. The program behind each card is in [`docs/SAMPLES.md`](docs/SAMPLES.md).
 
@@ -110,6 +110,12 @@ A citation link, opened only when clicked.
 <img src="assets/catalog/image.png" alt="image" width="720">
 
 An inline `data:` image with alt text and a caption.
+
+### `code` — Text
+
+<img src="assets/catalog/code.png" alt="code" width="720">
+
+Code or other preformatted text, kept exactly as written, with syntax colours in the host's palette, line numbers, a copy button, and `current=` highlighting the running line.
 
 ### `metric` — Data
 

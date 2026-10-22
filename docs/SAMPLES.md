@@ -542,6 +542,47 @@ What a text-only reader sees:
 
 4 components, 1 control, zero repairs.
 
+## 32. `code`
+
+Code or other preformatted text, shown exactly as written: `{…}` is not read, and indentation, braces, and quotes survive. The text is a block that starts with `"""` at the end of the component line and ends with a line holding only `"""`. `lang=` colours the syntax with the host's own code-block palette, `numbers=true` adds line numbers, and `current=` highlights one line, so a `player` walks the listing; the block scrolls itself to that line, never the page. The header carries the caption and a copy button.
+
+```dil
+@state frame = 1 min=1 max=6 step=1
+@calc line = pick(frame, 1, 2, 3, 2, 3, 4)
+@calc vars = pick(frame, "a = 0, b = 1", "a = 0, b = 1", "a = 1, b = 1", "a = 1, b = 1", "a = 1, b = 2", "a = 1, b = 2")
+card "code · 代码块"
+  code lang=python caption="fib.py" current=line numbers=true """
+    a, b = 0, 1
+    for _ in range(2):
+        a, b = b, a + b
+    print(a)  # {a} stays as written
+  """
+  keys items=["变量: {vars}"]
+  text "代码原样显示（不解析 {{…}}），lang= 着色，current= 高亮当前行，播放器逐行推进。" tone="muted" size="sm"
+  player "步骤" bind=frame unit="/ 6"
+```
+
+Result:
+
+````
+The card is shown: 5 component(s), 1 control(s).
+What a text-only reader sees:
+## code · 代码块
+  fib.py:
+  ```python
+  a, b = 0, 1
+  for _ in range(2):
+      a, b = b, a + b
+  print(a)  # {a} stays as written
+  ```
+  (line 1 highlighted)
+  变量: a = 0, b = 1
+  代码原样显示（不解析 {…}），lang= 着色，current= 高亮当前行，播放器逐行推进。
+  步骤: 1 / 6 (1–6)
+````
+
+5 components, 1 control, zero repairs.
+
 ## What this tour found
 
 **A bare `expr` value ended at the first space (fixed).** Sample 9 first read `metric "折合小时" value=mins / 60 unit="h"`, and the compiler kept `value=mins` while reporting the `/` and the `60` as stray tokens; the card showed `24 h` instead of `0.75 h`. Bare values now keep spaces inside brackets and rejoin pieces that start or follow an operator, so that line reads as written; `tests/dil.test.ts` pins it. Quoting an expression with spaces remains the documented form.
@@ -550,4 +591,4 @@ What a text-only reader sees:
 
 ## Status
 
-Samples 1 to 24 were drawn in one live session on 2026-10-15, in the `ui_render` tool row, with the compiler reporting zero repairs except the first attempt at sample 9. Samples 25 and 26 were drawn on 2026-10-16 in the tool row and then under the reply, and survived a page reload; that run is recorded in `VERIFY.md`. Sample 27 was drawn on 2026-10-16 after the program-version reset, and played as described above. Samples 28 to 31 are compiled, tested, and drawn in the static gallery only; a live run in the web UI is still to do.
+Samples 1 to 24 were drawn in one live session on 2026-10-15, in the `ui_render` tool row, with the compiler reporting zero repairs except the first attempt at sample 9. Samples 25 and 26 were drawn on 2026-10-16 in the tool row and then under the reply, and survived a page reload; that run is recorded in `VERIFY.md`. Sample 27 was drawn on 2026-10-16 after the program-version reset, and played as described above. Samples 28 to 31 are compiled, tested, and drawn in the static gallery, and one card using all four drew in the web UI on 2026-10-19. Sample 32 (2026-10-22) is compiled, tested, and drawn in the static gallery; a code card a live model wrote for the same kind of request drew in the web UI and the macOS desktop app on 2026-10-22, as recorded in `VERIFY.md`.

@@ -5,9 +5,9 @@
 The harness-process half. It defines the one tool the model can call and the
 description that teaches the model the language; it compiles the model's source
 and returns either a short summary or the diagnostics the model repairs from. It
-also registers the bundled skill, which carries the judgement the description
-leaves out: when a card beats prose, how to shape one, and how to write math
-cards.
+also provides the bundled skill, which carries the judgement the description
+leaves out: when a card beats prose, how to shape one, and how to write math and
+code cards; the skill row mounts that provider.
 
 It is a compiler, not a renderer. It never draws anything, never reads a session,
 and holds no state between calls; the interface it validates travels to the
@@ -15,10 +15,16 @@ browser separately, as tool-result metadata.
 
 ## 2. Constraints
 
-**One tool, one skill, one registration each.** `createUIRenderTool()` is the
-tool. `loadSkill()` reads `skills/SKILL.md` once, at load, and the entry registers
-it with the host's skill registry when that registry exists; a host without one
-still gets the tool. Both registrations are effects of the plugin's context.
+**One tool and one skill, each from its own row.** The bundle mounts two rows.
+The tool row (`src/index.ts`) registers `createUIRenderTool()` and nothing else.
+The skill row (`src/skill.ts`, `inject = ['skills']`) registers one skill
+provider the way the host's own skill packages do — `bundled` source, bundled
+rank 600, model and reader invocation — so the Plugin Manager lists the skill as
+a part of the plugin and the host lists it wherever it lists its own skills.
+`readSkillCandidate()` reads the frontmatter of
+`skills/dsh-intelligent-ui/SKILL.md` when the row loads; when it cannot, the row
+logs why and registers nothing, and the tool is unaffected. Every registration is
+an effect of its row's context. Never use the registry's runtime `register()`.
 
 **One required argument.** `source` carries the program; `title` is optional.
 Models confused a separate grammar switch with the grammar itself, so the
@@ -45,9 +51,10 @@ the action that removes it; repairs the compiler made are reported too, so the
 next call is cleaner. `LIMITS.maxDiagnosticsReported` caps the list.
 
 **No I/O inside a call.** `execute` reads its arguments and returns a value: no
-file, no clock, no network, no randomness. The only file this half reads is its
-own skill, once, when the plugin loads, located with `fileURLToPath` so the path
-is right on Windows too.
+file, no clock, no network, no randomness. The only files this half reads are its
+own skill's: the frontmatter when the skill row loads, and the body each time the
+host loads the skill, so an edited skill needs no restart. Both are located with
+`fileURLToPath`, so the path is right on Windows too.
 
 **Parameters are authored with `defineTool`, never hand-written.** `parameters` on
 a `ToolDefinition` is JSON Schema that travels to the provider verbatim, and
@@ -63,7 +70,8 @@ through the registry's own `assertSupportedJsonSchema` in the tests.
   vocabulary derived from the function table, and the repair hint appended to a
   failed call.
 - `skill.ts` — the skill's location, its frontmatter reader (byte-order mark and
-  Windows line endings accepted), and the registration it produces.
+  Windows line endings accepted), its catalog entry, and the provider the skill
+  row registers.
 
 ## 4. Progress
 
@@ -73,13 +81,15 @@ through the registry's own `assertSupportedJsonSchema` in the tests.
   rejected before compiling (`tests/tool.test.ts`).
 - Success reports counts, the repairs made, and the text-only view with computed
   figures; failure reports capped diagnostics and the repair hint.
-- Metadata is `{ v: 2, ok: true, program, title? }` on success and
-  `{ v: 2, ok: false, diagnostics }` (at most five) on failure; the program inside
-  carries its own format, 2 or 3.
+- Metadata is `{ version: 1, ok: true, program, title? }` on success and
+  `{ version: 1, ok: false, diagnostics }` (at most five) on failure; the program
+  inside carries the same API version.
 - The description lists every component, the limits, the math vocabulary, and
   four examples that compile cleanly, at under nine thousand characters.
-- The skill registers under `dsh-intelligent-ui` with its directory as the base
-  for its two reference files (`tests/skill.test.ts`, `tests/isolation.test.ts`).
+- The skill lists under `dsh-intelligent-ui` from its own row, as a bundled
+  provider whose base directory holds its two reference files
+  (`tests/skill.test.ts`, `tests/isolation.test.ts`); the move from the runtime
+  registration followed the desktop app showing no skill (2026-10-22).
   In the live run the model loaded it unprompted before its first card.
 
 **Not done.**

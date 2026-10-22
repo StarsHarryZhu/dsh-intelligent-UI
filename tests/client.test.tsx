@@ -828,3 +828,83 @@ describe('diagram layout', () => {
     expect(layout.width).toBeGreaterThan(0)
   })
 })
+
+describe('code blocks', () => {
+  const Q = '"""'
+  async function draw(source: string, callId: string) {
+    const meta = await settle(source)
+    const { ToolView } = loadClient()
+    return render(<ToolView phase="result" block={resultBlock(meta)} callId={callId} useDisclosure={useHostDisclosure} {...kit()} />)
+  }
+  const TRACE = [
+    '@state frame = 1 min=1 max=3 step=1',
+    '@calc line = pick(frame, 1, 2, 3)',
+    'card "Trace"',
+    `  code lang=python current=line numbers=true ${Q}`,
+    '    total = 0  # start',
+    '    for i in range(3):',
+    '        total += i',
+    `  ${Q}`,
+    '  player "Step" bind=frame',
+  ].join('\n')
+
+  it('draws each line with its number and syntax colours, and the current line marked', async () => {
+    const view = await draw(TRACE, 'code-1')
+    const lines = [...view.container.querySelectorAll('.dsh-iui-code-line')]
+    expect(lines.map(line => line.querySelector('.dsh-iui-code-text')?.textContent)).toEqual(['total = 0  # start', 'for i in range(3):', '    total += i'])
+    expect(lines.map(line => line.querySelector('.dsh-iui-code-number')?.textContent)).toEqual(['1', '2', '3'])
+    expect(view.container.querySelector('.dsh-iui-tok-keyword')?.textContent).toBe('for')
+    expect(view.container.querySelector('.dsh-iui-tok-comment')?.textContent).toBe('# start')
+    expect(view.container.querySelector('.dsh-iui-tok-function')?.textContent).toBe('range')
+    expect(lines[0]?.getAttribute('aria-current')).toBe('step')
+    expect(lines[0]?.classList.contains('dsh-iui-current')).toBe(true)
+    expect(screen.getByRole('region', { name: 'python' })).toBeTruthy()
+  })
+
+  it('moves the highlight with the player and scrolls only the block to it', async () => {
+    const rows = vi.spyOn(HTMLElement.prototype, 'offsetTop', 'get').mockImplementation(function (this: HTMLElement) {
+      return Number(this.getAttribute('data-line') ?? 0) * 20
+    })
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(20)
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(30)
+    const scrolled = vi.spyOn(window, 'scrollTo')
+    const view = await draw(TRACE, 'code-2')
+    const box = view.container.querySelector('.dsh-iui-code-scroll') as HTMLElement
+    expect(box.scrollTop).toBe(0)
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Step forward' })) })
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Step forward' })) })
+    const current = view.container.querySelector('[aria-current="step"]')
+    expect(current?.getAttribute('data-line')).toBe('2')
+    // Line 2 (20–40px) left a 30px viewport, which scrolled to 30 with one line of margin;
+    // line 3 (40–60px) is then already in view, so the block does not move again.
+    expect(box.scrollTop).toBe(40 - 30 + 20)
+    expect(scrolled).not.toHaveBeenCalled()
+    rows.mockRestore()
+  })
+
+  it('copies the exact text, and says when the page refuses', async () => {
+    const writeText = vi.fn(() => Promise.resolve())
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+    await draw(`card\n  code caption="a.py" ${Q}\n    x = {1}\n\n    y = "}}"\n  ${Q}`, 'code-3')
+    expect(screen.getByText('a.py')).toBeTruthy()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copy' })) })
+    expect(writeText).toHaveBeenCalledWith('x = {1}\n\ny = "}}"')
+    expect(screen.getByRole('button', { name: 'Copied' })).toBeTruthy()
+    act(() => { fireEvent.blur(screen.getByRole('button', { name: 'Copied' })) })
+    writeText.mockImplementation(() => Promise.reject(new Error('denied')))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copy' })) })
+    expect(screen.getByRole('button', { name: 'Copy failed' })).toBeTruthy()
+    vi.unstubAllGlobals()
+  })
+
+  it('follows a text state through value=, and wraps plain text', async () => {
+    const view = await draw('@state src = "SELECT 1"\ncard\n  textInput "Query" bind=src\n  code lang=sql value=src\n  code "plain words"', 'code-4')
+    const blocks = [...view.container.querySelectorAll('.dsh-iui-code-pre')]
+    expect(blocks[0]?.textContent).toBe('SELECT 1')
+    expect(blocks[0]?.hasAttribute('data-wrap')).toBe(false)
+    expect(blocks[1]?.hasAttribute('data-wrap')).toBe(true)
+    act(() => { fireEvent.change(screen.getByRole('textbox', { name: 'Query' }), { target: { value: 'select name from t' } }) })
+    expect(blocks[0]?.textContent).toBe('select name from t')
+    expect([...(blocks[0] as Element).querySelectorAll('.dsh-iui-tok-keyword')].map(token => token.textContent)).toEqual(['select', 'from'])
+  })
+})

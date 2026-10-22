@@ -60,12 +60,17 @@ needs the build first: run `node build.js` before the suite.
 - `text.test.ts` — `{…}` interpolation, escapes, rejected interpolations, and
   hoisted-text rendering.
 - `dil.test.ts` — the line grammar: indentation nesting, flat lines, the refused
-  old forms, primary text, quoting, declarations, comments, fences, and streaming.
+  old forms, primary text, quoting, declarations, comments, fences, streaming,
+  and `"""` text blocks.
+- `highlight.test.ts` — the code colouring of every language, constructs that
+  span lines, plain text for unknown languages, and the lossless guarantee over
+  the samples, the recipes, and random text.
 - `compile.test.ts` — both grammars end to end, interpolation in lists and
   tables, choices, every repair the compiler makes, what still fails, real model
   sources, content safety, streaming compiles, the API version, the
   animation props, and the newest components: tabs and their repairs,
-  checklists, sortable tables, and diagram arrows.
+  checklists, sortable tables, diagram arrows, and code blocks with their
+  limits and text view.
 - `limits.test.ts` — each bound at its limit and one past it, and bounded JSON
   recovery.
 - `catalog.test.ts` — the catalog and the render registry in both directions,
@@ -74,26 +79,30 @@ needs the build first: run `node build.js` before the suite.
   model is told, and the persisted metadata.
 - `client.test.tsx` — the browser half through its real registration: the row's
   stages, buttons, the turn data Definition, the tail, shared edits, the player,
-  tabs, checklists, sorting, diagrams and their layout, and every degradation
-  path.
+  tabs, checklists, sorting, diagrams and their layout, code blocks (colours,
+  the moving highlight that scrolls only the block, copying, `value=`), and
+  every degradation path.
 - `math.test.ts` — the quadrature rule's constants, integrals, derivatives,
   limits, sums, products, roots, Taylor polynomials, special functions,
   precedence, the work budget, and number display, each against known values.
-- `skill.test.ts` — the bundled skill: frontmatter, size, references, every
-  program it teaches compiling cleanly, and Windows line endings.
-- `manifest.test.ts` — the packaging contract: the client declaration, no
+- `skill.test.ts` — the bundled skill: the `skills/<name>/SKILL.md` layout,
+  frontmatter, size, references, every program it teaches compiling cleanly,
+  the bundled catalog entry and fresh body loads, and Windows line endings.
+- `manifest.test.ts` — the packaging contract: the client declaration, the
+  two bundle rows and the skill row's exports and display text, no
   install-time script, published files, no symbolic links, LF line endings, the
   claimed harness versions (from 0.2.1-rc.1, which refuses older desktop apps
   until they ship that version), and the screenshot list.
-- `isolation.test.ts` — the pluggability invariants of the root `AGENTS.md`.
+- `isolation.test.ts` — the pluggability invariants of the root `AGENTS.md`,
+  including what each of the two host rows registers.
 - `agents-md.test.ts` — the documentation rules this file describes.
 
 ## 4. Progress
 
 **Done.**
 
-- Fourteen specs cover the language layer, the math engine, the host tool and
-  skill, the browser half, the pluggability and packaging invariants, and the
+- Fifteen specs cover the language layer, the code colouring, the math engine,
+  the host tool and skill, the browser half, the pluggability and packaging invariants, and the
   documentation rules; `node build.js && node node_modules/vitest/vitest.mjs run`
   runs them all.
 - The browser spec found two defects before any live run: a turn-tail snapshot

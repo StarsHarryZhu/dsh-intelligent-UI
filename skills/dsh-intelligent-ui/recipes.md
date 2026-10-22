@@ -126,7 +126,12 @@ has ended.
 @calc items = pick(frame, "3 1 2", "3 1 2", "3 1 2", "1 3 2", "1 3 2", "1 3 2", "1 2 3", "1 2 3", "1 2 3", "1 2 3", "1 2 3")
 @calc note = pick(frame, "First pass", "Compare positions 0 and 1", "3 > 1, so swap", "Swapped", "Compare positions 1 and 2", "3 > 2, so swap", "Swapped", "Second pass", "Compare positions 0 and 1", "1 > 2 is false", "Sorted")
 card "Bubble sort on 3 1 2"
-  steps items=["for i in range(n - 1):", "  for j in range(n - 1 - i):", "    if a[j] > a[j + 1]:", "      a[j], a[j + 1] = a[j + 1], a[j]"] current=line mono=true
+  code lang=python current=line numbers=true """
+    for i in range(n - 1):
+        for j in range(n - 1 - i):
+            if a[j] > a[j + 1]:
+                a[j], a[j + 1] = a[j + 1], a[j]
+  """
   keys items=["i: {i}", "j: {j}", "a: {items}"]
   callout "{note}"
   player "Step" bind=frame unit="/ 11"

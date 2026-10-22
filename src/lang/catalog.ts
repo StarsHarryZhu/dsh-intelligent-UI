@@ -8,6 +8,7 @@
  * @module dsh-intelligent-ui/lang/catalog
  */
 
+import { CODE_LANGUAGE_ALIASES, CODE_LANGUAGES } from './highlight.ts'
 import type { StateKind } from './types.ts'
 
 /** Tone tokens map to theme aliases, never to literal colours. */
@@ -34,7 +35,9 @@ export type Size = (typeof SIZES)[number]
 export type PropSpec =
   | { kind: 'expr'; required?: boolean; of: 'number' | 'string' | 'boolean' }
   | { kind: 'text'; required?: boolean }
-  | { kind: 'string'; required?: boolean; maxLength?: number; enum?: readonly string[]; default?: string; format?: 'url' | 'image' }
+  | { kind: 'string'; required?: boolean; maxLength?: number; enum?: readonly string[]; aliases?: Readonly<Record<string, string>>; default?: string; format?: 'url' | 'image' }
+  /** Text shown exactly as written: no `{…}` interpolation, line breaks kept, cut at the code limits. */
+  | { kind: 'code'; required?: boolean }
   | { kind: 'number'; required?: boolean; min?: number; max?: number; integer?: boolean; default?: number }
   | { kind: 'space'; required?: boolean; default?: number }
   | { kind: 'tone'; required?: boolean; default?: string }
@@ -74,7 +77,7 @@ export interface ComponentDescriptor {
 export const CATALOG: readonly ComponentDescriptor[] = [
   {
     type: 'card',
-    description: 'Framed surface for one answer; usually the single root. An optional title heads it.',
+    description: 'Framed surface for one answer; usually the single root.',
     container: true,
     primary: 'title',
     props: { title: { kind: 'text' }, padding: { kind: 'space', default: 3 }, gap: { kind: 'space', default: 2 }, tone: { kind: 'tone' } },
@@ -126,7 +129,7 @@ export const CATALOG: readonly ComponentDescriptor[] = [
   },
   {
     type: 'metric',
-    description: 'One prominent number with its caption: the headline figure of an answer; digits= sets significant digits.',
+    description: 'The headline number of an answer, with its caption; digits= sets significant digits.',
     container: false,
     primary: 'label',
     props: {
@@ -204,7 +207,7 @@ export const CATALOG: readonly ComponentDescriptor[] = [
   },
   {
     type: 'player',
-    description: 'Animation control for a number state: play/pause, step back/forward, scrub; duration= seconds for one run.',
+    description: 'Plays a number state: play/pause, step, scrub; duration= seconds per run.',
     container: false,
     primary: 'label',
     props: {
@@ -247,6 +250,20 @@ export const CATALOG: readonly ComponentDescriptor[] = [
     description: 'Numbered procedure the reader performs in order.',
     container: false,
     props: { items: { kind: 'items', required: true }, current: { kind: 'expr', of: 'number' }, mono: { kind: 'expr', of: 'boolean' } },
+  },
+  {
+    type: 'code',
+    description: 'Code or other preformatted text, kept as written (no {…}); or value= a text state or calc.',
+    container: false,
+    primary: 'text',
+    props: {
+      text: { kind: 'code' },
+      value: { kind: 'expr', of: 'string' },
+      lang: { kind: 'string', enum: CODE_LANGUAGES, aliases: CODE_LANGUAGE_ALIASES, default: 'text' },
+      current: { kind: 'expr', of: 'number' },
+      numbers: { kind: 'expr', of: 'boolean' },
+      caption: { kind: 'text' },
+    },
   },
   {
     type: 'checklist',
@@ -334,13 +351,13 @@ export const CATALOG: readonly ComponentDescriptor[] = [
   },
   {
     type: 'image',
-    description: 'Inline image from a data:image/… URL. Remote URLs are rejected.',
+    description: 'Inline data:image/… image; remote URLs are rejected.',
     container: false,
     props: { src: { kind: 'string', required: true, format: 'image' }, alt: { kind: 'string', required: true, maxLength: 200 }, caption: { kind: 'text' } },
   },
   {
     type: 'link',
-    description: 'Citation link (http or https), opened only when the reader clicks it.',
+    description: 'Citation link, opened only when the reader clicks it.',
     container: false,
     primary: 'text',
     props: { text: { kind: 'text', required: true }, url: { kind: 'string', required: true, format: 'url' } },

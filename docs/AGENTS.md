@@ -44,7 +44,8 @@ proven.
   differences; and what was given up.
 - `VERIFY.md` — the checklist in three parts: the web UI (activation, persisted
   cards, math cards, the skill, buttons, a bad program, reload, themes, the
-  uninstall regression, and an animated card), the macOS and Windows desktop apps, and what only
+  uninstall regression, an animated card, the newer components, a code block,
+  and the skill row), the macOS and Windows desktop apps, and what only
   Windows shows; plus the recorded runs. All three parts are required: Part 1
   passed on the web UI, Parts 2 and 3 on both desktop apps of 0.2.1-rc.2, and
   only W4 has no recorded pass.
@@ -64,9 +65,10 @@ proven.
   check that costs no model call: a persisted card, and a card from before the
   version fields showing its text. The web part was run on 2026-10-16 and the
   desktop parts on 2026-10-17; both are recorded there.
-- `SAMPLES.md` carries all thirty-one components: samples 1 to 27 as they were
-  actually drawn, samples 28 to 31 as compiled by the built tool (all four drew
-  together in one web-UI card on 2026-10-19), and
+- `SAMPLES.md` carries all thirty-two components: samples 1 to 27 as they were
+  actually drawn, samples 28 to 32 as compiled by the built tool (28 to 31 drew
+  together in one web-UI card on 2026-10-19; a model-written code card drew
+  live on both the web UI and the macOS app on 2026-10-22), and
   doubles as a compile corpus: `tests/compile.test.ts` compiles the two math
   samples a live model wrote.
 - Screenshots of rendered cards live in the repository's `assets/`.

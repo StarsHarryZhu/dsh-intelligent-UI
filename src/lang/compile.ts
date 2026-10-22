@@ -449,6 +449,15 @@ function readNode(raw: RawNode, context: NodeContext, diagnostics: Diagnostic[])
     })
     return undefined
   }
+  if (type === 'code' && !('text' in props) && !('value' in props)) {
+    diagnostics.push({
+      code: 'invalid_literal',
+      ...where(`nodes.${id}.text`),
+      message: '<code> has neither text nor value=; the component was left out',
+      repair: 'Write the text in a block (code lang=python """ … """), or name a text state or calc with value=.',
+    })
+    return undefined
+  }
   if (type === 'select' && bind !== undefined && bind.kind !== 'select' && !('options' in props)) {
     diagnostics.push({
       code: 'invalid_literal',
@@ -485,6 +494,26 @@ interface PropContext extends NodeContext {
   id: string
 }
 
+/**
+ * Read a code block's text: line breaks normalised, trailing empty lines dropped,
+ * and anything past the code limits cut, with the cut reported so the model can
+ * shorten the listing instead of losing it silently.
+ */
+function readCode(written: string): PropOutcome {
+  let text = written.replace(/\r\n?/gu, '\n').replace(/\n+$/u, '')
+  const problems: Array<{ message: string; repair: string }> = []
+  const lines = text.split('\n')
+  if (lines.length > LIMITS.maxCodeLines) {
+    text = lines.slice(0, LIMITS.maxCodeLines).join('\n')
+    problems.push({ message: `has ${lines.length} lines; only the first ${LIMITS.maxCodeLines} are shown`, repair: 'Show the part the answer is about, and say in prose what was left out.' })
+  }
+  if (text.length > LIMITS.maxCodeChars) {
+    text = text.slice(0, LIMITS.maxCodeChars)
+    problems.push({ message: `is longer than ${LIMITS.maxCodeChars} characters; the rest was cut`, repair: 'Show the part the answer is about, and say in prose what was left out.' })
+  }
+  return { ok: true, value: text, ...(problems.length > 0 ? { problems } : {}) }
+}
+
 /** Synonyms models reach for, mapped onto the tone vocabulary. */
 const TONE_SYNONYMS: Readonly<Record<string, string>> = {
   danger: 'error', negative: 'error', bad: 'error', warning: 'warn', caution: 'warn',
@@ -509,8 +538,9 @@ function readProp(
     ({ ok: false, message, repair, ...(code === undefined ? {} : { code }) })
   switch (spec.kind) {
     case 'string': {
-      const text = typeof value === 'number' ? String(value) : value
-      if (typeof text !== 'string') return bad('must be text', `Write ${name}="…".`)
+      const written = typeof value === 'number' ? String(value) : value
+      if (typeof written !== 'string') return bad('must be text', `Write ${name}="…".`)
+      const text = spec.aliases === undefined ? written : spec.aliases[written.trim().toLowerCase()] ?? written.trim().toLowerCase()
       if (spec.enum !== undefined && !spec.enum.includes(text)) return bad(`must be one of ${spec.enum.join(', ')}`, `Write ${name}=${spec.enum[0] as string}.`)
       if (spec.maxLength !== undefined && text.length > spec.maxLength) return bad(`is longer than ${spec.maxLength} characters`, 'Shorten it.')
       if (spec.format === 'url' && !/^https?:\/\/[^\s]+$/iu.test(text)) return bad('must be an http(s) URL', `Write ${name}="https://…".`)
@@ -518,6 +548,11 @@ function readProp(
         return bad('must be a data:image/png, jpeg, gif, or webp URL; remote images are not loaded', 'Describe the image in text instead.')
       }
       return { ok: true, value: text }
+    }
+    case 'code': {
+      const written = typeof value === 'number' ? String(value) : value
+      if (typeof written !== 'string') return bad('must be text', `Write ${name}=""" on its line, the text below, and """ to close it.`)
+      return readCode(written)
     }
     case 'text': {
       const read = readText(value, context)
@@ -969,9 +1004,12 @@ function depthOf(node: UINode, byId: ReadonlyMap<string, UINode>): number {
 export function buildFallback(program: UIProgram): string {
   const values = initialValues(program)
   const lines = fallbackLines(program, values)
-  const text = lines.filter(line => line.trim() !== '').join('\n')
+  const text = lines.filter(line => line.trim() !== '').join('\n').replaceAll(KEPT_BLANK, '')
   return text === '' ? 'Interactive interface (no readable summary was produced).' : text
 }
+
+/** Stands for an empty line inside a code block, so the empty-line filter keeps it. */
+const KEPT_BLANK = '\u0000'
 
 /**
  * State and derived values at their declared initial state.
@@ -1060,6 +1098,7 @@ export function fallbackLines(program: Pick<UIProgram, 'nodes' | 'constants' | '
         return [head, ...items.map(item => `- [ ] ${item}`)].join('\n')
       }
       case 'diagram': return diagramText(node)
+      case 'code': return codeText(node)
       case 'chart': return chartText(node)
       default: return undefined
     }
@@ -1136,6 +1175,22 @@ export function fallbackLines(program: Pick<UIProgram, 'nodes' | 'constants' | '
     const current = node.props.current === undefined ? undefined : evalExpr(node.props.current, key => values.get(key))
     const highlighted = typeof current === 'number' ? names[Math.floor(current) - 1] : undefined
     return `${caption}: ${parts.join('; ')}${highlighted === undefined ? '' : `; current: ${highlighted}`}`
+  }
+
+  /** The block as a Markdown fence longer than any backtick run inside it, then the highlighted line. */
+  function codeText(node: UINode): string {
+    const body = typeof node.props.text === 'string'
+      ? node.props.text
+      : node.props.value === undefined ? '' : valueText(node.props.value, values)
+    const lang = typeof node.props.lang === 'string' && node.props.lang !== 'text' ? node.props.lang : ''
+    const longest = Math.max(0, ...[...body.matchAll(/`+/gu)].map(run => run[0].length))
+    const fence = '`'.repeat(Math.max(3, longest + 1))
+    const head = node.props.caption === undefined ? [] : [`${text(node, 'caption')}:`]
+    const current = node.props.current === undefined ? undefined : evalExpr(node.props.current, key => values.get(key))
+    const lineCount = body.split('\n').length
+    const mark = typeof current === 'number' && current >= 1 && current < lineCount + 1 ? [`(line ${Math.floor(current)} highlighted)`] : []
+    const kept = body.split('\n').map(line => (line.trim() === '' ? KEPT_BLANK : line)).join('\n')
+    return [...head, `${fence}${lang}`, kept, fence, ...mark].join('\n')
   }
 
   function chartText(node: UINode): string {

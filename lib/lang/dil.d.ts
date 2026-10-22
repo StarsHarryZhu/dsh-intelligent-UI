@@ -12,8 +12,20 @@
  *
  * One statement per line, so a streamed program can be compiled from the lines
  * that have arrived. Indentation nests a component inside the container above it,
- * and is the only way to nest one. The parser only produces the JSON envelope;
- * the compiler validates it against the catalog.
+ * and is the only way to nest one. The one exception to one-line statements is a
+ * text block: a component line that ends in `"""` takes the lines after it, up
+ * to a line holding only `"""`, as one multi-line value, written as is:
+ *
+ * ```
+ * code lang=python """
+ *   total = 0
+ *   for i in range(4):
+ *       total += i
+ * """
+ * ```
+ *
+ * The parser only produces the JSON envelope; the compiler validates it against
+ * the catalog.
  * @module dsh-intelligent-ui/lang/dil
  */
 import type { Diagnostic } from './types.ts';

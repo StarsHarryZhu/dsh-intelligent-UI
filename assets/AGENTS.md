@@ -40,7 +40,7 @@ high-density screens without bloating the repository.
 - `taylor-light.png` — a Taylor approximation card with two curves, a legend,
   and a typeset limit, light theme.
 - `quiz.png` — a multiple-choice question answered with one click, dark theme.
-- `catalog/` — one card per component, thirty-one in all, light theme, for the
+- `catalog/` — one card per component, thirty-two in all, light theme, for the
   README. See `catalog/AGENTS.md`.
 
 ## 4. Progress
@@ -48,7 +48,7 @@ high-density screens without bloating the repository.
 **Done.**
 
 - Four captures from the live run of 2026-10-16, listed in `screenshots.json`.
-- All thirty-one components in `catalog/`, embedded in both READMEs.
+- All thirty-two components in `catalog/`, embedded in both READMEs.
 
 **Not done.**
 

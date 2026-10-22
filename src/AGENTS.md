@@ -2,9 +2,10 @@
 
 ## 1. Role
 
-All source for both halves of the plugin. `index.ts` is the Node entry the cordis
-loader imports; `host/` is the compiler side that runs in the harness process,
-with the tool and the skill registration; `client/` is the renderer side that
+All source for both halves of the plugin. `index.ts` and `skill.ts` are the two
+Node entries the cordis loader imports, one per bundle row: the tool row and the
+skill row; `host/` is the compiler side that runs in the harness process, with
+the tool and the skill provider; `client/` is the renderer side that
 runs in the browser; `lang/` is the part both halves share, including the math
 engine.
 
@@ -15,8 +16,8 @@ degrades to text instead of throwing.
 
 ## 2. Constraints
 
-**Two compiles, two sets of globals.** `tsconfig.json` checks `index.ts`, `host/`,
-and `lang/` with Node types and no DOM; `tsconfig.client.json` compiles `client/`
+**Two compiles, two sets of globals.** `tsconfig.json` checks `index.ts`,
+`skill.ts`, `host/`, and `lang/` with Node types and no DOM; `tsconfig.client.json` compiles `client/`
 and `lang/` with DOM types and no Node types. `lang/` therefore compiles under
 both, which is what keeps it free of either environment.
 
@@ -53,9 +54,12 @@ test or consumer needs. The browser entry exports the same three names.
 ## 3. Contents
 
 - `AGENTS.md` — this file: how the two halves share code and what each may assume.
-- `index.ts` — the Node entry: `name`, `inject`, `apply`, and the public re-exports.
+- `index.ts` — the tool row's Node entry: `name`, `inject`, `apply`, and the
+  public re-exports.
+- `skill.ts` — the skill row's Node entry: registers the bundled skill's
+  provider.
 - `host/` — the harness-process half: the tool definition, the model-facing
-  contract, and the skill registration. See `host/AGENTS.md`.
+  contract, and the skill provider. See `host/AGENTS.md`.
 - `client/` — the browser half: the tool row, the turn tail, the turn data
   Definition, and the card. See `client/AGENTS.md`.
 - `lang/` — the shared language layer: catalog, grammar, expressions, the math
@@ -65,8 +69,9 @@ test or consumer needs. The browser entry exports the same three names.
 
 **Done.**
 
-- `index.ts` registers exactly one tool, and one skill once the skill registry
-  exists, as effects of its own context (`tests/isolation.test.ts`).
+- `index.ts` registers exactly one tool, and `skill.ts` exactly one skill
+  provider, each as an effect of its own row's context
+  (`tests/isolation.test.ts`).
 - The host and browser compiles are separate and each forbids the other's
   globals; the build fails on either half's type error.
 - The browser bundle's external requests are checked on every build.

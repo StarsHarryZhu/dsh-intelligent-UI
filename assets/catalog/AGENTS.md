@@ -2,11 +2,12 @@
 
 ## 1. Role
 
-One picture per catalog component, thirty-one in all, for the README's component
+One picture per catalog component, thirty-two in all, for the README's component
 gallery. Each is the card that one sample program of `docs/SAMPLES.md` draws,
 cropped to the card's frame. Samples 1 to 24 were first drawn in a live chat on
 2026-10-15 and samples 25 to 27 on 2026-10-16; samples 28 to 31 were written on
-2026-10-18 and have not been drawn in a live chat yet. These pictures redraw the
+2026-10-18 and drew together in one live card on 2026-10-19; sample 32 was
+written on 2026-10-22, the day a model-written code card first drew live. These pictures redraw the
 programs with the current build, so the gallery shows the cards as they look
 today.
 
@@ -48,6 +49,7 @@ the parent folder cover the dark theme.
 - `divider.png` — the `divider` sample.
 - `link.png` — the `link` sample.
 - `image.png` — the `image` sample.
+- `code.png` — the `code` sample, stepped to frame 3 so the loop body is highlighted.
 - `metric.png` — the `metric` sample.
 - `progress.png` — the `progress` sample.
 - `table.png` — the `table` sample.
@@ -75,7 +77,9 @@ the parent folder cover the dark theme.
 
 - All twenty-seven components, regenerated on 2026-10-16 after `player` was
   added and code-type lists got their wider gutter; `tabs`, `tab`, `checklist`,
-  and `diagram` added on 2026-10-18.
+  and `diagram` added on 2026-10-18; `code` added on 2026-10-22, drawn with
+  the host's light syntax palette (`--shiki-token-*`) supplied to the static
+  page, because the host's theme injects it at run time.
 
 **Not done.**
 

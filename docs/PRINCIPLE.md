@@ -94,11 +94,13 @@ The architecture, not the training. Each layer maps onto a mechanism DeepSeek Ha
 
 **The model sees what it built.** The tool result tells the model what a text-only reader sees, with the figures computed, and lists what the compiler repaired, so the next call is cleaner — the original's diagnostics never reached its model.
 
-**The catalog is scoped to what the host can style natively.** Thirty-one components rather than seventy, each drawn from theme tokens. A smaller catalog the model uses correctly is worth more than a large one it half-remembers.
+**The catalog is scoped to what the host can style natively.** Thirty-two components rather than seventy, each drawn from theme tokens. A smaller catalog the model uses correctly is worth more than a large one it half-remembers.
 
 **Mathematics is computed, not written.** The original's cards show figures the model computed. Here a card can carry the computation itself: integrals (adaptive Gauss–Kronrod, with infinite bounds), derivatives (exact, by Taylor-mode automatic differentiation over the expression tree), limits (extrapolated, refusing when the sides disagree), finite sums and products, roots (Brent's method), and Taylor polynomials, with `plot` and `formula` to show them. A figure the engine cannot vouch for is shown as "—" rather than guessed, and the tool result hands the model the computed figures, so the reply and the card agree. Formulas are typeset by the plugin's own spans: React 18 cannot create MathML, and the host's KaTeX is not a plugin dependency.
 
-**The judgement travels as a skill.** The tool description is the language reference; a bundled skill, registered under the plugin's name, carries when to draw a card, how to shape it, and complete recipes, and the model loads it only when a task matches.
+**Code is data, not a program.** A `code` block shows text exactly as written — no interpolation, no evaluation — from a `"""` text block in the source, the one statement that spans lines. The plugin colours it with its own small scanner, losslessly, in the host's syntax palette, so a listing in a card reads like the host's code blocks without the card pulling in the host's highlighter.
+
+**The judgement travels as a skill.** The tool description is the language reference; a bundled skill, registered under the plugin's name, carries when to draw a card, how to shape it, and complete recipes, and the model loads it only when a task matches. The skill is a row of the bundle of its own, registered the way the host's own skill packages register theirs, so the Plugin Manager shows it as a part of the plugin.
 
 ### Deliberate give-ups
 

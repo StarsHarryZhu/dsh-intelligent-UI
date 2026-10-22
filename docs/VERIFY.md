@@ -138,6 +138,25 @@ Send:
 
 Pass: the program compiles with no repair and uses `tabs`, `checklist`, `table … sortable=true`, and `diagram`. Clicking a tab and the left and right arrow keys switch pages, and the open page is the same in the tool row and under the reply. Ticking items updates the done count and anything bound to it. A column header sorts ascending, then descending, then back to the written order. The flowchart's loop returns along the side without crossing a box, and the slider moves the highlight. No request appears in the network panel while doing any of this.
 
+## 15. A code block
+
+Keep the Browser window in view, as in step 13. Send:
+
+> 用一张卡片演示这段 Python 求斐波那契数的代码逐行执行：语法高亮、显示行号、高亮当前执行的行，并显示每一步的变量。
+>
+> a, b = 0, 1
+> for _ in range(5):
+>     a, b = b, a + b
+> print(a)
+
+Pass: the program compiles with no repair and writes the listing as a `code lang=python … current= numbers=true` block between `"""` lines. Keywords, strings, comments, numbers, and called names take the colours of the host's own code blocks, in the light and in the dark theme. Playing moves the highlighted line; when it leaves the block's view, the block scrolls itself to it while the chat stays where it is. Copy puts the exact listing on the clipboard and the button says so (in the in-app browser, which may refuse the clipboard, it says it could not copy). No request appears in the network panel.
+
+## 16. The skill is a part of the plugin
+
+This needs the restart of step 1 after an update, because the skill row is part of the host half. Open Settings → Plugins → 渐进式交互 / Intelligent UI.
+
+Pass: the plugin's parts list two rows, 渐进式交互 / Intelligent UI and 渐进式交互 · 技能 / Intelligent UI · Skill, both active. Typing `/` in the composer lists `dsh-intelligent-ui` with the skills. Switching the skill row off removes it from that list and leaves cards drawing; switch it back on afterwards.
+
 # Part 2 — Desktop apps (macOS and Windows)
 
 **Passed on 0.2.1-rc.2, on both apps.** D1 to D4 passed on the macOS app and on the Windows app of DeepSeek Harness 0.2.1-rc.2, installed on macOS from the working checkout as a `link:` dependency and on Windows through W1. The failure of 2026-10-16 on 0.2.0-rc.2 — no card drawn, and past conversations that would not open with the plugin loaded — did not recur on this build. Run this part again on any new desktop version, in a throwaway session first, before claiming that version.
@@ -160,7 +179,7 @@ Pass: the install reports success with no compatibility error (the plugin declar
 
 Open the app's developer tools (View → Toggle Developer Tools, or the shortcut the app shows) and run the two console expressions of step 2.
 
-Pass: `true`, then `1`, and Settings → Plugins lists 渐进式交互 / Intelligent UI as enabled.
+Pass: `true`, then `1`, and Settings → Plugins lists 渐进式交互 / Intelligent UI as enabled, with the skill row of step 16 among its parts; typing `/` lists `dsh-intelligent-ui` with the skills.
 
 ## D3. The standard transcript view
 
@@ -187,7 +206,7 @@ Pass: the install in D1 succeeds from a machine where `git` is on `PATH`. Withou
 In a clone of this repository on Windows:
 
 ```powershell
-git ls-files --eol skills/SKILL.md lib/client.js
+git ls-files --eol skills/dsh-intelligent-ui/SKILL.md lib/client.js
 ```
 
 Pass: both show `w/lf`; `.gitattributes` keeps them LF whatever `core.autocrlf` says.
@@ -221,6 +240,11 @@ Pass: the linker creates directory junctions without asking for administrator ri
 - 2026-10-16, maintainer's verdict on Parts 2 and 3 after the run above and a Windows attempt: D1 passed (installed into the desktop profile from the local build, accepted by the engine range of the time, active without a restart). D2 partly: the slot and skill registrations were live; the console expressions and the stylesheet count were not taken. D3 failed: the standard-view settings held, but no card appeared under the reply when the turn ended. D4 failed: the host half of steps 7, 9, and 12 passed, while the visual and interactive criteria of steps 5, 6, 8, and 10 could not pass with no card on screen. W1 and W3 were not run (Windows-only, and W3 needs a visible card). W2 passed on macOS (`git ls-files --eol` shows `w/lf` for both files). W4 failed on Windows; the output was not recorded. **With the plugin loaded, every past conversation in the desktop app failed to open.** Decision: desktop adaptation is paused, the engine range was raised to `>=0.2.1-alpha.1 <0.3.0-0` so the desktop app of today refuses the plugin, and Parts 2 and 3 resume when the desktop app ships 0.2.1-alpha.1 or later. (2026-10-17: the pause was lifted — the three hosts are the supported target — but this run's results stand, and Part 2 is still unpassed on a qualifying build.)
 
 - 2026-10-17, both desktop apps, DeepSeek Harness 0.2.1-rc.2 (the macOS app bundle and the Windows app), maintainer-run: D1 to D4 passed on each, so every card drew in the row while the turn ran and under the reply when it finished, the controls recomputed without a request, and past conversations opened with the plugin loaded — the two failures of 2026-10-16 on 0.2.0-rc.2 did not recur. W1 passed on Windows, installing from the GitHub URL; W2 passed; W3 passed at 100% and 150% display scaling. W4 was not run.
+
+- 2026-10-22, web UI and the macOS desktop app, DeepSeek Harness 0.2.1-rc.2, DeepSeek-V4.1-Flash, both profiles linked to the working checkout, run by Claude Code (the web UI in its browser pane, the desktop app's own window over a local debugging port): steps 15 and 16 and D2 passed on both hosts, with notes.
+  - Step 16 / D2: the plugin's parts list two rows, 渐进式交互 and 渐进式交互 · 技能, both running; `/` lists `dsh-intelligent-ui` with the skills. On the web UI the skill row was switched off — `/` stopped listing it and the code card kept drawing — and on again, without a restart.
+  - Step 15: the prompt went in English with "Reply in Chinese", because the composer drops CJK text typed by automation. On both hosts the model loaded the skill first and drew a `code lang=python current=line numbers=true` block traced frame by frame, with a correct trace (a, b = 1,1 → 1,2 → 2,3 → 3,5 → 5,8; print shows 5). Keyword, number, and called-name colours equal the host's syntax tokens in the dark theme (web UI) and the light theme (both); stepping and playing moved the highlight line by line and the page did not scroll; no request left the card while it played. Copy wrote the exact listing to the clipboard in the desktop app; the in-app browser refused the clipboard and the button said it could not copy, as the step allows. A history session from 2026-10-16 opened in the desktop app with its three cards drawn.
+  - Found and fixed in this run: the running host defines no `--shiki-background`, so the block fell back to a lighter layer than the host's code blocks; it now falls back to `--dsw-alias-markdown-code-block`. And on its first desktop call the model opened the block with `"""` on a line of its own under `code`, which dropped the block until the model retried; such a block now attaches to the component above it, with a repair note.
 
 # Not verified
 

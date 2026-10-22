@@ -552,3 +552,81 @@ describe('pages, checklists, sortable tables, and diagrams', () => {
     expect(program.diagnostics.some(entry => entry.code === 'limit_exceeded')).toBe(true)
   })
 })
+
+describe('code blocks', () => {
+  const Q = '"""'
+  const LISTING = [
+    '@state line = 2 min=1 max=4 step=1',
+    'card "Trace"',
+    `  code lang=python caption="sum.py" current=line numbers=true ${Q}`,
+    '    total = 0',
+    '    for i in range(4):',
+    '        total += {i}  # not an interpolation',
+    '    print(total)}}',
+    `  ${Q}`,
+  ].join('\n')
+
+  it('keeps the text exactly as written, braces and all, in the same API version', () => {
+    const program = ok(LISTING)
+    expect(program.diagnostics).toEqual([])
+    expect(program.version).toBe(API_VERSION)
+    const code = first(program, 'code')
+    expect(code.props.text).toBe('total = 0\nfor i in range(4):\n    total += {i}  # not an interpolation\nprint(total)}}')
+    expect(code.props.lang).toBe('python')
+    expect(code.props.current).toEqual(['ref', 'line'])
+  })
+
+  it('writes a fenced block in the text view, with the highlighted line', () => {
+    expect(ok(LISTING).fallback).toBe([
+      '## Trace',
+      '  sum.py:',
+      '  ```python',
+      '  total = 0',
+      '  for i in range(4):',
+      '      total += {i}  # not an interpolation',
+      '  print(total)}}',
+      '  ```',
+      '  (line 2 highlighted)',
+    ].join('\n'))
+  })
+
+  it('makes the fence longer than any backtick run, and keeps blank lines', () => {
+    const program = ok(['card', `  code ${Q}`, '    a ```b``` c', '', '    d', `  ${Q}`].join('\n'))
+    expect(program.fallback).toBe('````\na ```b``` c\n\nd\n````')
+  })
+
+  it('shows a text state or calc through value=, and its current value in the text view', () => {
+    const program = ok('@state src = "SELECT 1"\ncard\n  textInput "Query" bind=src\n  code lang=sql value=src')
+    expect(first(program, 'code').props.value).toEqual(['ref', 'src'])
+    expect(program.fallback).toContain('```sql\nSELECT 1\n```')
+  })
+
+  it('reads the names models write for a language, and reports one it does not know', () => {
+    expect(first(ok(`card\n  code lang=JavaScript ${Q}x${Q}`), 'code').props.lang).toBe('js')
+    expect(first(ok(`card\n  code lang=py ${Q}x${Q}`), 'code').props.lang).toBe('python')
+    const unknown = ok(`card\n  code lang=klingon ${Q}x${Q}`)
+    expect(first(unknown, 'code').props).not.toHaveProperty('lang')
+    expect(unknown.diagnostics[0]?.message).toContain('must be one of text, python')
+  })
+
+  it('leaves out a block with neither text nor value=, and says how to write one', () => {
+    const program = ok('card\n  code lang=python\n  text "still here"')
+    expect(program.nodes.some(node => node.type === 'code')).toBe(false)
+    expect(program.diagnostics[0]?.repair).toContain(Q)
+  })
+
+  it('cuts a listing past the code limits and reports the cut', () => {
+    const lines = Array.from({ length: 450 }, (_, index) => `x${index}`)
+    const long = ok(`card\n  code ${Q}\n${lines.map(line => `    ${line}`).join('\n')}\n  ${Q}`)
+    expect((first(long, 'code').props.text as string).split('\n')).toHaveLength(400)
+    expect(long.diagnostics.some(entry => /450 lines/u.test(entry.message))).toBe(true)
+    const wide = ok(`card\n  code ${Q}${'y'.repeat(9000)}${Q}`)
+    expect((first(wide, 'code').props.text as string).length).toBe(8000)
+    expect(wide.diagnostics.some(entry => /8000 characters/u.test(entry.message))).toBe(true)
+  })
+
+  it('accepts the JSON form with line breaks, and normalises Windows line ends', () => {
+    const program = ok(JSON.stringify({ nodes: [{ type: 'card', children: [{ type: 'code', text: 'a\r\nb\n\n', lang: 'bash' }] }] }))
+    expect(first(program, 'code').props.text).toBe('a\nb')
+  })
+})

@@ -25,6 +25,10 @@ export declare const LIMITS: {
     readonly maxTableColumns: 12;
     /** Entries in one list prop. */
     readonly maxItems: 200;
+    /** Characters in one code block; a longer block is cut and the cut reported. */
+    readonly maxCodeChars: 8000;
+    /** Lines in one code block. */
+    readonly maxCodeLines: 400;
     /** `{…}` interpolations in one piece of text. */
     readonly maxInterpolations: 32;
     /** Positions tried when trimming junk around a JSON envelope; keeps recovery linear. */

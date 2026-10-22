@@ -13,7 +13,7 @@
 
 ## 工作方式
 
-- 插件注册一个工具 `ui_render` 和一个技能 `dsh-intelligent-ui`，技能教模型什么时候用卡片比用文字好。模型不写 HTML 或 JavaScript：它写的程序按 31 个组件的目录校验，随工具结果一起保存。
+- 插件注册一个工具 `ui_render` 和一个技能 `dsh-intelligent-ui`，技能教模型什么时候用卡片比用文字好。技能是插件里单独的一部分：插件管理页单独列出它、有自己的开关，安装插件时一起装上。模型不写 HTML 或 JavaScript：它写的程序按 32 个组件的目录校验，随工具结果一起保存。
 - 回复生成时，卡片显示在工具行里；回复结束后，卡片显示在回复下方。调整控件时，所有数字都在本地重算。
 - `player` 让卡片动起来：逐行演示代码执行、算法的每一轮、点沿曲线移动。播放在浏览器里进行，不会发消息给模型。
 - 卡片能算定积分（含无穷积分限）、导数、极限、求和与连乘、方程求根和泰勒多项式。算不准的值显示“—”，不会给出猜测的数。
@@ -29,7 +29,7 @@ node node_modules/vitest/vitest.mjs run
 
 目录规则见 `AGENTS.md`，线上验证清单见 `docs/VERIFY.md`。
 
-## 31 个组件
+## 32 个组件
 
 每个组件一张卡片，由本插件按宿主的浅色主题绘制。每张卡片的程序原文见 [`docs/SAMPLES.md`](docs/SAMPLES.md)。
 
@@ -110,6 +110,12 @@ node node_modules/vitest/vitest.mjs run
 <img src="assets/catalog/image.png" alt="image" width="720">
 
 内联图片（只接受 `data:` 地址），带替代文字和说明。
+
+### `code` — 文本
+
+<img src="assets/catalog/code.png" alt="code" width="720">
+
+代码或其他需要保留格式的文本，原样显示：按宿主的配色做语法高亮，可显示行号，带复制按钮，`current=` 高亮正在执行的行。
 
 ### `metric` — 数据
 

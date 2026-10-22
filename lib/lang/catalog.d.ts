@@ -37,8 +37,14 @@ export type PropSpec = {
     required?: boolean;
     maxLength?: number;
     enum?: readonly string[];
+    aliases?: Readonly<Record<string, string>>;
     default?: string;
     format?: 'url' | 'image';
+}
+/** Text shown exactly as written: no `{…}` interpolation, line breaks kept, cut at the code limits. */
+ | {
+    kind: 'code';
+    required?: boolean;
 } | {
     kind: 'number';
     required?: boolean;

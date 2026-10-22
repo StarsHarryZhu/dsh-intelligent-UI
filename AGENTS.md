@@ -23,10 +23,11 @@ when…" with a sentence forces the reader to ask again for every variation. A c
 keeps the answer and the exploration in one place without spending a request per
 variation, and a button turns a choice into the next message without retyping it.
 
-How it fits the host: the host half registers one tool, `ui_render`, which
-compiles the model's source and persists the compiled program as the tool
-result's presentation metadata, and one skill, `dsh-intelligent-ui`, which
-teaches the model when and how to use the tool. The browser half draws the
+How it fits the host: the bundle mounts two rows. The tool row registers one
+tool, `ui_render`, which compiles the model's source and persists the compiled
+program as the tool result's presentation metadata; the skill row registers one
+skill, `dsh-intelligent-ui`, which teaches the model when and how to use the
+tool, the way the host's own skill packages register theirs. The browser half draws the
 program in two places — in the tool row while the turn runs (with a live preview
 while the arguments stream), and under the reply once the turn has finished,
 because a finished turn folds its tool rows away. It supports DeepSeek Harness
@@ -51,8 +52,9 @@ own composer. Whatever reaches the model is reconstructable from events the host
 already defines, which is what makes "uninstall the plugin and every session still
 opens" true.
 
-**Registered surface, exactly, all under this plugin's own names.** Host: one tool,
-`ui_render`, and, where the host composes a skill registry, one skill,
+**Registered surface, exactly, all under this plugin's own names.** Host: two
+bundle rows, `dsh-intelligent-ui` with one tool, `ui_render`, and
+`dsh-intelligent-ui-skill` with one skill provider listing one skill,
 `dsh-intelligent-ui`. Browser: one keyed `tool.call.toolview` cell under
 `ui_render`, one `conversation.chat.turnTail` list entry with id
 `dsh-intelligent-ui`, one data-only Conversation Definition of kind
@@ -148,7 +150,7 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
   the `dsh.client` browser declaration, the supported harness range in
   `engines.dsh`, and the published file list.
 - `cordis.patch.yml` — the bundle's own patch layer, which inserts this package's
-  row into a profile.
+  two rows into a profile: the tool row and the skill row.
 - `build.js` — the build: type-check, emit the host half, compile and wrap the
   browser half, and self-check the bundle. See its JSDoc for the exact steps.
 - `tsconfig.json` — the host-half type check (no DOM types).
@@ -161,13 +163,14 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
 - `screenshots.json` — the storefront screenshot list, read from the repository
   by plugin markets.
 - `locale/zh.json`, `locale/en.json` — the display metadata the Plugin Manager
-  reads (`meta.title`, `meta.description`).
+  reads (`meta.title`, `meta.description`); `locale/skill/` holds the skill
+  row's, exported under `./skill/locale/`.
 - `icon.svg` — the plugin's icon, exported under `./icon`.
 - `LICENSE` — the MIT license text.
 - `lib/` — generated host and browser artifacts. Never edited by hand.
 - `src/` — all source. See `src/AGENTS.md`.
-- `skills/` — the bundled skill that teaches the model to use `ui_render`. See
-  `skills/AGENTS.md`.
+- `skills/` — the bundled skill that teaches the model to use `ui_render`, in the
+  `skills/<name>/SKILL.md` layout. See `skills/AGENTS.md`.
 - `assets/` — the screenshots `screenshots.json` and the README show, including
   one drawn card per component in `assets/catalog/`. See `assets/AGENTS.md`.
 - `tests/` — the unit, contract, isolation, and packaging suite. See
@@ -188,15 +191,26 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
   exact derivatives by Taylor arithmetic, limits, finite sums and products, roots,
   and Taylor polynomials — each pinned against known values
   (`tests/math.test.ts`). `plot` and `formula` draw them.
-- The skill `dsh-intelligent-ui` (`skills/`) registers where the host has a skill
-  registry; every program it teaches compiles without a repair
-  (`tests/skill.test.ts`).
+- The skill `dsh-intelligent-ui` (`skills/dsh-intelligent-ui/`) is its own
+  bundle row and registers as a bundled skill provider, so the Plugin Manager
+  lists it as a part of the plugin; every program it teaches compiles without a
+  repair (`tests/skill.test.ts`, `tests/isolation.test.ts`).
 - The browser half registers through `apply(ctx)` alone and the build proves it
   on every run; the bundle is tested with real React 18.3.1, jsdom, and Testing
   Library through its own `__ModuleLoader__` registration (`tests/client.test.tsx`).
 - Animation: `player` plays, pauses, steps, and scrubs a number state, with a
   duration and a reader-chosen speed; `pick` and the `current=` and `mono=`
   props let a card trace code line by line (`tests/client.test.tsx`).
+- Code blocks (2026-10-22): `code` shows code or preformatted text exactly as
+  written, from a `"""` text block or a text state, colours fifteen languages
+  with the host's syntax tokens, numbers its lines, highlights `current=` while
+  scrolling only itself, and copies its exact text (`tests/highlight.test.ts`,
+  `tests/compile.test.ts`, `tests/client.test.tsx`).
+- **Live run of 2026-10-22, web UI and macOS desktop app** (`docs/VERIFY.md`
+  steps 15, 16, D2): the Plugin Manager lists the skill row on both hosts and
+  `/` lists the skill; the model loaded the skill and drew a code card traced
+  line by line, with the host's syntax colours in both themes, a moving
+  highlight, and copying.
 - Pages, checklists, sortable tables, and flowcharts:
   `tabs` and `tab` switch pages by click or arrow key, `checklist` counts ticked
   items into an optional bound state, `table sortable=true` sorts by any column,
@@ -238,6 +252,8 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
   roughly forty components it should move behind a `deferLoading` tool.
 - **Persisted reader edits.** Edits live for the page's lifetime only; a reload
   starts from the model's initial values, and nothing claims otherwise.
+- **Cards in the exported session log as clean text.** Deferred (2026-10-22): the
+  tool result would carry the card's text view as its own block.
 
 **Defects found by live use, and the guard each now has.**
 
@@ -254,6 +270,9 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
   now keep bracketed spaces and rejoin operator-led pieces (`tests/dil.test.ts`).
 - Earlier: the parameter dialect reached a provider once, and an unsupported
   result schema failed activation once; `tests/tool.test.ts` pins both shapes.
+- A model opened a code block with `"""` on a line of its own under the
+  component, and the block was dropped. Such a block now attaches to the
+  component above it, with a repair note (`tests/dil.test.ts`).
 
 **Known defects.**
 
