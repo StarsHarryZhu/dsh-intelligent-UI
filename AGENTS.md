@@ -125,12 +125,14 @@ slot key.
 the four sections of this file, in order, in English. The `Contents` list names
 the files that actually exist; `tests/agents-md.test.ts` enforces both rules.
 
-**Release tags are short and bilingual.** An annotated tag's message is a
-Chinese version, then an English version of the same items. Each version has
-exactly two parts, Added and Fixed, with one short phrase or sentence per item,
-and nothing else: no title line, no scope notes, no other prose. The English half
-reads `English version:`, then `Added:` and `Fixed:`, each followed by `- ` items;
-the Chinese half has the same shape with Chinese labels.
+**Release tags are short and bilingual.** An annotated tag's message starts with
+the tag name alone on its first line — GitHub shows that line as the release
+title — then one blank line. After it come two versions of the same items, the
+Chinese one first and then the English one. Each version has exactly two parts,
+Added and Fixed, with one short phrase or sentence per item, and nothing else: no
+scope notes, no other prose. The English half reads `English version:`, then
+`Added:` and `Fixed:`, each followed by `- ` items; the Chinese half has the same
+shape with Chinese labels.
 
 **Build and test.** `node scripts/link-dev.mjs` links the toolchain from the
 sibling harness checkout. `node build.js` is the only build command and ends with
