@@ -31,6 +31,10 @@ export interface UIRenderSuccess {
     summary: string;
     /** Problems that were repaired or ignored, written as instructions. */
     notes: string[];
+    /** This card's id, the call id, which a later call passes as `revises` to change it. */
+    card?: string;
+    /** Id of the earlier card this one replaces, when the model named a valid one. */
+    revises?: string;
     /**
      * The compiled program, as lossless JSON. Present in the result value so
      * `output.presentationMeta` can persist it; it never reaches the model, because

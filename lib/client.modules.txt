@@ -1,4 +1,4 @@
-/** Bundled client modules (30):
+/** Bundled client modules (32):
  *   client/card.js
  *   client/chart.js
  *   client/clipboard.js
@@ -10,9 +10,11 @@
  *   client/host.js
  *   client/index.js
  *   client/locales.js
+ *   client/parts.js
  *   client/plot.js
  *   client/program.js
  *   client/styles.css
+ *   client/table.js
  *   client/tail.js
  *   client/toolview.js
  *   client/turn-data.js

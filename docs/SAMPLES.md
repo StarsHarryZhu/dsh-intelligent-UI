@@ -1,6 +1,6 @@
 # The catalog, one sample per component
 
-A live tour of the catalog: one card per component, drawn in a real chat. Samples 1 to 24 were drawn on 2026-10-15 in the order the catalog had then; samples 25 and 26, the math components, and sample 27, the animation player, were written by the model itself on 2026-10-16. Samples 28 to 31, the newest components, were written by hand on 2026-10-18 and compiled by the built tool; their results are that tool's output. On 2026-10-19 one card using all four — tabs, a checklist, a sortable table, and a diagram — drew in the web UI.
+A live tour of the catalog: one card per component, drawn in a real chat. Samples 1 to 24 were drawn on 2026-10-15 in the order the catalog had then; samples 25 and 26, the math components, and sample 27, the animation player, were written by the model itself on 2026-10-16. Samples 28 to 31, the newest components, were written by hand on 2026-10-18 and compiled by the built tool; their results are that tool's output. Samples 32 (`code`, 2026-10-22) and 33 (`series`, 2026-10-26) were written the same way. On 2026-10-19 one card using all four — tabs, a checklist, a sortable table, and a diagram — drew in the web UI.
 
 Every block below is the exact `source` that was passed to `ui_render` and the exact result it reported, so this file doubles as a regression corpus — `tests/compile.test.ts` can compile any of them.
 
@@ -583,6 +583,42 @@ What a text-only reader sees:
 
 5 components, 1 control, zero repairs.
 
+## 33. `series`
+
+One named series of the chart it is indented under; a chart holds up to four. `shape=area stacked=true` stacks them, `shape=bar` groups or stacks them, and `shape=line` draws one line each, dashed past the first. The legend hides and shows a series, and a readout under the plot names one month's figures, moved by the pointer or the arrow keys. A pie draws one series, here written straight on the chart with `values=`, and its legend carries each slice's share. Both charts follow the slider.
+
+```dil
+@state ads = 3 min=0 max=10
+card "series · 多序列图表"
+  chart shape=area stacked=true labels=["一月","二月","三月","四月"] unit="万元" caption="收入构成（堆叠面积）"
+    series "订阅" values=[12, 14, 15, 18]
+    series "服务" values=[5, 6, 8, 7]
+    series "广告" values=[2, 2, 3, "ads"]
+  chart shape=pie labels=["订阅","服务","广告"] values=[18, 7, "ads"] unit="万元" caption="四月收入占比"
+  slider "四月广告收入" bind=ads unit="万元"
+  text "点图例隐藏或显示一个序列；悬停或用 ←/→ 看某个月的读数。" tone="muted" size="sm"
+```
+
+Result:
+
+```
+The card is shown: 8 component(s), 1 control(s).
+What a text-only reader sees:
+## series · 多序列图表
+  收入构成（堆叠面积）
+  | 订阅 | 服务 | 广告
+  一月 | 12 万元 | 5 万元 | 2 万元
+  二月 | 14 万元 | 6 万元 | 2 万元
+  三月 | 15 万元 | 8 万元 | 3 万元
+  四月 | 18 万元 | 7 万元 | 3 万元
+  四月收入占比
+  订阅: 18 万元 (64.3%) · 服务: 7 万元 (25%) · 广告: 3 万元 (10.7%)
+  四月广告收入: 3 万元 (0–10)
+  点图例隐藏或显示一个序列；悬停或用 ←/→ 看某个月的读数。
+```
+
+8 components, 1 control, zero repairs.
+
 ## What this tour found
 
 **A bare `expr` value ended at the first space (fixed).** Sample 9 first read `metric "折合小时" value=mins / 60 unit="h"`, and the compiler kept `value=mins` while reporting the `/` and the `60` as stray tokens; the card showed `24 h` instead of `0.75 h`. Bare values now keep spaces inside brackets and rejoin pieces that start or follow an operator, so that line reads as written; `tests/dil.test.ts` pins it. Quoting an expression with spaces remains the documented form.
@@ -591,4 +627,4 @@ What a text-only reader sees:
 
 ## Status
 
-Samples 1 to 24 were drawn in one live session on 2026-10-15, in the `ui_render` tool row, with the compiler reporting zero repairs except the first attempt at sample 9. Samples 25 and 26 were drawn on 2026-10-16 in the tool row and then under the reply, and survived a page reload; that run is recorded in `VERIFY.md`. Sample 27 was drawn on 2026-10-16 after the program-version reset, and played as described above. Samples 28 to 31 are compiled, tested, and drawn in the static gallery, and one card using all four drew in the web UI on 2026-10-19. Sample 32 (2026-10-22) is compiled, tested, and drawn in the static gallery; a code card a live model wrote for the same kind of request drew in the web UI and the macOS desktop app on 2026-10-22, as recorded in `VERIFY.md`.
+Samples 1 to 24 were drawn in one live session on 2026-10-15, in the `ui_render` tool row, with the compiler reporting zero repairs except the first attempt at sample 9. Samples 25 and 26 were drawn on 2026-10-16 in the tool row and then under the reply, and survived a page reload; that run is recorded in `VERIFY.md`. Sample 27 was drawn on 2026-10-16 after the program-version reset, and played as described above. Samples 28 to 31 are compiled, tested, and drawn in the static gallery, and one card using all four drew in the web UI on 2026-10-19. Sample 32 (2026-10-22) is compiled, tested, and drawn in the static gallery; a code card a live model wrote for the same kind of request drew in the web UI and the macOS desktop app on 2026-10-22, as recorded in `VERIFY.md`. Sample 33 (2026-10-26) is compiled, tested, and drawn in the static gallery; a card a live model wrote for the same kind of request drew on the web UI and the macOS desktop app the same day (step 17 of `VERIFY.md`).

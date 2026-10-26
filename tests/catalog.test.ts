@@ -29,9 +29,17 @@ describe('every descriptor is internally consistent', () => {
     for (const descriptor of controls) expect(descriptor.props.bind?.required === true, descriptor.type).toBe(descriptor.type !== 'checklist')
   })
 
-  it('gives every container a gap on the 4px grid', () => {
-    for (const descriptor of CATALOG.filter(entry => entry.container)) {
+  it('gives every layout container a gap on the 4px grid', () => {
+    // A container that holds only its own parts, as a chart holds series, lays them out itself.
+    for (const descriptor of CATALOG.filter(entry => entry.container && entry.holds === undefined)) {
       expect(descriptor.props.gap?.kind, descriptor.type).toBe('space')
+    }
+  })
+
+  it('names only catalog components in holds', () => {
+    for (const descriptor of CATALOG) {
+      for (const held of descriptor.holds ?? []) expect(CATALOG.some(entry => entry.type === held), `${descriptor.type} holds ${held}`).toBe(true)
+      if (descriptor.holds !== undefined) expect(descriptor.container, descriptor.type).toBe(true)
     }
   })
 

@@ -94,11 +94,15 @@ The architecture, not the training. Each layer maps onto a mechanism DeepSeek Ha
 
 **The model sees what it built.** The tool result tells the model what a text-only reader sees, with the figures computed, and lists what the compiler repaired, so the next call is cleaner — the original's diagnostics never reached its model.
 
-**The catalog is scoped to what the host can style natively.** Thirty-two components rather than seventy, each drawn from theme tokens. A smaller catalog the model uses correctly is worth more than a large one it half-remembers.
+**The catalog is scoped to what the host can style natively.** Thirty-three components rather than seventy, each drawn from theme tokens. A smaller catalog the model uses correctly is worth more than a large one it half-remembers.
 
 **Mathematics is computed, not written.** The original's cards show figures the model computed. Here a card can carry the computation itself: integrals (adaptive Gauss–Kronrod, with infinite bounds), derivatives (exact, by Taylor-mode automatic differentiation over the expression tree), limits (extrapolated, refusing when the sides disagree), finite sums and products, roots (Brent's method), and Taylor polynomials, with `plot` and `formula` to show them. A figure the engine cannot vouch for is shown as "—" rather than guessed, and the tool result hands the model the computed figures, so the reply and the card agree. Formulas are typeset by the plugin's own spans: React 18 cannot create MathML, and the host's KaTeX is not a plugin dependency.
 
 **Code is data, not a program.** A `code` block shows text exactly as written — no interpolation, no evaluation — from a `"""` text block in the source, the one statement that spans lines. The plugin colours it with its own small scanner, losslessly, in the host's syntax palette, so a listing in a card reads like the host's code blocks without the card pulling in the host's highlighter.
+
+**Reader edits outlive the page, in the reader's browser.** The original sent interaction state to a view-state endpoint and lost it on reload. Here a card's edits — values, open tabs, ticks, sorts, filters, hidden series, and a sent button — are written to the browser's local storage, keyed by session and call, for the 200 most recent cards. They belong to that viewer: another browser, another device, and the session log still start from the model's values. Nothing read back is trusted: every value is checked against the card's own declarations again, and a damaged entry is ignored.
+
+**A follow-up revises a card; it does not patch one.** The original never modified an existing interface. Here each result tells the model its card id, and a later call with `revises=` that id draws a new card that starts from the reader's values for the states with the same names, while the earlier card stays as it was and says that a newer version follows. The model still writes whole programs — no operation stream, no patch by component id — so each card stays honest about what the model wrote.
 
 **The judgement travels as a skill.** The tool description is the language reference; a bundled skill, registered under the plugin's name, carries when to draw a card, how to shape it, and complete recipes, and the model loads it only when a task matches. The skill is a row of the bundle of its own, registered the way the host's own skill packages register theirs, so the Plugin Manager shows it as a part of the plugin.
 
@@ -106,10 +110,8 @@ The architecture, not the training. Each layer maps onto a mechanism DeepSeek Ha
 
 **No free-form escape hatch.** The original offers `AppBlock`, an entire embedded web app. A plugin may not host a page in a slot, and a generated page belongs in the document preview as a file, not as a card.
 
-**No cross-turn patch.** Following the original, a follow-up produces a new card rather than mutating the old one. Each card keeps its own state and its own numbers, which is honest about what the model saw when it wrote each one.
-
-**Reader edits are not persisted.** They live for the page's lifetime and are shared between a card's two surfaces; a reload starts from the model's initial values, and nothing claims otherwise.
+**No half-written card after a stop.** When a turn stops while the model is still writing a card, the host hides the call's row and never records the arguments that had streamed, so there is nothing left to draw or to regenerate from without changing the host.
 
 ## Not verified
 
-The behaviour above is proven by the unit suite in jsdom with real React, on the web UI by the run of 0.2.1-alpha.4 recorded in `VERIFY.md`, and on the macOS and Windows desktop apps by the run of 0.2.1-rc.2 recorded there. The desktop apps load the same `dsh.client` declaration and the same bundle as the web UI, so what the cards do on all three hosts is the same code. Two things are not proven: a desktop release newer than 0.2.1-rc.2, and the failure seen on 0.2.0-rc.2, which drew no card and kept past conversations from opening — that build is below the engine range, the plugin refuses it, and no root cause was ever named for it.
+The behaviour above is proven by the unit suite in jsdom with real React, on the web UI by the run of 0.2.1-alpha.4 recorded in `VERIFY.md`, and on the macOS and Windows desktop apps by the run of 0.2.1-rc.2 recorded there. The desktop apps load the same `dsh.client` declaration and the same bundle as the web UI, so what the cards do on all three hosts is the same code. Kept reader edits, revised cards, table tools, and charts of several series ran live on the web UI and the macOS desktop app on 2026-10-26, as recorded there. Two things are not proven: a desktop release newer than 0.2.1-rc.2, and the failure seen on 0.2.0-rc.2, which drew no card and kept past conversations from opening — that build is below the engine range, the plugin refuses it, and no root cause was ever named for it.

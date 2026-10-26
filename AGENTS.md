@@ -78,8 +78,10 @@ contribution is registered inside its own `try`/`catch`, because a throw from
 `eval`, no `new Function`, no element created from a model-supplied name. A
 renderer is reached only through the fixed registry keyed by catalog type, so an
 unknown type draws nothing; a math function is reached only through the fixed
-function table. No iframe, no Worker, no network access, no timers, and no
-browser storage in the browser half.
+function table. No iframe, no Worker, no network access, and no timers in the
+browser half. Its one use of browser storage is the reader's own edits, kept in
+local storage by `src/client/edits.ts` alone, bounded, and never read back
+without checking each value against the card's declarations.
 
 **Bounded work.** Every evaluation draws on a work budget, calculus nests at most
 three deep, and a value that cannot be computed reliably is shown as "—", never
@@ -186,7 +188,7 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
 **Done.**
 
 - The host tool `ui_render` takes one required argument, `source`, plus an
-  optional `title`, and compiles both grammars: indentation-nested DIL and a JSON
+  optional `title` and `revises`, and compiles both grammars: indentation-nested DIL and a JSON
   envelope with nested `children` (`tests/compile.test.ts`, `tests/dil.test.ts`).
 - The math engine: powers, factorials, implicit products, constants, a table of
   thirty-seven functions, and seven calculus operators — integrals with infinite bounds,
@@ -213,6 +215,21 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
   `/` lists the skill; the model loaded the skill and drew a code card traced
   line by line, with the host's syntax colours in both themes, a moving
   highlight, and copying.
+- Reader edits kept and cards revised (2026-10-26): edits, ticks, sorts, and a
+  sent button survive a reload in this browser; a result names its card id, and
+  a call with `revises=` replaces that card, starting from the reader's values
+  for states with the same names and marking the earlier card
+  (`tests/client.test.tsx`, `tests/tool.test.ts`).
+- Long tables and charts of several series (2026-10-26): a table past 8 rows
+  filters, past 20 pages, and any table copies CSV or Markdown; `chart` holds up
+  to four `series` as grouped or stacked bars, lines, or areas, or draws a pie,
+  with a legend that hides series and a readout moved by keyboard
+  (`tests/compile.test.ts`, `tests/client.test.tsx`).
+- **Live run of 2026-10-26, web UI and macOS desktop app** (`docs/VERIFY.md`
+  step 17): a model-written card with three series, a pie, and a 30-row table
+  drew with zero repairs; its settings survived a page reload and an app
+  restart; a revision started from the reader's slider value, clamped to the
+  new maximum, and marked the earlier card.
 - Pages, checklists, sortable tables, and flowcharts:
   `tabs` and `tab` switch pages by click or arrow key, `checklist` counts ticked
   items into an optional bound state, `table sortable=true` sorts by any column,
@@ -252,8 +269,6 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
   conversation's attachment loader is not wired.
 - **A `ui_catalog` query tool.** The catalog travels in the tool description; past
   roughly forty components it should move behind a `deferLoading` tool.
-- **Persisted reader edits.** Edits live for the page's lifetime only; a reload
-  starts from the model's initial values, and nothing claims otherwise.
 - **Cards in the exported session log as clean text.** Deferred (2026-10-22): the
   tool result would carry the card's text view as its own block.
 

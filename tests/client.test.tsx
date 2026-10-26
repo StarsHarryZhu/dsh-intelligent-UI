@@ -17,7 +17,8 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CALCULUS_EXAMPLE, COMPARISON_EXAMPLE, ESTIMATE_EXAMPLE, QUIZ_EXAMPLE } from '../src/host/model-brief.ts'
 import { buildPresentationMeta, createUIRenderTool } from '../src/host/tool.ts'
-import { compareCells } from '../src/client/components.tsx'
+import { createEditsStore, type StorageLike } from '../src/client/edits.ts'
+import { compareCells, toCsv, toMarkdown, visibleRows } from '../src/client/table.tsx'
 import { layoutDiagram } from '../src/client/diagram.tsx'
 
 type Component = (props: Record<string, unknown>) => React.ReactNode
@@ -114,6 +115,8 @@ function streamingArgs(text: { source: string }) {
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+  // Reader edits now outlive the page; each test starts from a clean browser.
+  localStorage.clear()
   document.head.querySelectorAll('style[data-plugin="dsh-intelligent-ui"]').forEach(style => style.remove())
 })
 
@@ -906,5 +909,253 @@ describe('code blocks', () => {
     act(() => { fireEvent.change(screen.getByRole('textbox', { name: 'Query' }), { target: { value: 'select name from t' } }) })
     expect(blocks[0]?.textContent).toBe('select name from t')
     expect([...(blocks[0] as Element).querySelectorAll('.dsh-iui-tok-keyword')].map(token => token.textContent)).toEqual(['select', 'from'])
+  })
+})
+
+/** A Web Storage stand-in over a map, for the store's own tests. */
+function memoryStorage(seed: Record<string, string> = {}): StorageLike & { map: Map<string, string> } {
+  const map = new Map(Object.entries(seed))
+  return { map, getItem: key => map.get(key) ?? null, setItem: (key, value) => { map.set(key, value) }, removeItem: (key) => { map.delete(key) } }
+}
+
+describe('reader edits outlive the page', () => {
+  const CARD = 'dsh-intelligent-ui.card.v1:'
+
+  it('writes each change through and reads it back in a fresh store', () => {
+    const storage = memoryStorage()
+    createEditsStore(storage).set('s:c1', { values: { seats: 10 }, ui: { n1: 2 } })
+    expect(JSON.parse(storage.map.get(`${CARD}s:c1`) ?? '')).toEqual({ values: { seats: 10 }, ui: { n1: 2 } })
+    expect(JSON.parse(storage.map.get('dsh-intelligent-ui.cards.v1') ?? '')).toEqual(['s:c1'])
+    const reloaded = createEditsStore(storage)
+    const memory = reloaded.get('s:c1')
+    expect(memory).toEqual({ values: { seats: 10 }, ui: { n1: 2 } })
+    expect(reloaded.get('s:c1')).toBe(memory)
+  })
+
+  it('forgets the oldest card past two hundred', () => {
+    const storage = memoryStorage()
+    const store = createEditsStore(storage)
+    for (let index = 0; index <= 200; index += 1) store.set(`s:c${index}`, { values: { n: index } })
+    const index = JSON.parse(storage.map.get('dsh-intelligent-ui.cards.v1') ?? '') as string[]
+    expect(index).toHaveLength(200)
+    expect(index[0]).toBe('s:c1')
+    expect(storage.map.has(`${CARD}s:c0`)).toBe(false)
+    expect(storage.map.has(`${CARD}s:c200`)).toBe(true)
+  })
+
+  it('ignores damaged entries and keeps working when storage refuses', () => {
+    const damaged = memoryStorage({ [`${CARD}s:a`]: '{bad', [`${CARD}s:b`]: '{"values":3}', [`${CARD}s:c`]: '{"values":{"x":1},"sent":7}' })
+    const store = createEditsStore(damaged)
+    expect(store.get('s:a')).toBeUndefined()
+    expect(store.get('s:b')).toBeUndefined()
+    expect(store.get('s:c')).toEqual({ values: { x: 1 } })
+    const refusing: StorageLike = { getItem: () => { throw new Error('blocked') }, setItem: () => { throw new Error('full') }, removeItem: () => undefined }
+    const page = createEditsStore(refusing)
+    expect(() => { page.set('s:d', { values: { y: 2 } }) }).not.toThrow()
+    expect(page.get('s:d')).toEqual({ values: { y: 2 } })
+  })
+
+  it('keeps a memory too large for storage on the page only', () => {
+    const storage = memoryStorage()
+    const store = createEditsStore(storage)
+    store.set('s:big', { values: { note: 'short' } })
+    store.set('s:big', { values: { note: 'x'.repeat(20_000) } })
+    expect(storage.map.has(`${CARD}s:big`)).toBe(false)
+    expect((store.get('s:big')?.values.note as string).length).toBe(20_000)
+  })
+
+  it('shows a slider where the reader left it after a reload', async () => {
+    const meta = await settle(ESTIMATE_EXAMPLE)
+    const first = loadClient()
+    render(<first.ToolView phase="result" block={resultBlock(meta)} callId="keep-1" useDisclosure={useHostDisclosure} {...kit()} />)
+    act(() => { fireEvent.change(screen.getByRole('slider', { name: 'Seats' }), { target: { value: '12' } }) })
+    cleanup()
+    const second = loadClient()
+    render(<second.ToolView phase="result" block={resultBlock(meta)} callId="keep-1" useDisclosure={useHostDisclosure} {...kit()} />)
+    expect(screen.getByText('12 seats on Pro cost 348 USD a month.')).toBeTruthy()
+    expect(screen.getByText(/this browser keeps your changes/u)).toBeTruthy()
+  })
+
+  it('keeps a sent button locked after a reload, so nothing is sent twice', async () => {
+    const meta = await settle(QUIZ_EXAMPLE)
+    const first = loadClient()
+    render(<first.ToolView phase="result" block={resultBlock(meta)} callId="keep-2" useDisclosure={useHostDisclosure} {...kit()} />)
+    act(() => { fireEvent.click(screen.getByRole('button', { name: /B\. Hypergeometric/u })) })
+    cleanup()
+    const second = loadClient()
+    const session = kit()
+    render(<second.ToolView phase="result" block={resultBlock(meta)} callId="keep-2" useDisclosure={useHostDisclosure} {...session} />)
+    expect(screen.getByText('Sent')).toBeTruthy()
+    act(() => { fireEvent.click(screen.getByRole('button', { name: /A\. Binomial/u })) })
+    expect(session.inputActions.submit).not.toHaveBeenCalled()
+  })
+})
+
+describe('revising a card', () => {
+  /** Compile and persist one call under its own call id, as the host runs it. */
+  async function settleAs(callId: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const tool = createUIRenderTool()
+    const value = await tool.execute(args, { callId } as never)
+    return buildPresentationMeta(args, value) as Record<string, unknown>
+  }
+  const REVISED = ESTIMATE_EXAMPLE.replace('@state seats = 8 min=1 max=50', '@state seats = 8 min=1 max=20').replace('card "Team plan"', 'card "Team plan, revised"')
+
+  it('starts from the reader\'s values and marks the earlier card', async () => {
+    const client = loadClient()
+    const before = await settleAs('rev-1', { source: ESTIMATE_EXAMPLE })
+    render(<client.ToolView phase="result" block={resultBlock(before)} callId="rev-1" useDisclosure={useHostDisclosure} {...kit()} />)
+    act(() => { fireEvent.change(screen.getByRole('slider', { name: 'Seats' }), { target: { value: '30' } }) })
+    act(() => { fireEvent.change(screen.getByRole('combobox', { name: 'Plan' }), { target: { value: 'Team' } }) })
+    cleanup()
+    const after = await settleAs('rev-2', { source: REVISED, revises: 'rev-1' })
+    expect(after.revises).toBe('rev-1')
+    render(<client.ToolView phase="result" block={resultBlock(after)} callId="rev-2" useDisclosure={useHostDisclosure} {...kit()} />)
+    // The plan carries over as it was; 30 seats is past the new maximum, so it is held at 20.
+    expect(screen.getByText('20 seats on Team cost 440 USD a month.')).toBeTruthy()
+    cleanup()
+    render(<client.ToolView phase="result" block={resultBlock(before)} callId="rev-1" useDisclosure={useHostDisclosure} {...kit()} />)
+    expect(screen.getByText('A newer version of this card follows.')).toBeTruthy()
+    expect(screen.getByText('30 seats on Team cost 660 USD a month.')).toBeTruthy()
+  })
+
+  it('carries values into the streaming preview, but marks nothing until the result lands', async () => {
+    const client = loadClient()
+    const before = await settleAs('rev-3', { source: ESTIMATE_EXAMPLE })
+    render(<client.ToolView phase="result" block={resultBlock(before)} callId="rev-3" useDisclosure={useHostDisclosure} {...kit()} />)
+    act(() => { fireEvent.change(screen.getByRole('slider', { name: 'Seats' }), { target: { value: '9' } }) })
+    cleanup()
+    const args = { text: (key: string) => (key === 'source' ? `${REVISED}\n` : key === 'revises' ? 'rev-3' : undefined) }
+    render(<client.ToolView phase="preparing" block={{ args }} callId="rev-4" useDisclosure={useHostDisclosure} {...kit()} />)
+    expect(screen.getByText('9 seats on Pro cost 261 USD a month.')).toBeTruthy()
+    cleanup()
+    render(<client.ToolView phase="result" block={resultBlock(before)} callId="rev-3" useDisclosure={useHostDisclosure} {...kit()} />)
+    expect(screen.queryByText('A newer version of this card follows.')).toBeNull()
+  })
+})
+
+describe('long tables', () => {
+  const rows = (count: number): string => `[${Array.from({ length: count }, (_, index) => `["Row ${index + 1}", "${(index + 1) * 10}"]`).join(', ')}]`
+  async function draw(source: string, callId: string) {
+    const meta = await settle(source)
+    const { ToolView } = loadClient()
+    return render(<ToolView phase="result" block={resultBlock(meta)} callId={callId} useDisclosure={useHostDisclosure} {...kit()} />)
+  }
+  const names = (view: ReturnType<typeof render>): string[] => [...view.container.querySelectorAll('tbody tr')].map(row => row.firstElementChild?.textContent ?? '')
+
+  it('adds no filter or pages to a short table', async () => {
+    await draw(COMPARISON_EXAMPLE, 'long-1')
+    expect(screen.queryByRole('searchbox')).toBeNull()
+    expect(screen.queryByText(/Page/u)).toBeNull()
+    expect(screen.getByRole('button', { name: 'Copy CSV' })).toBeTruthy()
+  })
+
+  it('filters a long table and pages what matches', async () => {
+    const view = await draw(`card\n  table columns=["Name", "Value"] rows=${rows(30)}`, 'long-2')
+    expect(names(view)).toHaveLength(20)
+    expect(screen.getByText('Page 1 of 2')).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Previous page' }) as HTMLButtonElement).disabled).toBe(true)
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Next page' })) })
+    expect(names(view)).toEqual(Array.from({ length: 10 }, (_, index) => `Row ${index + 21}`))
+    act(() => { fireEvent.change(screen.getByRole('searchbox', { name: 'Filter rows' }), { target: { value: 'row 2' } }) })
+    expect(names(view)).toEqual(['Row 2', ...Array.from({ length: 10 }, (_, index) => `Row ${index + 20}`)])
+    expect(screen.getByText('11 of 30 rows')).toBeTruthy()
+    expect(screen.queryByText(/Page/u)).toBeNull()
+    act(() => { fireEvent.change(screen.getByRole('searchbox', { name: 'Filter rows' }), { target: { value: 'nothing' } }) })
+    expect(screen.getByText('No rows match')).toBeTruthy()
+  })
+
+  it('turns to the page of the current row as it moves', async () => {
+    const view = await draw(`@state at = 1 min=1 max=30\ncard\n  table columns=["Name", "Value"] rows=${rows(30)} current=at\n  slider "At" bind=at`, 'long-3')
+    act(() => { fireEvent.change(screen.getByRole('slider', { name: 'At' }), { target: { value: '25' } }) })
+    expect(screen.getByText('Page 2 of 2')).toBeTruthy()
+    expect(view.container.querySelector('[aria-current="step"]')?.firstElementChild?.textContent).toBe('Row 25')
+  })
+
+  it('copies what the filter and sort leave, as CSV or Markdown', async () => {
+    const writeText = vi.fn(() => Promise.resolve())
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+    await draw('card\n  table columns=["Item", "Note"] rows=[["Tea, green", "says \\"hi\\""], ["Pipe", "a | b"]] sortable=true', 'long-4')
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Item' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copy CSV' })) })
+    expect(writeText).toHaveBeenLastCalledWith('Item,Note\r\nPipe,a | b\r\n"Tea, green","says ""hi"""')
+    expect(screen.getByRole('button', { name: 'Copied' })).toBeTruthy()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copy Markdown' })) })
+    expect(writeText).toHaveBeenLastCalledWith('| Item | Note |\n| --- | --- |\n| Pipe | a \\| b |\n| Tea, green | says "hi" |')
+    vi.unstubAllGlobals()
+  })
+
+  it('keeps filtering, sorting, and copying pure', () => {
+    const table = [['b', '2'], ['a', '10'], ['B', '1']]
+    expect(visibleRows(table, ' B ', { column: 1, descending: false })).toEqual([2, 0])
+    expect(toCsv([], [['x\ny']])).toBe('"x\ny"')
+    expect(toMarkdown([], [['one', 'two'], ['three']])).toBe('|  |  |\n| --- | --- |\n| one | two |\n| three |  |')
+  })
+})
+
+describe('charts', () => {
+  async function draw(source: string, callId: string) {
+    const meta = await settle(source)
+    const { ToolView } = loadClient()
+    return render(<ToolView phase="result" block={resultBlock(meta)} callId={callId} useDisclosure={useHostDisclosure} {...kit()} />)
+  }
+  const QUARTERS = 'labels=["Q1","Q2","Q3"]'
+
+  it('draws one values= series as before: marks over labels and figures, no legend', async () => {
+    const view = await draw(`card\n  chart ${QUARTERS} values=[1, 2, 3] unit="k"`, 'chart-1')
+    expect(view.container.querySelectorAll('.dsh-iui-chart-bar')).toHaveLength(3)
+    expect([...view.container.querySelectorAll('.dsh-iui-chart-value')].map(cell => cell.textContent)).toEqual(['1 k', '2 k', '3 k'])
+    expect(view.container.querySelector('.dsh-iui-chart-legend')).toBeNull()
+  })
+
+  it('groups the bars of several series, and the legend hides and shows them', async () => {
+    const view = await draw(`card\n  chart ${QUARTERS}\n    series "Revenue" values=[3, 4, 5]\n    series "Cost" values=[1, 2, 2]`, 'chart-2')
+    const bars = (): number => view.container.querySelectorAll('.dsh-iui-chart-bar').length
+    expect(bars()).toBe(6)
+    const cost = screen.getByRole('button', { name: /Cost/u })
+    act(() => { fireEvent.click(cost) })
+    expect(cost.getAttribute('aria-pressed')).toBe('false')
+    expect(bars()).toBe(3)
+    // The last series drawn stays drawn.
+    act(() => { fireEvent.click(screen.getByRole('button', { name: /Revenue/u })) })
+    expect(bars()).toBe(3)
+    act(() => { fireEvent.click(cost) })
+    expect(bars()).toBe(6)
+  })
+
+  it('reads one column out, moved by the arrow keys', async () => {
+    const view = await draw(`card\n  chart shape=line unit="k" ${QUARTERS}\n    series "Revenue" values=[3, 4, 5]\n    series "Cost" values=[1, 2, 2]`, 'chart-3')
+    const readout = (): string => view.container.querySelector('.dsh-iui-chart-readout')?.textContent ?? ''
+    expect(readout()).toBe('Q3Revenue 5 kCost 2 k')
+    const plot = screen.getByRole('img', { name: 'Chart: Revenue, Cost' })
+    act(() => { fireEvent.keyDown(plot, { key: 'ArrowLeft' }) })
+    expect(readout()).toBe('Q2Revenue 4 kCost 2 k')
+    act(() => { fireEvent.keyDown(plot, { key: 'Home' }) })
+    expect(readout()).toBe('Q1Revenue 3 kCost 1 k')
+    expect(view.container.querySelectorAll('.dsh-iui-chart-line')).toHaveLength(2)
+    expect(view.container.querySelector('.dsh-iui-chart-line[data-series="1"]')).toBeTruthy()
+  })
+
+  it('stacks positive values up and negative values down', async () => {
+    const view = await draw('card\n  chart stacked=true labels=["a","b"]\n    series "A" values=[2, -1]\n    series "B" values=[3, -2]', 'chart-4')
+    const bar = (series: number, index: number): Element => view.container.querySelectorAll(`.dsh-iui-chart-bar[data-series="${series}"]`)[index] as Element
+    // Peak 5, floor -3: y(v) = 8 + (5 - v) / 8 * 112.
+    expect(Number(bar(1, 0).getAttribute('y'))).toBeCloseTo(8)
+    expect(Number(bar(1, 1).getAttribute('y'))).toBeCloseTo(92)
+    expect(Number(bar(1, 1).getAttribute('height'))).toBeCloseTo(28)
+  })
+
+  it('fills one area per series', async () => {
+    const view = await draw(`card\n  chart shape=area stacked=true ${QUARTERS}\n    series "A" values=[1, 2, 3]\n    series "B" values=[1, 1, 1]`, 'chart-5')
+    expect(view.container.querySelectorAll('.dsh-iui-chart-area')).toHaveLength(2)
+  })
+
+  it('draws a pie with each slice\'s share, and recomputes shares when a slice is hidden', async () => {
+    const view = await draw('card\n  chart shape=pie labels=["Rent","Food","Fun"] values=[1, 1, 2]', 'chart-6')
+    expect(view.container.querySelectorAll('.dsh-iui-chart-slice')).toHaveLength(3)
+    const fun = screen.getByRole('button', { name: /Fun/u })
+    expect(fun.textContent).toContain('2 · 50%')
+    act(() => { fireEvent.click(screen.getByRole('button', { name: /Rent/u })) })
+    expect(view.container.querySelectorAll('.dsh-iui-chart-slice')).toHaveLength(2)
+    expect(fun.textContent).toContain('2 · 66.7%')
   })
 })

@@ -18,7 +18,7 @@
 import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'
 import { catalogHash } from '../lang/catalog.ts'
 import { compileSource } from '../lang/compile.ts'
-import { API_VERSION, UI_TOOL_NAME } from '../lang/identity.ts'
+import { API_VERSION, CARD_ID_PATTERN, UI_TOOL_NAME } from '../lang/identity.ts'
 import { LIMITS } from '../lang/limits.ts'
 import type { Diagnostic, JsonValue, UIProgram } from '../lang/types.ts'
 import { REPAIR_HINT, UI_TOOL_DESCRIPTION } from './model-brief.ts'
@@ -36,6 +36,10 @@ export interface UIRenderSuccess {
   summary: string
   /** Problems that were repaired or ignored, written as instructions. */
   notes: string[]
+  /** This card's id, the call id, which a later call passes as `revises` to change it. */
+  card?: string
+  /** Id of the earlier card this one replaces, when the model named a valid one. */
+  revises?: string
   /**
    * The compiled program, as lossless JSON. Present in the result value so
    * `output.presentationMeta` can persist it; it never reaches the model, because
@@ -75,6 +79,10 @@ export function createUIRenderTool(): ToolDefinition {
         type: 'string',
         description: 'Short label for the card, shown in its header.',
       },
+      revises: {
+        type: 'string',
+        description: 'Card id of an earlier ui_render result that this card replaces; the reader\'s settings carry over to states with the same name.',
+      },
     },
     output: {
       schema: {
@@ -87,6 +95,8 @@ export function createUIRenderTool(): ToolDefinition {
           truncated: { type: 'boolean' },
           summary: { type: 'string' },
           notes: { type: 'array', items: { type: 'string' } },
+          card: { type: 'string' },
+          revises: { type: 'string' },
           diagnostics: {
             type: 'array',
             items: {
@@ -113,7 +123,7 @@ export function createUIRenderTool(): ToolDefinition {
       render: (_args, value) => [{ type: 'text', text: renderForModel(value) }],
       presentationMeta: (args, value) => buildPresentationMeta(args, value),
     },
-    async execute(args) {
+    async execute(args, exec) {
       const result = compileSource(args.source)
       if (!result.ok) {
         return {
@@ -123,13 +133,22 @@ export function createUIRenderTool(): ToolDefinition {
         }
       }
       const { program } = result
+      const notes = program.diagnostics.slice(0, LIMITS.maxDiagnosticsReported).map(formatDiagnostic)
+      const card = readCallId(exec)
+      const revises = args.revises === undefined || args.revises.trim() === '' ? undefined : args.revises.trim()
+      const revisable = revises !== undefined && CARD_ID_PATTERN.test(revises) && revises !== card
+      if (revises !== undefined && !revisable) {
+        notes.push('- revises was ignored: it is not the id of another card. Pass the "Card id" an earlier ui_render result reported')
+      }
       return {
         ok: true,
         components: program.nodes.length,
         controls: program.nodes.filter(node => node.bind !== undefined || node.type === 'button').length,
         truncated: program.truncated !== undefined,
         summary: program.fallback,
-        notes: program.diagnostics.slice(0, LIMITS.maxDiagnosticsReported).map(formatDiagnostic),
+        notes,
+        ...(card === undefined ? {} : { card }),
+        ...(revisable ? { revises } : {}),
         program: programAsJson(program),
       }
     },
@@ -147,6 +166,12 @@ function programAsJson(program: UIProgram): Record<string, JsonValue> {
   return program as unknown as Record<string, JsonValue>
 }
 
+/** The call id the host runs this call under, when it is one a later call can name. */
+function readCallId(exec: unknown): string | undefined {
+  const callId = (typeof exec === 'object' && exec !== null ? exec as { callId?: unknown } : {}).callId
+  return typeof callId === 'string' && CARD_ID_PATTERN.test(callId) ? callId : undefined
+}
+
 /** Render the tool result for the model: the summary, or the repair list when it failed. */
 export function renderForModel(value: unknown): string {
   const record = (typeof value === 'object' && value !== null ? value : {}) as Partial<UIRenderSuccess> & Partial<UIRenderFailure>
@@ -157,6 +182,8 @@ export function renderForModel(value: unknown): string {
   const notes = record.notes ?? []
   return [
     `The card is shown: ${String(record.components ?? 0)} component(s), ${String(record.controls ?? 0)} control(s).`,
+    typeof record.card === 'string' ? `Card id: ${record.card}` : '',
+    typeof record.revises === 'string' ? `It replaces card ${record.revises}: states with the same names keep the reader's values.` : '',
     record.truncated === true ? 'A size limit was reached, so part of the source was left out.' : '',
     notes.length > 0 ? `Repaired or ignored (fix these next time):\n${notes.join('\n')}` : '',
     `What a text-only reader sees:\n${record.summary ?? ''}`,
@@ -186,6 +213,7 @@ export function buildPresentationMeta(args: { title?: string | undefined }, valu
   if (typeof args.title === 'string' && args.title.trim() !== '') meta.title = args.title.trim().slice(0, 120)
   if (candidate.ok === true && candidate.program !== undefined) {
     meta.ok = true
+    if (typeof candidate.revises === 'string') meta.revises = candidate.revises
     meta.program = candidate.program
     return meta
   }

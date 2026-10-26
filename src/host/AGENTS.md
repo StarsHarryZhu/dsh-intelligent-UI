@@ -26,9 +26,17 @@ a part of the plugin and the host lists it wherever it lists its own skills.
 logs why and registers nothing, and the tool is unaffected. Every registration is
 an effect of its row's context. Never use the registry's runtime `register()`.
 
-**One required argument.** `source` carries the program; `title` is optional.
-Models confused a separate grammar switch with the grammar itself, so the
-compiler detects the grammar from the source instead.
+**One required argument.** `source` carries the program; `title` and `revises`
+are optional. Models confused a separate grammar switch with the grammar itself,
+so the compiler detects the grammar from the source instead.
+
+**A card's id is its call id.** A successful result tells the model `Card id:`
+with the call id from `exec.callId`; a later call passes it as `revises` to
+replace that card, and the reader's values for states with the same names carry
+over in the browser. A `revises` without a card id's shape (`CARD_ID_PATTERN`),
+or naming the call itself, is ignored with a note; a valid one is persisted as
+`meta.revises`. The host checks only the shape: whether that card exists is the
+browser's to find out, and a missing one carries nothing.
 
 **The model sees the summary, never the program.** `output.render` projects the
 result into model-visible text — counts, repairs, and the text-only view, which
@@ -66,7 +74,7 @@ through the registry's own `assertSupportedJsonSchema` in the tests.
 - `AGENTS.md` — this file: what the host half may do and what it must not.
 - `tool.ts` — the `ui_render` definition: parameters, result schema, the
   model-facing text, the persisted metadata, and the compiling `execute`.
-- `model-brief.ts` — the tool description, its four worked examples, the math
+- `model-brief.ts` — the tool description, its five worked examples, the math
   vocabulary derived from the function table, and the repair hint appended to a
   failed call.
 - `skill.ts` — the skill's location, its frontmatter reader (byte-order mark and
@@ -77,15 +85,17 @@ through the registry's own `assertSupportedJsonSchema` in the tests.
 
 **Done.**
 
-- Parameters are `source` (required) and `title`; arguments without `source` are
-  rejected before compiling (`tests/tool.test.ts`).
+- Parameters are `source` (required), `title`, and `revises`; arguments without
+  `source` are rejected before compiling (`tests/tool.test.ts`).
+- A result names its card id, and a valid `revises` reaches the metadata while
+  an invalid one is reported (`tests/tool.test.ts`).
 - Success reports counts, the repairs made, and the text-only view with computed
   figures; failure reports capped diagnostics and the repair hint.
-- Metadata is `{ version: 1, ok: true, program, title? }` on success and
+- Metadata is `{ version: 1, ok: true, program, title?, revises? }` on success and
   `{ version: 1, ok: false, diagnostics }` (at most five) on failure; the program
   inside carries the same API version.
 - The description lists every component, the limits, the math vocabulary, and
-  four examples that compile cleanly, at under nine thousand characters.
+  five examples that compile cleanly, at under nine thousand characters.
 - The skill lists under `dsh-intelligent-ui` from its own row, as a bundled
   provider whose base directory holds its two reference files
   (`tests/skill.test.ts`, `tests/isolation.test.ts`); the move from the runtime

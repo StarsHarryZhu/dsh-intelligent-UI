@@ -6,13 +6,14 @@ The browser half. `index.ts` registers the plugin's contributions; `toolview.tsx
 draws the `ui_render` row while its turn runs; `tail.tsx` draws a finished turn's
 cards under its reply; `turn-data.ts` collects those cards from events the host
 already records; `card.tsx` draws one program with its local state, and
-`components.tsx`, `chart.tsx`, `plot.tsx`, and `formula.tsx` map each catalog type
-to exactly one renderer.
+`components.tsx` with `table.tsx`, `chart.tsx`, `plot.tsx`, `formula.tsx`, and
+the other figure files maps each catalog type to exactly one renderer.
 
 Everything a card draws comes from `tool/result.meta`, or, while the call streams,
-from compiling its arguments in the browser. The half reads no other session data,
-makes no request, and keeps nothing beyond the page's lifetime, so a reload that
-replays the log rebuilds the same cards.
+from compiling its arguments in the browser. The half reads no other session data
+and makes no request. The one thing it keeps beyond the page is the reader's own
+edits, in this browser's local storage, so a reload that replays the log rebuilds
+the same cards and shows them as the reader left them.
 
 ## 2. Constraints
 
@@ -43,7 +44,8 @@ program of an API version this build does not know.
 **What the reader sets on a component is card state, not program state.** The
 open tab, the ticked items of a checklist, and a table's sort live in the edits
 store under the node's id (`CardMemory.ui`), so both copies of a card agree; they
-are page-lifetime like every edit. A checklist reports only its count, and only
+are kept like every edit. A table keeps its filter and page under the node's id
+with `:q` and `:p` appended, and a chart the series or slices the reader hid. A checklist reports only its count, and only
 through a bound number state, so the program's state kinds stay as they were.
 
 **The boundary sits above the renderer.** `Card` wraps `CardBody` in its failure
@@ -56,7 +58,19 @@ memoized by the text itself, never by the block's identity.
 
 **State is local and shared by call.** Edits live in one store created by `apply`,
 keyed by session and call, so the row and the tail show the same values and a
-remount loses nothing. They are not persisted.
+remount loses nothing. `edits.ts` writes each card's memory through to local
+storage — one key per card plus an index of at most 200 cards, oldest dropped
+first — and is the only file of this half that touches storage; the isolation
+test holds it to that. A memory over 16 KB, a damaged entry, or a storage that
+refuses leaves the edit for the page only. Values read back are checked again by
+`acceptEdit` against the card's own declarations, and a sent button stays locked.
+
+**A revision starts where the reader left off.** A card whose meta names
+`revises` starts from the earlier card's values for the states it still declares,
+without writing anything until the reader edits; open tabs, ticks, sorts, and a
+sent button stay with the earlier card, because node ids do not carry over. Once
+the revision's result has settled, the earlier card is marked `revisedBy` and says
+that a newer version follows; a streaming preview carries values but marks nothing.
 
 **Buttons go through the composer.** A press calls `inputActions.setDraft` and
 `submit` only when the composer is empty and idle; otherwise the prompt is copied
@@ -97,6 +111,17 @@ feature, degrading as described above.
 into `styles.css`; requiring `@deepseek-ai/dsh-client-ui-primitives` or any other
 client package is forbidden.
 
+**Table tools appear by size.** A table offers CSV and Markdown copies of what
+its filter and sort leave; past 8 rows it gains a filter box, and past 20
+matching rows it pages, turning to the current row's page when `current=` moves.
+
+**A chart draws from values, with the reader's choice of series.** One `values=`
+series draws as it always has. Indented `series` lines draw grouped or stacked
+bars, lines, or areas in the plot's four curve colours, with dashes on lines past
+the first; the legend hides and shows a series, always keeping one, and a readout
+names one column, moved by pointer or arrow keys. Only that pointer position is
+read from the DOM. A pie draws one series with its shares in the legend.
+
 **A code block scrolls itself, never the page.** When `current=` moves, the
 block sets its own `scrollTop` so the line stays in view; it never calls
 `scrollIntoView`, which would move the chat. Its colours are the host's syntax
@@ -112,21 +137,24 @@ accepts no other non-theme colour. Copying writes the block's exact text.
   failure details, and the fresh-result disclosure.
 - `tail.tsx` — the turn-tail entry that draws a completed turn's cards.
 - `turn-data.ts` — the data-only Conversation Definition that collects cards per turn.
-- `card.tsx` — the card: values, edits, button sends, notices, and the boundaries.
+- `card.tsx` — the card: values, edits, revisions, button sends, notices, and the boundaries.
 - `clipboard.ts` — the page clipboard, shared by the button fallback and the
   code block's copy button.
 - `components.tsx` — the type-to-renderer registry, the number field, the
-  animation player, tabs, the checklist, and table sorting.
+  animation player, tabs, and the checklist.
+- `parts.tsx` — prop readers and the glyph that several renderers share.
+- `table.tsx` — tables: sorting, filtering, pages, and CSV and Markdown copies.
 - `diagram.tsx` — flowcharts: the layered layout and its SVG drawing.
 - `code.tsx` — code blocks: coloured lines, line numbers, the current line kept
   in view, and copying.
-- `chart.tsx` — bar and line charts as inline SVG.
+- `chart.tsx` — bar, line, area, and pie charts of one series or several, with
+  the legend and the readout.
 - `plot.tsx` — function plots: sampled curves, ranges, the marked point and
   tangent, the shaded area, the legend, and the readout.
 - `formula.tsx` — the formula typesetter and its live value.
 - `program.ts` — defensive reading of persisted programs and metadata, preview
   compilation, value computation, and edit validation.
-- `edits.ts` — the page-lifetime store of reader edits.
+- `edits.ts` — the store of reader edits, written through to local storage.
 - `locales.ts` — the card chrome's Chinese and English copy and the translator.
 - `host.ts` — structural types for the host props and services this half reads.
 - `styles.css` — the stylesheet, inlined by the build.
@@ -160,6 +188,15 @@ accepts no other non-theme colour. Copying writes the block's exact text.
   move the highlight with a player while scrolling only themselves, follow a
   text state through `value=`, and copy their exact text, saying so when the
   page refuses (`tests/client.test.tsx`).
+- Reader edits, ticks, sorts, and sent buttons survive a reload; damaged or
+  oversized entries and a refusing storage fall back to the page; a revision
+  starts from the earlier card's values, clamped by its own declarations, and
+  marks the earlier card (`tests/client.test.tsx`).
+- Long tables filter, page, follow `current=` across pages, and copy CSV and
+  Markdown; charts group, stack, and fill several series, toggle them from the
+  legend, read a column out by keyboard, and draw pies with their shares
+  (`tests/client.test.tsx`); all of it, kept settings and revisions included,
+  ran live on the web UI and the macOS app on 2026-10-26.
 - Plots break at asymptotes, label several curves, and print the point, slope,
   and area they draw; chart and plot dots stay round when the SVG stretches;
   formulas typeset fractions, radicals, scripts, integrals, sums, limits, and
@@ -170,7 +207,6 @@ accepts no other non-theme colour. Copying writes the block's exact text.
 **Not done.**
 
 - **Attachment images.** Only inline `data:image/…` sources render.
-- **Persisted edits.** A reload resets a card to the model's initial values.
 
 **Known defects.**
 

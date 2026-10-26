@@ -65,6 +65,14 @@ tab before it (`arrangeTabs` in `compile.ts`); both are reported. A diagram's
 arrows name their ends by a node's exact text or its 1-based number and compile
 to number pairs; an arrow that names no node is dropped and reported.
 
+**A chart holds only series.** A container may name the only types it holds
+(`holds` in `catalog.ts`); such a container belongs inside another one, like a
+leaf, and anything else written under it moves to its parent. A `series` written
+beside its chart joins the chart just before it; one with no chart there is left
+out. A chart keeps `values=` or its series, at most four, and is left out with
+neither; a pie of more than eight slices is drawn as bars, and `stacked=` on a
+line or pie is dropped (`arrangeSeries` in `compile.ts`). Each repair is reported.
+
 **A player is its card's control bar.** The compiler moves every `player` to the
 end of the outermost card above it (`dockPlayers` in `compile.ts`), whatever line
 the source wrote it on, and the browser applies the same rule to every program it
@@ -96,8 +104,9 @@ https, images must be inline `data:image/…` rasters.
 ## 3. Contents
 
 - `AGENTS.md` — this file: what the language permits and why.
-- `catalog.ts` — the component table: name, purpose, container flag, primary text
-  prop, and prop specs, plus the semantic hash.
+- `catalog.ts` — the component table: name, purpose, container flag and what a
+  narrow container holds, primary text prop, and prop specs, plus the semantic
+  hash and the chart bounds.
 - `types.ts` — the wire vocabulary: expressions, declarations, nodes, templates,
   diagnostics, the program, and the operator set.
 - `dil.ts` — the DIL line parser: declarations, indentation nesting, primary
@@ -119,18 +128,18 @@ https, images must be inline `data:image/…` rasters.
 - `print.ts` — expressions printed back as readable infix text, for text views and
   accessible names.
 - `compile.ts` — grammar detection, prop validation against the catalog,
-  hoisting, tree repair, tabs and diagram arrows, code text and its limits,
-  fallback text, and bounded JSON recovery.
+  hoisting, tree repair, tabs, chart series, and diagram arrows, code text and
+  its limits, fallback text, and bounded JSON recovery.
 - `limits.ts` — the vocabulary bounds and the spacing grid maximum.
-- `identity.ts` — the plugin id, the tool name, the slot names, and the API
-  version. Imports nothing.
+- `identity.ts` — the plugin id, the tool name, the slot names, the API
+  version, and the shape of a card id. Imports nothing.
 
 ## 4. Progress
 
 **Done.**
 
-- Thirty-two components, `player`, `tabs`, `tab`, `checklist`, `diagram`, and
-  `code` among them; the catalog drives validation, the description, and the registry
+- Thirty-three components, `player`, `tabs`, `tab`, `checklist`, `diagram`,
+  `code`, and `series` among them; the catalog drives validation, the description, and the registry
   check (`tests/catalog.test.ts`).
 - DIL nests by indentation, fills primary text from a bare quoted string, infers
   state kinds, keeps a spaced bare expression whole, reads `"""` text blocks,
@@ -138,6 +147,10 @@ https, images must be inline `data:image/…` rasters.
 - `code` keeps its text as written, colours fifteen languages without ever
   changing the text, and writes a fenced block in the text view
   (`tests/highlight.test.ts`, `tests/compile.test.ts`).
+- A chart holds up to four series as bars, lines, areas, or a pie, with every
+  misplaced or surplus series repaired and reported, and writes several series
+  as a small table and a pie with its shares in the text view
+  (`tests/compile.test.ts`).
 - `pick(i, a, b, …)` chooses the i-th option lazily, floored and held inside the
   options, and `current=` and `mono=` give `steps`, `list`, and `table` a
   highlighted item and code type (`tests/expr.test.ts`, `tests/compile.test.ts`).

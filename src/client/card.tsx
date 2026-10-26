@@ -8,7 +8,7 @@
  * @module dsh-intelligent-ui/client/card
  */
 
-import { Component, Fragment, useCallback, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { Component, Fragment, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { evalExpr } from '../lang/expr.ts'
 import { renderText } from '../lang/text.ts'
 import type { JsonValue } from '../lang/types.ts'
@@ -29,6 +29,28 @@ export interface CardProps {
   kit: SessionKit
   /** Title for the first root card when the program gave it none. */
   fallbackTitle?: string | undefined
+  /** The earlier card this one revises, from {@link revisionOf}. */
+  revision?: Revision | undefined
+}
+
+/** How a card relates to the earlier card it revises. */
+export interface Revision {
+  /** Memory key of the earlier card, whose state values this card starts from. */
+  key: string
+  /** This card's call id, recorded on the earlier card once this one has settled. */
+  by?: string
+}
+
+/**
+ * Describe a card's revision of an earlier one.
+ * @param sessionId - the hosting session.
+ * @param revises - the earlier card's id, when the card names one.
+ * @param callId - this card's call id, once its result has settled; a preview leaves it out.
+ * @returns the revision, or undefined when the card revises nothing.
+ */
+export function revisionOf(sessionId: string | undefined, revises: string | undefined, callId?: string): Revision | undefined {
+  if (revises === undefined || revises === callId) return undefined
+  return { key: `${sessionId ?? ''}:${revises}`, ...(callId === undefined ? {} : { by: callId }) }
 }
 
 /** Memory of a card nobody has touched. Stable, so the store snapshot stays referentially equal. */
@@ -57,7 +79,18 @@ function CardBody(props: CardProps): ReactNode {
   const { program, store, memoryKey, kit } = props
   const tr = translator(kit.t)
   const subscribe = useCallback((listener: () => void) => store.subscribe(memoryKey, listener), [store, memoryKey])
-  const memory = useSyncExternalStore(subscribe, () => store.get(memoryKey) ?? UNTOUCHED)
+  const revisedKey = props.revision?.key
+  const revisedBy = props.revision?.by
+  // A revision starts from the earlier card's values for the states it still
+  // declares; acceptEdit checks each one again. Nothing is written until the
+  // reader edits, so the earlier card's later edits do not leak in.
+  const base = useMemo(() => carriedMemory(program, revisedKey === undefined ? undefined : store.get(revisedKey)), [program, store, revisedKey])
+  const memory = useSyncExternalStore(subscribe, () => store.get(memoryKey) ?? base)
+  useEffect(() => {
+    if (revisedKey === undefined || revisedBy === undefined || revisedKey === memoryKey) return
+    const earlier = store.get(revisedKey) ?? UNTOUCHED
+    if (earlier.revisedBy !== revisedBy) store.set(revisedKey, { ...earlier, revisedBy })
+  }, [store, revisedKey, revisedBy, memoryKey])
   const composerReady = useComposerReady(kit)
   const [notice, setNotice] = useState<{ key: CopyKey; text?: string } | undefined>(undefined)
   const values = useMemo(() => computeValues(program, memory.values), [program, memory.values])
@@ -68,15 +101,15 @@ function CardBody(props: CardProps): ReactNode {
     const row = program.state.find(entry => entry.key === key)
     const accepted = row === undefined ? undefined : acceptEdit(row, value)
     if (accepted === undefined) return
-    const current = store.get(memoryKey) ?? UNTOUCHED
+    const current = store.get(memoryKey) ?? base
     store.set(memoryKey, { ...current, values: { ...current.values, [key]: accepted } })
   }
   const setUi = (id: string, value: JsonValue): void => {
-    const current = store.get(memoryKey) ?? UNTOUCHED
+    const current = store.get(memoryKey) ?? base
     store.set(memoryKey, { ...current, ui: { ...current.ui, [id]: value } })
   }
   const press = (node: NodeRow, prompt: string): void => {
-    const current = store.get(memoryKey) ?? UNTOUCHED
+    const current = store.get(memoryKey) ?? base
     if (current.sent !== undefined || prompt.trim() === '') return
     const actions = kit.inputActions
     if (typeof actions?.setDraft === 'function' && typeof actions.submit === 'function' && composerReady) {
@@ -127,6 +160,7 @@ function CardBody(props: CardProps): ReactNode {
           : <div key={node.id} className="dsh-iui-card" style={{ padding: '12px', gap: '8px' }}>{element}</div>
       })}
       {missing > 0 ? <div className="dsh-iui-note">{tr('card.partial', { count: missing })}</div> : null}
+      {memory.revisedBy === undefined ? null : <div className="dsh-iui-note" data-revised="">{tr('card.revised')}</div>}
       {notice === undefined ? null : (
         <div className="dsh-iui-note" role="status">
           {tr(notice.key)}
@@ -136,6 +170,18 @@ function CardBody(props: CardProps): ReactNode {
       {hasControls ? <div className="dsh-iui-foot">{tr('card.local')}</div> : null}
     </div>
   )
+}
+
+/**
+ * The memory a revision starts from: the earlier card's values for the states
+ * this program declares. Ticked items, open tabs, and a sent button stay with the
+ * earlier card, because node ids do not carry over between programs.
+ */
+function carriedMemory(program: Program, earlier: CardMemory | undefined): CardMemory {
+  if (earlier === undefined) return UNTOUCHED
+  const declared = new Set(program.state.map(row => row.key))
+  const values = Object.fromEntries(Object.entries(earlier.values).filter(([key]) => declared.has(key)))
+  return Object.keys(values).length === 0 ? UNTOUCHED : { values }
 }
 
 /** Whether the composer can take a message right now: empty, and not mid-submission. */

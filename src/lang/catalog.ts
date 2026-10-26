@@ -23,6 +23,15 @@ export const SIZES = ['xs', 'sm', 'md', 'lg', 'xl'] as const
 /** A size name from {@link SIZES}. */
 export type Size = (typeof SIZES)[number]
 
+/** Shapes a chart draws. */
+export const CHART_SHAPES = ['bar', 'line', 'area', 'pie'] as const
+
+/** Series one chart holds; the four colours a plot's curves use. */
+export const MAX_CHART_SERIES = 4
+
+/** Slices a pie keeps; a pie with more is drawn as bars. */
+export const MAX_PIE_SLICES = 8
+
 /**
  * A prop spec. `kind` is the validator's switch and the renderer's hint; the
  * two are one field so a new kind cannot be half-implemented.
@@ -64,6 +73,11 @@ export interface ComponentDescriptor {
   description: string
   /** Whether the component may contain children. */
   container: boolean
+  /**
+   * The only component types a container holds, when it is that narrow. Such a
+   * container belongs inside another one, like any leaf: a chart holds series.
+   */
+  holds?: readonly string[]
   /** Prop that a bare quoted string on a DIL line fills: `title "Total"`. */
   primary?: string
   /** Props the compiler accepts. An unknown prop is dropped with `unknown_prop`. */
@@ -129,7 +143,7 @@ export const CATALOG: readonly ComponentDescriptor[] = [
   },
   {
     type: 'metric',
-    description: 'The headline number of an answer, with its caption; digits= sets significant digits.',
+    description: 'The headline number of an answer; digits= sets significant digits.',
     container: false,
     primary: 'label',
     props: {
@@ -274,19 +288,28 @@ export const CATALOG: readonly ComponentDescriptor[] = [
   },
   {
     type: 'chart',
-    description: 'Bar or line chart; each value is a number or an expression over state.',
-    container: false,
+    description: `values= is one series; for several (up to ${MAX_CHART_SERIES}) use series lines. stacked=true stacks bars or areas.`,
+    container: true,
+    holds: ['series'],
     props: {
-      shape: { kind: 'string', enum: ['bar', 'line'], default: 'bar' },
+      shape: { kind: 'string', enum: CHART_SHAPES, default: 'bar' },
       labels: { kind: 'items', required: true },
-      values: { kind: 'series', required: true },
+      values: { kind: 'series' },
+      stacked: { kind: 'expr', of: 'boolean' },
       caption: { kind: 'text' },
       unit: { kind: 'string', maxLength: 24 },
     },
   },
   {
+    type: 'series',
+    description: 'One named series of the chart above it.',
+    container: false,
+    primary: 'name',
+    props: { name: { kind: 'text' }, values: { kind: 'series', required: true } },
+  },
+  {
     type: 'plot',
-    description: 'Graph of y = f(x) over from..to: up to four curves, a point mark= with tangent=true, and shading shadeFrom..shadeTo.',
+    description: 'Graph of y = f(x) over from..to, up to four curves.',
     container: false,
     primary: 'caption',
     props: {
@@ -319,7 +342,7 @@ export const CATALOG: readonly ComponentDescriptor[] = [
   },
   {
     type: 'formula',
-    description: 'Typeset formula and its live value (digits= significant digits, default 6); an equation shows no value.',
+    description: 'Typeset formula with its live value (digits=, default 6); an equation shows none.',
     container: false,
     primary: 'expr',
     props: {
@@ -385,7 +408,7 @@ export const CATALOG_BY_TYPE: ReadonlyMap<string, ComponentDescriptor> = new Map
  */
 export function catalogHash(): string {
   const canonical = CATALOG
-    .map(descriptor => `${descriptor.type}|${descriptor.container ? 1 : 0}|${descriptor.primary ?? ''}|${propSignature(descriptor.props)}`)
+    .map(descriptor => `${descriptor.type}|${descriptor.container ? 1 : 0}${descriptor.holds === undefined ? '' : `:${descriptor.holds.join('+')}`}|${descriptor.primary ?? ''}|${propSignature(descriptor.props)}`)
     .join('\n')
   return digest(canonical)
 }

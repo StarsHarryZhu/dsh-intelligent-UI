@@ -13,8 +13,9 @@
 
 ## 工作方式
 
-- 插件注册一个工具 `ui_render` 和一个技能 `dsh-intelligent-ui`，技能教模型什么时候用卡片比用文字好。技能是插件里单独的一部分：插件管理页单独列出它、有自己的开关，安装插件时一起装上。模型不写 HTML 或 JavaScript：它写的程序按 32 个组件的目录校验，随工具结果一起保存。
-- 回复生成时，卡片显示在工具行里；回复结束后，卡片显示在回复下方。调整控件时，所有数字都在本地重算。
+- 插件注册一个工具 `ui_render` 和一个技能 `dsh-intelligent-ui`，技能教模型什么时候用卡片比用文字好。技能是插件里单独的一部分：插件管理页单独列出它、有自己的开关，安装插件时一起装上。模型不写 HTML 或 JavaScript：它写的程序按 33 个组件的目录校验，随工具结果一起保存。
+- 回复生成时，卡片显示在工具行里；回复结束后，卡片显示在回复下方。调整控件时，所有数字都在本地重算；你调过的设置保存在这个浏览器里，刷新后卡片保持原样。
+- 让模型修改一张卡片时，它会画一张新版本，从你调好的设置开始；旧卡片会注明已有新版本。
 - `player` 让卡片动起来：逐行演示代码执行、算法的每一轮、点沿曲线移动。播放在浏览器里进行，不会发消息给模型。
 - 卡片能算定积分（含无穷积分限）、导数、极限、求和与连乘、方程求根和泰勒多项式。算不准的值显示“—”，不会给出猜测的数。
 - 卸载后，所有会话照常打开，之前的调用显示为普通工具行。
@@ -29,7 +30,7 @@ node node_modules/vitest/vitest.mjs run
 
 目录规则见 `AGENTS.md`，线上验证清单见 `docs/VERIFY.md`。
 
-## 32 个组件
+## 33 个组件
 
 每个组件一张卡片，由本插件按宿主的浅色主题绘制。每张卡片的程序原文见 [`docs/SAMPLES.md`](docs/SAMPLES.md)。
 
@@ -133,7 +134,7 @@ node node_modules/vitest/vitest.mjs run
 
 <img src="assets/catalog/table.png" alt="table" width="720">
 
-对比表；`current=` 高亮当前行，`sortable=true` 让读者按任意列排序。
+对比表；`current=` 高亮当前行，`sortable=true` 让读者按任意列排序。每张表都能复制为 CSV 或 Markdown；超过 8 行出现筛选框，超过 20 行自动分页。
 
 ### `keys` — 数据
 
@@ -157,7 +158,13 @@ node node_modules/vitest/vitest.mjs run
 
 <img src="assets/catalog/chart.png" alt="chart" width="720">
 
-柱状图或折线图。
+柱状图、折线图、面积图或饼图；`values=` 画一个序列，或者在下面缩进最多四行 `series`。
+
+### `series` — 数据
+
+<img src="assets/catalog/series.png" alt="series" width="720">
+
+图表里的一个具名序列，可以堆叠或并排；点图例隐藏或显示它，读数行显示某一列的数值。
 
 ### `diagram` — 数据
 

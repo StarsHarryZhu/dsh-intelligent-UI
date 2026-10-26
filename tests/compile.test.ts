@@ -630,3 +630,85 @@ describe('code blocks', () => {
     expect(first(program, 'code').props.text).toBe('a\nb')
   })
 })
+
+describe('charts of several series', () => {
+  const QUARTERS = 'labels=["Q1","Q2","Q3"]'
+
+  it('keeps indented series under their chart, in order', () => {
+    const program = ok(`card\n  chart shape=area stacked=true ${QUARTERS}\n    series "Revenue" values=[3, 4, 5]\n    series "Cost" values=[1, 2, 2]`)
+    const chart = first(program, 'chart')
+    const series = program.nodes.filter(node => node.type === 'series')
+    expect(series.map(node => node.parent)).toEqual([chart.id, chart.id])
+    expect(chart.props.stacked).toEqual(['lit', true])
+    expect(program.diagnostics).toEqual([])
+  })
+
+  it('places a series written beside its chart into that chart, and reports it', () => {
+    const program = ok(`card\n  chart ${QUARTERS}\n  series "A" values=[1, 2, 3]\n  series "B" values=[3, 2, 1]`)
+    const chart = first(program, 'chart')
+    expect(program.nodes.filter(node => node.type === 'series').every(node => node.parent === chart.id)).toBe(true)
+    expect(program.diagnostics.filter(entry => /beside its chart/u.test(entry.message))).toHaveLength(2)
+  })
+
+  it('leaves out a series with no chart before it', () => {
+    const program = ok('card\n  text "No chart here."\n  series "A" values=[1, 2]')
+    expect(program.nodes.some(node => node.type === 'series')).toBe(false)
+    expect(program.diagnostics.some(entry => /belongs inside a chart/u.test(entry.message))).toBe(true)
+  })
+
+  it('moves anything but a series out of a chart', () => {
+    const program = ok(`card\n  chart ${QUARTERS} values=[1, 2, 3]\n    text "Note"`)
+    expect(first(program, 'text').parent).toBe(first(program, 'card').id)
+    expect(program.diagnostics.some(entry => /<chart> holds only series lines; <text> was placed in <card>/u.test(entry.message))).toBe(true)
+  })
+
+  it('lets a top-level chart join the card before it, as a leaf would', () => {
+    const program = ok(`card "Sales"\n  text "Quarterly"\nchart ${QUARTERS} values=[1, 2, 3]`)
+    expect(first(program, 'chart').parent).toBe(first(program, 'card').id)
+  })
+
+  it('needs values= or a series, prefers the series, and keeps four of them', () => {
+    const none = ok(`card\n  chart ${QUARTERS}\n  text "after"`)
+    expect(none.nodes.some(node => node.type === 'chart')).toBe(false)
+    expect(none.diagnostics.some(entry => /neither values= nor series/u.test(entry.message))).toBe(true)
+    const both = ok(`card\n  chart ${QUARTERS} values=[1, 2, 3]\n    series "A" values=[3, 2, 1]`)
+    expect(first(both, 'chart').props.values).toBeUndefined()
+    expect(both.diagnostics.some(entry => /values= was ignored/u.test(entry.message))).toBe(true)
+    const five = ok(`card\n  chart ${QUARTERS}\n${['A', 'B', 'C', 'D', 'E'].map(name => `    series "${name}" values=[1, 2, 3]`).join('\n')}`)
+    expect(five.nodes.filter(node => node.type === 'series')).toHaveLength(4)
+    expect(five.diagnostics.some(entry => entry.code === 'limit_exceeded')).toBe(true)
+  })
+
+  it('reports a series whose length differs from its labels', () => {
+    const program = ok(`card\n  chart ${QUARTERS}\n    series "A" values=[1, 2]`)
+    expect(program.diagnostics.some(entry => /3 labels but a series with a different number of values/u.test(entry.message))).toBe(true)
+  })
+
+  it('draws a crowded pie as bars and drops stacked= where nothing stacks', () => {
+    const labels = Array.from({ length: 9 }, (_, index) => `"s${index}"`).join(', ')
+    const crowded = ok(`card\n  chart shape=pie labels=[${labels}] values=[1, 1, 1, 1, 1, 1, 1, 1, 1]`)
+    expect(first(crowded, 'chart').props.shape).toBe('bar')
+    expect(crowded.diagnostics.some(entry => /pie of 9 slices/u.test(entry.message))).toBe(true)
+    const line = ok(`card\n  chart shape=line stacked=true ${QUARTERS} values=[1, 2, 3]`)
+    expect(first(line, 'chart').props.stacked).toBeUndefined()
+    expect(line.diagnostics.some(entry => /stacked= applies to bar and area/u.test(entry.message))).toBe(true)
+  })
+
+  it('compiles sample 33 without a repair, to the text the samples file records', () => {
+    const samples = readFileSync(join(import.meta.dirname, '..', 'docs', 'SAMPLES.md'), 'utf8')
+    const match = /^## 33\. [\s\S]*?```dil\n([\s\S]*?)```\n\nResult:\n\n```\n[\s\S]*?What a text-only reader sees:\n([\s\S]*?)\n```/mu.exec(samples)
+    expect(match).not.toBeNull()
+    const program = ok((match?.[1] ?? '').replace(/\n$/u, ''))
+    expect(program.diagnostics).toEqual([])
+    expect(program.fallback).toBe(match?.[2])
+  })
+
+  it('writes several series as a small table and a pie with its shares', () => {
+    const several = ok(`card\n  chart caption="Sales" unit="k" ${QUARTERS}\n    series "Revenue" values=[3, 4, 5]\n    series "Cost" values=[1, 2]`)
+    expect(several.fallback).toContain('Sales\n| Revenue | Cost\nQ1 | 3 k | 1 k\nQ2 | 4 k | 2 k\nQ3 | 5 k | —')
+    const pie = ok('card\n  chart shape=pie labels=["Rent","Food"] values=[3, 1]')
+    expect(pie.fallback).toContain('Rent: 3 (75%) · Food: 1 (25%)')
+    const single = ok(`card\n  chart ${QUARTERS} values=[1, 2, 3]`)
+    expect(single.fallback).toContain('Q1: 1 · Q2: 2 · Q3: 3')
+  })
+})

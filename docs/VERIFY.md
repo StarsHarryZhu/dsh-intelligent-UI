@@ -157,6 +157,22 @@ This needs the restart of step 1 after an update, because the skill row is part 
 
 Pass: the plugin's parts list two rows, 渐进式交互 / Intelligent UI and 渐进式交互 · 技能 / Intelligent UI · Skill, both active. Typing `/` in the composer lists `dsh-intelligent-ui` with the skills. Switching the skill row off removes it from that list and leaves cards drawing; switch it back on afterwards.
 
+## 17. Kept edits, a revised card, a long table, and a chart of several series
+
+The prompts are in English because the composer drops CJK text typed by automation; a reader typing by hand can send them in Chinese. Send:
+
+> Make one card for a small shop's first quarter, reply in Chinese: a slider for the April ad budget; a stacked area chart of three revenue series (subscriptions, services, ads) over January to April with ads in April following the slider; a pie of April's revenue split; and a table of 30 orders (order number, customer, amount).
+
+Pass, before any reload: the program compiles with no repair and uses `chart … shape=area stacked=true` with three indented `series` lines, a `chart shape=pie`, and a 30-row `table`. The legend hides and shows each series, always keeping one; hovering or focusing the chart and pressing ← and → moves the readout from month to month. The pie's legend shows each slice's share, and hiding a slice recomputes them. The table shows a filter box, a row count, and pages of 20; filtering narrows the rows and resets to the first page; Copy CSV and Copy Markdown paste as a spreadsheet range and as a Markdown table. No request appears in the network panel.
+
+Then move the slider, hide a series, sort and filter the table, and turn to its second page. Reload the page. Pass: the card shows every one of those settings as it was left, in the tool row and under the reply alike.
+
+Then send:
+
+> Change that card: make the slider go up to 20 and add a fourth series for refunds. Keep everything else.
+
+Pass: the result names the earlier card in `revises`; the new card starts with the slider where it was left (held at 20 if it was past it), and the earlier card says that a newer version follows. A quiz card whose button was pressed before a reload stays locked after it.
+
 # Part 2 — Desktop apps (macOS and Windows)
 
 **Passed on 0.2.1-rc.2, on both apps.** D1 to D4 passed on the macOS app and on the Windows app of DeepSeek Harness 0.2.1-rc.2, installed on macOS from the working checkout as a `link:` dependency and on Windows through W1. The failure of 2026-10-16 on 0.2.0-rc.2 — no card drawn, and past conversations that would not open with the plugin loaded — did not recur on this build. Run this part again on any new desktop version, in a throwaway session first, before claiming that version.
@@ -245,6 +261,13 @@ Pass: the linker creates directory junctions without asking for administrator ri
   - Step 16 / D2: the plugin's parts list two rows, 渐进式交互 and 渐进式交互 · 技能, both running; `/` lists `dsh-intelligent-ui` with the skills. On the web UI the skill row was switched off — `/` stopped listing it and the code card kept drawing — and on again, without a restart.
   - Step 15: the prompt went in English with "Reply in Chinese", because the composer drops CJK text typed by automation. On both hosts the model loaded the skill first and drew a `code lang=python current=line numbers=true` block traced frame by frame, with a correct trace (a, b = 1,1 → 1,2 → 2,3 → 3,5 → 5,8; print shows 5). Keyword, number, and called-name colours equal the host's syntax tokens in the dark theme (web UI) and the light theme (both); stepping and playing moved the highlight line by line and the page did not scroll; no request left the card while it played. Copy wrote the exact listing to the clipboard in the desktop app; the in-app browser refused the clipboard and the button said it could not copy, as the step allows. A history session from 2026-10-16 opened in the desktop app with its three cards drawn.
   - Found and fixed in this run: the running host defines no `--shiki-background`, so the block fell back to a lighter layer than the host's code blocks; it now falls back to `--dsw-alias-markdown-code-block`. And on its first desktop call the model opened the block with `"""` on a line of its own under `code`, which dropped the block until the model retried; such a block now attaches to the component above it, with a repair note.
+
+- 2026-10-26, web UI and the macOS desktop app, DeepSeek Harness 0.2.1-rc.2, DeepSeek-V4.1-Flash, both profiles linked to the working checkout, run by Claude Code as on 2026-10-22: step 17 passed on both hosts, with notes.
+  - Both programs of each host compiled with zero repairs: one card with a slider, a stacked area chart of three `series`, a pie, and a 30-row table, and its revision. Each result named its card id, and each revision carried `revises` with that id.
+  - The legend hid a series and the area chart redrew without it; ← and Home moved the readout to March and January; hiding a pie slice recomputed the other shares (41.6% and 58.4%). The table showed its filter, "30 / 30 行", and two pages; filtering for one customer left one row with no pages, a filter matching nothing said so, and the next-page button turned to rows 21 to 30. No `/api` request left the page while doing any of this. Copy said it could not copy in the in-app browser, which refuses the clipboard, as step 15 allows.
+  - After a page reload (web UI) and after quitting and reopening the app (desktop), the slider, the hidden series and slice, the filter, and the second table page were all as left, in the dark and the light theme.
+  - Asked to lower the slider's maximum and add a fourth series, the model revised the card: the new card started from the slider value the reader had set, held at the new maximum (30000 → 25000 on the web UI, 36000 → 30000 on the desktop app), drew four series, and the earlier card said a newer version follows. A quiz button locked across a reload was not tried live; `tests/client.test.tsx` covers it.
+  - Found and fixed in this run: the chart's keyboard focus ring used the brand colour, near black in the light theme; it now takes the host's focus ring like every other control.
 
 # Not verified
 

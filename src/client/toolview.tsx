@@ -10,11 +10,11 @@
  */
 
 import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { Card, Contained } from './card.tsx'
+import { Card, Contained, revisionOf } from './card.tsx'
 import type { EditsStore } from './edits.ts'
 import type { DisclosureLike, ToolBlockLike, ToolViewProps } from './host.ts'
 import { translator } from './locales.ts'
-import { previewProgram, readMeta, type Program } from './program.ts'
+import { previewProgram, readCardId, readMeta, type Program } from './program.ts'
 
 /** A result newer than this opens its row on arrival. */
 const FRESH_MS = 30_000
@@ -81,7 +81,12 @@ function ToolViewBody(props: ToolViewProps & { edits: EditsStore }): ReactNode {
     event.preventDefault()
     disclosure.toggle()
   }
-  const memoryKey = `${props.sessionId ?? ''}:${props.callId ?? block.callId ?? ''}`
+  const callId = props.callId ?? block.callId
+  const memoryKey = `${props.sessionId ?? ''}:${callId ?? ''}`
+  // A preview already starts from the revised card's values; only a settled
+  // result marks the earlier card as revised.
+  const revises = live ? readCardId(readArgument(block, 'revises')) : meta?.ok === true ? meta.revises : undefined
+  const revision = revisionOf(props.sessionId, revises, live ? undefined : callId)
   return (
     <div className="dsh-iui-tool" data-dsh-intelligent-ui="tool" data-state={state}>
       <div
@@ -110,7 +115,7 @@ function ToolViewBody(props: ToolViewProps & { edits: EditsStore }): ReactNode {
       </div>
       {open && program !== undefined ? (
         <div className="dsh-iui-row-body">
-          <Card program={program} memoryKey={memoryKey} store={store} kit={props} />
+          <Card program={program} memoryKey={memoryKey} store={store} kit={props} revision={revision} />
         </div>
       ) : null}
       {open && !live && program === undefined && detail !== undefined && detail !== '' ? (

@@ -11,7 +11,7 @@
 
 import { compileSource, dockPlayers } from '../lang/compile.ts'
 import { evalExpr } from '../lang/expr.ts'
-import { API_VERSION } from '../lang/identity.ts'
+import { API_VERSION, CARD_ID_PATTERN } from '../lang/identity.ts'
 import type { JsonValue } from '../lang/types.ts'
 
 /** One declared state value, as read. */
@@ -51,7 +51,7 @@ export interface Program {
 
 /** A settled call's metadata, as read. */
 export type CardMeta =
-  | { ok: true; program: Program; title?: string }
+  | { ok: true; program: Program; title?: string; revises?: string }
   | { ok: false; diagnostics: ReadonlyArray<{ message: string; repair: string; line?: number }>; title?: string }
 
 /**
@@ -71,7 +71,8 @@ export function readMeta(meta: unknown): CardMeta | undefined {
   }
   if (record.ok === true) {
     const program = readProgram(record.program)
-    return program === undefined ? undefined : { ok: true, program, ...title }
+    const revises = readCardId(record.revises)
+    return program === undefined ? undefined : { ok: true, program, ...title, ...(revises === undefined ? {} : { revises }) }
   }
   if (record.ok === false) {
     const diagnostics = asArray(record.diagnostics).map(asRecord)
@@ -84,6 +85,17 @@ export function readMeta(meta: unknown): CardMeta | undefined {
     return { ok: false, diagnostics, ...title }
   }
   return undefined
+}
+
+/**
+ * Read a card id: the call id of a `ui_render` result, as `revises` names it.
+ * @param value - the candidate.
+ * @returns the id, or undefined when it does not have a card id's shape.
+ */
+export function readCardId(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const id = value.trim()
+  return CARD_ID_PATTERN.test(id) ? id : undefined
 }
 
 /**

@@ -16,6 +16,12 @@ export type Tone = (typeof TONES)[number];
 export declare const SIZES: readonly ["xs", "sm", "md", "lg", "xl"];
 /** A size name from {@link SIZES}. */
 export type Size = (typeof SIZES)[number];
+/** Shapes a chart draws. */
+export declare const CHART_SHAPES: readonly ["bar", "line", "area", "pie"];
+/** Series one chart holds; the four colours a plot's curves use. */
+export declare const MAX_CHART_SERIES = 4;
+/** Slices a pie keeps; a pie with more is drawn as bars. */
+export declare const MAX_PIE_SLICES = 8;
 /**
  * A prop spec. `kind` is the validator's switch and the renderer's hint; the
  * two are one field so a new kind cannot be half-implemented.
@@ -110,6 +116,11 @@ export interface ComponentDescriptor {
     description: string;
     /** Whether the component may contain children. */
     container: boolean;
+    /**
+     * The only component types a container holds, when it is that narrow. Such a
+     * container belongs inside another one, like any leaf: a chart holds series.
+     */
+    holds?: readonly string[];
     /** Prop that a bare quoted string on a DIL line fills: `title "Total"`. */
     primary?: string;
     /** Props the compiler accepts. An unknown prop is dropped with `unknown_prop`. */

@@ -17,12 +17,14 @@ import { evalExpr, formatNumber } from '../lang/expr.ts'
 import { MAX_SPACE } from '../lang/limits.ts'
 import { formatSignificant } from '../lang/math.ts'
 import type { JsonValue } from '../lang/types.ts'
-import { renderChart } from './chart.tsx'
+import { ChartFigure } from './chart.tsx'
 import { CodeFigure } from './code.tsx'
 import { DiagramFigure } from './diagram.tsx'
 import { renderFormula } from './formula.tsx'
 import type { CopyKey } from './locales.ts'
+import { currentIndex, currentMark, flag, Glyph, list, mono } from './parts.tsx'
 import { PlotFigure } from './plot.tsx'
+import { TableFigure } from './table.tsx'
 import type { NodeRow, Program, StateRow } from './program.ts'
 
 /** Everything a renderer needs to draw one node. */
@@ -288,57 +290,7 @@ export const REGISTRY: Readonly<Record<string, Renderer>> = {
       />
     )
   },
-  table: (node, _children, scope) => {
-    const columns = list(node.props.columns, scope)
-    const rows = (Array.isArray(node.props.rows) ? node.props.rows as unknown[] : [])
-      .map(row => (Array.isArray(row) ? row as unknown[] : []).map(cell => scope.text(cell)))
-    const current = currentIndex(node, scope)
-    const sortable = flag(node, 'sortable', scope)
-    const sort = sortable ? readSort(scope.ui(node.id), columns.length) : undefined
-    const order = rows.map((_row, index) => index)
-    if (sort !== undefined) {
-      order.sort((a, b) => compareCells(rows[a]?.[sort.column] ?? '', rows[b]?.[sort.column] ?? '', sort.descending) || a - b)
-    }
-    // Ascending, then descending, then the order the program wrote.
-    const cycle = (column: number): void => {
-      const next = sort?.column !== column ? { column, descending: false } : sort.descending ? null : { column, descending: true }
-      scope.setUi(node.id, next)
-    }
-    return (
-      <figure className="dsh-iui-figure" data-mono={mono(node, scope)}>
-        {node.props.caption === undefined ? null : <figcaption className="dsh-iui-caption">{scope.text(node.props.caption)}</figcaption>}
-        <div className="dsh-iui-table-wrap">
-          <table className="dsh-iui-table">
-            {columns.length === 0 ? null : (
-              <thead>
-                <tr>
-                  {columns.map((column, index) => {
-                    if (!sortable) return <th key={index} scope="col">{column}</th>
-                    const direction = sort?.column === index ? (sort.descending ? 'descending' : 'ascending') : undefined
-                    return (
-                      <th key={index} scope="col" aria-sort={direction ?? 'none'}>
-                        <button type="button" className="dsh-iui-table-sort" title={scope.tr('table.sort')} onClick={() => { cycle(index) }}>
-                          <span>{column}</span>
-                          {direction === undefined ? null : <Glyph path={direction === 'ascending' ? 'M6 3.5l3.5 5h-7z' : 'M6 8.5l3.5-5h-7z'} />}
-                        </button>
-                      </th>
-                    )
-                  })}
-                </tr>
-              </thead>
-            )}
-            <tbody>
-              {order.map(rowIndex => (
-                <tr key={rowIndex} {...currentMark(rowIndex === current)}>
-                  {(rows[rowIndex] ?? []).map((cell, cellIndex) => <td key={cellIndex}>{cell}</td>)}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </figure>
-    )
-  },
+  table: (node, _children, scope) => <TableFigure node={node} scope={scope} />,
   keys: (node, _children, scope) => (
     <dl className="dsh-iui-keys">
       {list(node.props.items, scope).map((entry, index) => {
@@ -398,7 +350,9 @@ export const REGISTRY: Readonly<Record<string, Renderer>> = {
       </div>
     )
   },
-  chart: (node, _children, scope) => renderChart(node, scope),
+  chart: (node, _children, scope) => <ChartFigure node={node} scope={scope} />,
+  // A series is drawn by the chart that holds it.
+  series: () => null,
   plot: (node, _children, scope) => <PlotFigure node={node} scope={scope} />,
   diagram: (node, _children, scope) => <DiagramFigure node={node} scope={scope} />,
   code: (node, _children, scope) => <CodeFigure node={node} scope={scope} />,
@@ -581,15 +535,6 @@ function Player(props: {
   )
 }
 
-/** One 12px glyph, such as a player button or a sort arrow, drawn in the text colour. */
-function Glyph(props: { path: string }): ReactNode {
-  return (
-    <svg className="dsh-iui-glyph" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false">
-      <path d={props.path} fill="currentColor" />
-    </svg>
-  )
-}
-
 /**
  * Pages the reader switches between. The open page is remembered by the card, so
  * both copies of it show the same page; the closed pages are not drawn at all.
@@ -661,65 +606,9 @@ function readTicked(value: JsonValue | undefined, count: number): Set<number> {
   return ticked
 }
 
-/** A table's sort, when the reader chose one for a column it has. */
-function readSort(value: JsonValue | undefined, columns: number): { column: number; descending: boolean } | undefined {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
-  const { column, descending } = value
-  if (typeof column !== 'number' || !Number.isInteger(column) || column < 0 || column >= columns) return undefined
-  return { column, descending: descending === true }
-}
-
-/**
- * Order two cells: as numbers when both read as one (a leading currency sign and
- * thousands separators allowed), numbers before words, words in the reader's
- * collation with digits compared by value. Empty cells always go last.
- */
-export function compareCells(a: string, b: string, descending: boolean): number {
-  const blankA = a.trim() === ''
-  const blankB = b.trim() === ''
-  if (blankA || blankB) return blankA === blankB ? 0 : blankA ? 1 : -1
-  const numberA = cellNumber(a)
-  const numberB = cellNumber(b)
-  const order = numberA !== undefined && numberB !== undefined ? numberA - numberB
-    : numberA !== undefined ? -1
-      : numberB !== undefined ? 1
-        : a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
-  return descending ? -order : order
-}
-
-/** The number a cell starts with, such as 89 in "$89" or 1200 in "1,200 kg". */
-function cellNumber(text: string): number | undefined {
-  const match = /^\s*[$€£¥￥]?\s*([-+−]?(?:\d[\d,]*(?:\.\d+)?|\.\d+))(?![\d.])/u.exec(text)
-  if (match === null) return undefined
-  const value = Number((match[1] as string).replace(/,/gu, '').replace('−', '-'))
-  return Number.isFinite(value) ? value : undefined
-}
-
-/** Whether a boolean expression prop is true right now. */
-function flag(node: NodeRow, name: string, scope: RenderScope): boolean {
-  return node.props[name] !== undefined && evalExpr(node.props[name], key => scope.values.get(key)) === true
-}
-
 /** Remove binary noise from a stepped value, so 0.1 + 0.2 shows as 0.3. */
 function tidy(value: number): number {
   return Math.round(value * 1e9) / 1e9
-}
-
-/** The 0-based item a `current=` prop highlights, or -1 when it names none. */
-export function currentIndex(node: NodeRow, scope: RenderScope): number {
-  if (node.props.current === undefined) return -1
-  const value = scope.number(node.props.current)
-  return value === undefined ? -1 : Math.floor(value) - 1
-}
-
-/** The marks of the highlighted item: a class for the look and `aria-current` for assistive tech. */
-function currentMark(current: boolean): { className?: string; 'aria-current'?: 'step' } {
-  return current ? { className: 'dsh-iui-current', 'aria-current': 'step' } : {}
-}
-
-/** `data-mono` when the `mono=` prop is true. */
-function mono(node: NodeRow, scope: RenderScope): '' | undefined {
-  return flag(node, 'mono', scope) ? '' : undefined
 }
 
 /**
@@ -799,11 +688,6 @@ function stringProp(node: NodeRow, name: string): string | undefined {
 function numberProp(node: NodeRow, name: string): number | undefined {
   const value = node.props[name]
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
-}
-
-/** A list prop resolved to strings. */
-function list(value: unknown, scope: RenderScope): string[] {
-  return Array.isArray(value) ? (value as unknown[]).map(entry => scope.text(entry)) : []
 }
 
 /** Split "Label: value" at its first colon, full-width or not. */

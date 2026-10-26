@@ -30,8 +30,9 @@ version fields are written out in the spec that uses them.
 
 **Pluggability is checked mechanically.** `isolation.test.ts` fails when a source
 file imports a harness package it may not, when the bundle requests anything but
-React, when the browser half uses the network, timers, storage, or code
-evaluation, when the host registers anything beyond its tool and its skill, and
+React, when the browser half uses the network, timers, or code evaluation, or
+touches storage outside the edits store (`src/client/edits.ts`, local storage
+only), when the host registers anything beyond its tool and its skill, and
 when a style rule escapes the `.dsh-iui-` scope or uses a literal colour or
 radius.
 
@@ -69,19 +70,22 @@ needs the build first: run `node build.js` before the suite.
   tables, choices, every repair the compiler makes, what still fails, real model
   sources, content safety, streaming compiles, the API version, the
   animation props, and the newest components: tabs and their repairs,
-  checklists, sortable tables, diagram arrows, and code blocks with their
-  limits and text view.
+  checklists, sortable tables, diagram arrows, code blocks with their
+  limits and text view, and charts of several series with their repairs.
 - `limits.test.ts` — each bound at its limit and one past it, and bounded JSON
   recovery.
 - `catalog.test.ts` — the catalog and the render registry in both directions,
-  and each descriptor's internal consistency.
+  and each descriptor's internal consistency, including what a narrow
+  container holds.
 - `tool.test.ts` — the tool definition's wire shape, its result schema, what the
-  model is told, and the persisted metadata.
+  model is told, the card id and `revises`, and the persisted metadata.
 - `client.test.tsx` — the browser half through its real registration: the row's
   stages, buttons, the turn data Definition, the tail, shared edits, the player,
   tabs, checklists, sorting, diagrams and their layout, code blocks (colours,
-  the moving highlight that scrolls only the block, copying, `value=`), and
-  every degradation path.
+  the moving highlight that scrolls only the block, copying, `value=`), edits
+  kept across a reload and the store's storage rules, revised cards, long
+  tables (filter, pages, copies), charts of several series and pies, and every
+  degradation path. `localStorage` is cleared after each spec.
 - `math.test.ts` — the quadrature rule's constants, integrals, derivatives,
   limits, sums, products, roots, Taylor polynomials, special functions,
   precedence, the work budget, and number display, each against known values.

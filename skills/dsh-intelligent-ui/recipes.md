@@ -112,6 +112,26 @@ When the answer arrives, reply in prose: right or wrong, a two-line explanation,
 then the next card. After the last question, summarise the score in prose; a
 `table` of question, answer, and result works well for a review.
 
+## Revenue by source, with its split
+
+Indent one `series` per quantity under the chart; `stacked=true` shows the total
+as well as the parts. A pie beside it shows one month's split. A value may be a
+quoted expression, so the charts follow the slider.
+
+```dil
+@state ads = 3 min=0 max=10 step=0.5
+card "Revenue, January to April"
+  chart shape=area stacked=true labels=["Jan","Feb","Mar","Apr"] unit="k USD"
+    series "Subscriptions" values=[12, 14, 15, 18]
+    series "Services" values=[5, 6, 8, 7]
+    series "Ads" values=[2, 2, 3, "ads"]
+  chart shape=pie labels=["Subscriptions","Services","Ads"] values=[18, 7, "ads"] caption="April"
+  slider "April ad revenue" bind=ads unit="k USD"
+```
+
+Use `shape=bar` to set the series side by side, or `shape=line` for trends that
+cross. The reader can hide a series from the legend.
+
 ## Code traced line by line
 
 Trace the program by hand first, one frame per executed line, then write each

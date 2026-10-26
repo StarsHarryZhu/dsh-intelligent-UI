@@ -132,10 +132,15 @@ describe('the browser half cannot reach outside its card', () => {
   const browser = sources(['src/client', 'src/lang'])
 
   it('uses no network, no timers, and no code evaluation', () => {
-    const banned = [/\bfetch\s*\(/u, /XMLHttpRequest/u, /WebSocket/u, /EventSource/u, /\beval\s*\(/u, /new\s+Function/u, /dangerouslySetInnerHTML/u, /\bsetTimeout\s*\(/u, /\bsetInterval\s*\(/u, /\blocalStorage\b/u, /\bsessionStorage\b/u, /\bindexedDB\b/u]
+    const banned = [/\bfetch\s*\(/u, /XMLHttpRequest/u, /WebSocket/u, /EventSource/u, /\beval\s*\(/u, /new\s+Function/u, /dangerouslySetInnerHTML/u, /\bsetTimeout\s*\(/u, /\bsetInterval\s*\(/u, /\bsessionStorage\b/u, /\bindexedDB\b/u]
     for (const file of browser) {
       for (const pattern of banned) expect(pattern.test(file.text), `${file.path} matches ${String(pattern)}`).toBe(false)
     }
+  })
+
+  it('keeps reader edits in local storage from one file only', () => {
+    const users = browser.filter(file => /\blocalStorage\b/u.test(file.text)).map(file => relative(ROOT, join(ROOT, file.path)))
+    expect(users).toEqual([join('src', 'client', 'edits.ts')])
   })
 
   it('creates elements only from fixed tag names', () => {

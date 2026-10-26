@@ -20,7 +20,8 @@ side, or answer with a click:
   with sliders and a headline `metric`.
 - Two to six options with several attributes each: a `table`, with a `badge` or
   `callout` for the recommendation.
-- A trend, a breakdown, or a share: `chart` or `progress`.
+- A trend, a breakdown, or a share: `chart` or `progress`. Compare up to four
+  quantities with indented `series` lines; show one whole's split with `shape=pie`.
 - A function, a derivative, an integral, a limit, or a series: `plot` and
   `formula`. Read `math.md` first.
 - A practice question: the stem in `text` and one `button` per option.
@@ -34,8 +35,8 @@ explores.
 
 ## Shape of a good card
 
-- One card answers one question. Its title says what it computes, in the user's
-  language.
+- One card answers one question; draw a second only for a separate question.
+  Its title says what it computes, in the user's language.
 - Put the headline figure in a `metric`, supporting figures in `keys`, and the
   assumptions behind them in one `callout`.
 - Use three or four controls at most. Give every number `@state` realistic
@@ -46,8 +47,6 @@ explores.
   only read calcs declared above it.
 - Put live values into sentences: `text "{seats} seats cost {monthly} USD a month."`
 - Quote any expression that contains spaces: `value="mins / 60"`.
-- Prefer one card per answer. Draw a second card only for a genuinely separate
-  question.
 
 ## What to say around it
 
@@ -71,16 +70,8 @@ reader why there is no value.
   card. The answer belongs in your next reply, after the reader has chosen.
 - When the reader's choice arrives as their message, say whether it is right,
   explain briefly, and send the next question as a new card if the set goes on.
-- A card sends at most once; after a click its buttons lock.
-
-```dil
-card "Question 2 of 5"
-  text "Which integral gives the area between y = x and y = x² on [0, 1]?"
-  col gap=1
-    button "A. ∫₀¹ (x − x²) dx" prompt="A"
-    button "B. ∫₀¹ (x² − x) dx" prompt="B"
-    button "C. ∫₀¹ x² dx" prompt="C"
-```
+- A card sends at most once; after a click its buttons lock. `recipes.md` has a
+  quiz series.
 
 ## Animate
 
@@ -110,7 +101,8 @@ reads the state recomputes on every frame, in the browser, without calling you.
   still read all pages in the result.
 - Use `checklist items=[…]` for steps the reader ticks off; add `bind=done` with
   `@state done = 0` when another figure should follow the count.
-- Add `sortable=true` to a `table` the reader may want to rank.
+- Add `sortable=true` to a `table` the reader may want to rank. Give a table all
+  its rows: past 8 the reader can filter, past 20 it pages, and any table copies.
 - Draw a process or decision flow with `diagram nodes=[…] edges=["A -> B", "B -> C: yes"]`.
   Name arrow ends by a node's exact text or its number; `current=` highlights a
   box, so a `player` can walk the flow.
@@ -128,6 +120,14 @@ reads the state recomputes on every frame, in the browser, without calling you.
   write `value=name` with a text state or calc instead of a literal.
 - Show only the lines the answer is about; the reader can copy the block.
 - Keep `steps mono=true` for numbered instructions, not for code.
+
+## Revising a card
+
+When the reader asks to change a card you drew, call `ui_render` with
+`revises=` set to the card id its result reported, and write the whole program
+again with the change. Keep the names of states you are not changing: the new
+card starts from the reader's values for them, and the earlier card says a newer
+version follows. A different question gets a new card, without `revises=`.
 
 ## When the call fails
 
@@ -151,5 +151,5 @@ Read these from this skill's base directory when the card needs them:
 - `math.md`: functions, the calculus operators and their accuracy, `plot` and
   `formula`, and six calculus recipes.
 - `recipes.md`: complete cards for prices, loans, unit conversion, probability,
-  projectile motion, quiz series, and two animations: code traced line by line
-  and a tangent sweeping a curve.
+  projectile motion, quiz series, a chart of several series, and two
+  animations: code traced line by line and a tangent sweeping a curve.

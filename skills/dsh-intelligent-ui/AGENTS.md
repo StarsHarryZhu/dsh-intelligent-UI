@@ -48,12 +48,14 @@ them on every platform.
 
 - `AGENTS.md` — this file: what the skill is for and the rules it keeps.
 - `SKILL.md` — the skill: when to draw a card, how to shape one, what to say
-  around it, code blocks, quiz rules, the repair loop, and the reference list.
+  around it, code blocks, quiz rules, revising a card, the repair loop, and the
+  reference list.
 - `math.md` — the math vocabulary, the calculus operators and their accuracy,
   `plot` and `formula`, and six calculus recipes.
 - `recipes.md` — complete cards for a subscription estimate, a loan, a unit
   conversion, binomial and normal probabilities, projectile motion, a quiz
-  series, and code played line by line.
+  series, revenue by source as stacked series with a pie, and code played line
+  by line.
 
 ## 4. Progress
 
@@ -67,6 +69,10 @@ them on every platform.
   call.
 - Code blocks (2026-10-22): when to use `code` rather than `steps mono=true`,
   and the `"""` text block.
+- Revisions, series, and long tables (2026-10-26): revising a card with
+  `revises=` and keeping state names, when to compare series or draw a pie, and
+  giving a table all its rows; the quiz example moved to `recipes.md` to keep
+  `SKILL.md` under its size.
 
 **Not done.**
 

@@ -11,7 +11,7 @@
 
 import { useCallback, useSyncExternalStore, type ReactNode } from 'react'
 import { TURN_DATA_KEY } from '../lang/identity.ts'
-import { Card, Contained } from './card.tsx'
+import { Card, Contained, revisionOf } from './card.tsx'
 import type { EditsStore } from './edits.ts'
 import type { TurnTailProps } from './host.ts'
 import { asArray, asRecord, readMeta } from './program.ts'
@@ -69,6 +69,7 @@ function TailBody(props: TurnTailProps & { edits: EditsStore }): ReactNode {
             store={props.edits}
             kit={props}
             fallbackTitle={meta.title}
+            revision={revisionOf(props.sessionId, meta.revises, callId)}
           />
         )
       })}

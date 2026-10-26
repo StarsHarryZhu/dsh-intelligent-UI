@@ -161,7 +161,9 @@
   font: var(--dsw-font-xs-13);
 }
 .dsh-iui-input:focus-visible, .dsh-iui-select:focus-visible, .dsh-iui-range:focus-visible, .dsh-iui-button:focus-visible, .dsh-iui-check input:focus-visible,
-.dsh-iui-player-button:focus-visible, .dsh-iui-player-speed:focus-visible, .dsh-iui-tabs-tab:focus-visible, .dsh-iui-table-sort:focus-visible {
+.dsh-iui-player-button:focus-visible, .dsh-iui-player-speed:focus-visible, .dsh-iui-tabs-tab:focus-visible, .dsh-iui-table-sort:focus-visible,
+.dsh-iui-table-copy:focus-visible, .dsh-iui-table-page:focus-visible, .dsh-iui-code-copy:focus-visible, .dsh-iui-chart-key:focus-visible,
+.dsh-iui-chart-plot:focus-visible {
   outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 1px;
 }
@@ -181,6 +183,32 @@
 .dsh-iui-table tbody tr:last-child td { border-bottom: 0; }
 .dsh-iui-table-sort { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
 .dsh-iui-table-sort:hover { color: var(--dsw-alias-label-primary); }
+/* Table tools: copy beside the caption, a filter for long tables, pages for longer ones. */
+.dsh-iui-table-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; }
+.dsh-iui-table-head > .dsh-iui-caption { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dsh-iui-table-tools { display: inline-flex; flex: none; gap: 2px; }
+.dsh-iui-table-copy, .dsh-iui-table-page {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.dsh-iui-table-copy:hover, .dsh-iui-table-page:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
+.dsh-iui-table-page { width: 24px; padding: 0; }
+.dsh-iui-table-page:disabled { cursor: default; opacity: 0.4; }
+.dsh-iui-table-filter-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dsh-iui-table-filter { flex: 1 1 auto; max-width: 240px; height: 28px; }
+.dsh-iui-table-count, .dsh-iui-table-empty { flex: none; font: var(--dsw-font-xxs-12); color: var(--dsw-alias-label-secondary); font-variant-numeric: tabular-nums; }
+.dsh-iui-table-empty { padding: 6px 0; }
+.dsh-iui-table-pager { display: flex; align-items: center; justify-content: flex-end; gap: 4px; font: var(--dsw-font-xxs-12); color: var(--dsw-alias-label-secondary); font-variant-numeric: tabular-nums; }
 
 .dsh-iui-keys { display: flex; flex-direction: column; gap: 0; margin: 0; }
 .dsh-iui-keys-row { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 0.5px solid var(--dsw-alias-border-l1); font: var(--dsw-font-xs-13); }
@@ -243,6 +271,53 @@
 .dsh-iui-chart-labels > span { display: flex; flex-direction: column; min-width: 0; }
 .dsh-iui-chart-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--dsw-font-xxxs-11); color: var(--dsw-alias-label-secondary); }
 .dsh-iui-chart-value { font: var(--dsw-font-xxs-12); color: var(--dsw-alias-label-primary); font-variant-numeric: tabular-nums; }
+/* Series take a plot's four curve colours; lines past the first also differ by dash, so colour is never the only cue. */
+.dsh-iui-chart-area { fill: var(--dsw-alias-brand-primary); fill-opacity: 0.18; stroke: none; }
+.dsh-iui-chart-focus { fill: var(--dsw-alias-interactive-bg-active); stroke: none; }
+.dsh-iui-chart-bar[data-series='1'], .dsh-iui-chart-area[data-series='1'], .dsh-iui-chart-slice[data-series='1'] { fill: var(--dsw-alias-state-success-primary); }
+.dsh-iui-chart-bar[data-series='2'], .dsh-iui-chart-area[data-series='2'], .dsh-iui-chart-slice[data-series='2'] { fill: var(--dsw-alias-state-warn-primary); }
+.dsh-iui-chart-bar[data-series='3'], .dsh-iui-chart-area[data-series='3'], .dsh-iui-chart-slice[data-series='3'] { fill: var(--dsw-alias-state-error-primary); }
+.dsh-iui-chart-line[data-series='1'], .dsh-iui-chart-dot[data-series='1'] { stroke: var(--dsw-alias-state-success-primary); }
+.dsh-iui-chart-line[data-series='2'], .dsh-iui-chart-dot[data-series='2'] { stroke: var(--dsw-alias-state-warn-primary); }
+.dsh-iui-chart-line[data-series='3'], .dsh-iui-chart-dot[data-series='3'] { stroke: var(--dsw-alias-state-error-primary); }
+.dsh-iui-chart-line[data-series='1'] { stroke-dasharray: 6 3; }
+.dsh-iui-chart-line[data-series='2'] { stroke-dasharray: 2 3; }
+.dsh-iui-chart-line[data-series='3'] { stroke-dasharray: 8 3 2 3; }
+.dsh-iui-chart-labels > span[data-focus] .dsh-iui-chart-label { color: var(--dsw-alias-label-primary); }
+.dsh-iui-chart-legend { display: flex; flex-wrap: wrap; gap: 2px 4px; }
+.dsh-iui-chart-legend[data-vertical] { flex-direction: column; flex-wrap: nowrap; min-width: 0; }
+.dsh-iui-chart-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 24px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 120ms ease, opacity 120ms ease;
+}
+.dsh-iui-chart-key:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
+.dsh-iui-chart-key[data-off] { opacity: 0.45; }
+.dsh-iui-chart-key[data-off] .dsh-iui-chart-key-name { text-decoration: line-through; }
+.dsh-iui-chart-key-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dsh-iui-chart-swatch { flex: none; width: 10px; height: 10px; border-radius: var(--dsw-radius-xs); background: var(--dsw-alias-brand-primary); }
+.dsh-iui-chart-swatch[data-series='1'] { background: var(--dsw-alias-state-success-primary); }
+.dsh-iui-chart-swatch[data-series='2'] { background: var(--dsw-alias-state-warn-primary); }
+.dsh-iui-chart-swatch[data-series='3'] { background: var(--dsw-alias-state-error-primary); }
+.dsh-iui-chart-swatch[data-dim], .dsh-iui-chart-slice[data-dim] { opacity: 0.55; }
+.dsh-iui-chart-readout { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; min-height: 18px; font: var(--dsw-font-xxs-12); color: var(--dsw-alias-label-secondary); font-variant-numeric: tabular-nums; }
+.dsh-iui-chart-readout-label { color: var(--dsw-alias-label-primary); font-weight: 500; }
+.dsh-iui-chart-readout-entry { display: inline-flex; align-items: center; gap: 4px; }
+.dsh-iui-chart-pie { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.dsh-iui-chart-pie-plot { display: block; flex: none; width: 140px; height: 140px; }
+.dsh-iui-chart-slice { fill: var(--dsw-alias-brand-primary); stroke: var(--dsw-alias-bg-layer-1); stroke-width: 1; stroke-linejoin: round; }
+.dsh-iui-card .dsh-iui-card .dsh-iui-chart-slice { stroke: var(--dsw-alias-bg-layer-2); }
 
 .dsh-iui-plot { gap: 4px; }
 .dsh-iui-plot-frame { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 4px; row-gap: 4px; min-width: 0; }
@@ -383,7 +458,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .dsh-iui-row-head, .dsh-iui-button, .dsh-iui-player-button, .dsh-iui-player-speed, .dsh-iui-progress-fill, .dsh-iui-chart-bar,
-  .dsh-iui-tabs-tab, .dsh-iui-diagram-node rect, .dsh-iui-code-copy { transition: none; }
+  .dsh-iui-tabs-tab, .dsh-iui-diagram-node rect, .dsh-iui-code-copy, .dsh-iui-table-copy, .dsh-iui-table-page, .dsh-iui-chart-key { transition: none; }
   .dsh-iui-code-scroll { scroll-behavior: auto; }
   .dsh-iui-row-head[data-state='running'] .dsh-iui-row-status { animation: none; }
 }

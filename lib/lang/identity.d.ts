@@ -26,3 +26,9 @@ export declare const LOCALE_NS = "dsh-intelligent-ui";
  * the package's and the tag's, kept by the maintainer, and is independent of it.
  */
 export declare const API_VERSION = 1;
+/**
+ * Shape of a card id: the host's call id of a `ui_render` result, which the
+ * model passes back as `revises` to change that card. Checked on both halves,
+ * because the browser also reads `revises` from a call's streaming arguments.
+ */
+export declare const CARD_ID_PATTERN: RegExp;

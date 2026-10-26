@@ -23,7 +23,7 @@ describe('the harness and the provider accept this definition', () => {
     expect(schema.type).toBe('object')
     expect(schema.required).toEqual(['source'])
     const properties = schema.properties as Record<string, JsonSchemaNode>
-    expect(Object.keys(properties).sort()).toEqual(['source', 'title'])
+    expect(Object.keys(properties).sort()).toEqual(['revises', 'source', 'title'])
     for (const [name, node] of Object.entries(properties)) {
       expect(node.type, name).toBe('string')
       expect(node).not.toHaveProperty('required')
@@ -138,5 +138,30 @@ describe('what is persisted for the card', () => {
   it('goes through the definition\'s own presentationMeta', async () => {
     const value = await run({ source: COMPARISON_EXAMPLE })
     expect(tool.output.presentationMeta?.({ source: COMPARISON_EXAMPLE }, value as never)).toEqual(buildPresentationMeta({}, value))
+  })
+})
+
+describe('revising a card', () => {
+  it('tells the model the card id a later call can revise', async () => {
+    const value = await tool.execute({ source: ESTIMATE_EXAMPLE }, { callId: 'call_01' } as never) as Record<string, unknown>
+    expect(value.card).toBe('call_01')
+    expect(renderForModel(value)).toContain('Card id: call_01')
+  })
+
+  it('records a valid revises in the meta and says what carries over', async () => {
+    const value = await tool.execute({ source: ESTIMATE_EXAMPLE, revises: ' call_01 ' }, { callId: 'call_02' } as never) as Record<string, unknown>
+    expect(value.revises).toBe('call_01')
+    expect(renderForModel(value)).toContain('It replaces card call_01')
+    const meta = buildPresentationMeta({}, value) as Record<string, unknown>
+    expect(meta.revises).toBe('call_01')
+  })
+
+  it('ignores a revises that is no card id, or is the card itself, and says so', async () => {
+    for (const revises of ['the old card', 'call_02']) {
+      const value = await tool.execute({ source: ESTIMATE_EXAMPLE, revises }, { callId: 'call_02' } as never) as Record<string, unknown>
+      expect(value.revises).toBeUndefined()
+      expect(value.notes).toEqual(expect.arrayContaining([expect.stringContaining('revises was ignored')]))
+      expect(buildPresentationMeta({}, value)).not.toHaveProperty('revises')
+    }
   })
 })

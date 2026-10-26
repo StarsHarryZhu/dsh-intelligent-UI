@@ -14,7 +14,7 @@
  * @module dsh-intelligent-ui/lang/compile
  */
 
-import { CATALOG_BY_TYPE, catalogHash, SIZES, TONES, type ComponentDescriptor, type PropSpec } from './catalog.ts'
+import { CATALOG_BY_TYPE, catalogHash, MAX_CHART_SERIES, MAX_PIE_SLICES, SIZES, TONES, type ComponentDescriptor, type PropSpec } from './catalog.ts'
 import { parseDil, type Envelope, type RawCalc, type RawNode, type RawState } from './dil.ts'
 import { checkExpr, evalExpr, type ExprType } from './expr.ts'
 import { API_VERSION } from './identity.ts'
@@ -156,6 +156,7 @@ export function compileEnvelope(envelope: Envelope, inherited: Diagnostic[] = []
   }
   connect(nodes, ids, diagnostics)
   arrangeTabs(nodes, ids, diagnostics)
+  arrangeSeries(nodes, diagnostics)
   dockPlayers(nodes)
 
   const program: UIProgram = {
@@ -834,7 +835,14 @@ function hoist(template: TextTemplate, constants: Constants): JsonValue {
  */
 function connect(nodes: UINode[], ids: Set<string>, diagnostics: Diagnostic[]): void {
   const byId = new Map(nodes.map(node => [node.id, node]))
-  const isContainer = (node: UINode | undefined): boolean => node !== undefined && CATALOG_BY_TYPE.get(node.type)?.container === true
+  const descriptorOf = (node: UINode | undefined): ComponentDescriptor | undefined => (node === undefined ? undefined : CATALOG_BY_TYPE.get(node.type))
+  /** Whether one node can hold another: a container, and one that holds its type. */
+  const holds = (parent: UINode, child: UINode): boolean => {
+    const descriptor = descriptorOf(parent)
+    return descriptor?.container === true && (descriptor.holds === undefined || descriptor.holds.includes(child.type))
+  }
+  /** Whether a node can be a root of its own: a container that holds any component. */
+  const standsAlone = (node: UINode | undefined): boolean => descriptorOf(node)?.container === true && descriptorOf(node)?.holds === undefined
   for (const node of nodes) {
     if (node.parent === null) continue
     let parent = byId.get(node.parent)
@@ -843,7 +851,7 @@ function connect(nodes: UINode[], ids: Set<string>, diagnostics: Diagnostic[]): 
       node.parent = null
       continue
     }
-    while (parent !== undefined && !isContainer(parent)) {
+    while (parent !== undefined && !holds(parent, node)) {
       parent = parent.parent === null ? undefined : byId.get(parent.parent)
     }
     if (parent === undefined) {
@@ -851,7 +859,10 @@ function connect(nodes: UINode[], ids: Set<string>, diagnostics: Diagnostic[]): 
       continue
     }
     if (parent.id !== node.parent) {
-      diagnostics.push({ code: 'orphan_node', path: `nodes.${node.id}`, message: `<${byId.get(node.parent)?.type ?? '?'}> cannot hold children; <${node.type}> was placed in <${parent.type}>`, repair: 'Put components inside card, col, row, or grid.' })
+      const written = byId.get(node.parent)
+      const narrow = descriptorOf(written)?.holds
+      const why = narrow === undefined ? 'cannot hold children' : `holds only ${narrow.join(', ')} lines`
+      diagnostics.push({ code: 'orphan_node', path: `nodes.${node.id}`, message: `<${written?.type ?? '?'}> ${why}; <${node.type}> was placed in <${parent.type}>`, repair: 'Put components inside card, col, row, or grid.' })
       node.parent = parent.id
     }
     // A loop has no root at all; cutting it here leaves the node at the top level.
@@ -870,9 +881,9 @@ function connect(nodes: UINode[], ids: Set<string>, diagnostics: Diagnostic[]): 
   // Top-level components that cannot stand alone join the closest container root.
   let stranded = false
   for (const [index, node] of nodes.entries()) {
-    if (node.parent !== null || isContainer(node)) continue
-    const before = nodes.slice(0, index).reverse().find(candidate => candidate.parent === null && isContainer(candidate))
-    const after = nodes.slice(index + 1).find(candidate => candidate.parent === null && isContainer(candidate))
+    if (node.parent !== null || standsAlone(node)) continue
+    const before = nodes.slice(0, index).reverse().find(candidate => candidate.parent === null && standsAlone(candidate))
+    const after = nodes.slice(index + 1).find(candidate => candidate.parent === null && standsAlone(candidate))
     const home = before ?? after
     if (home === undefined) {
       stranded = true
@@ -885,7 +896,7 @@ function connect(nodes: UINode[], ids: Set<string>, diagnostics: Diagnostic[]): 
     ids.add(id)
     nodes.unshift({ id, type: 'card', parent: null, props: {} })
     for (const node of nodes) {
-      if (node.id !== id && node.parent === null && !isContainer(node)) node.parent = id
+      if (node.id !== id && node.parent === null && !standsAlone(node)) node.parent = id
     }
   }
   const lookup = new Map(nodes.map(node => [node.id, node]))
@@ -954,6 +965,119 @@ function arrangeTabs(nodes: UINode[], ids: Set<string>, diagnostics: Diagnostic[
       })
     }
   }
+}
+
+/**
+ * Give every series a chart and every chart something to draw.
+ *
+ * A series written beside its chart instead of under it joins the chart just
+ * before it; one with no chart there is left out. A chart keeps either its own
+ * `values=` or its series, at most {@link MAX_CHART_SERIES} of them, and is left
+ * out when it has neither. A pie with too many slices to read is drawn as bars,
+ * and `stacked=` on a shape that cannot stack is dropped. Each repair is reported.
+ */
+function arrangeSeries(nodes: UINode[], diagnostics: Diagnostic[]): void {
+  if (!nodes.some(node => node.type === 'series' || node.type === 'chart')) return
+  const byId = new Map(nodes.map(node => [node.id, node]))
+  const lastChart = new Map<string | null, UINode | undefined>()
+  const strays: UINode[] = []
+  for (const node of nodes) {
+    if (node.type === 'chart') {
+      lastChart.set(node.parent, node)
+      continue
+    }
+    if (node.type !== 'series') {
+      lastChart.set(node.parent, undefined)
+      continue
+    }
+    if (node.parent !== null && byId.get(node.parent)?.type === 'chart') continue
+    const chart = lastChart.get(node.parent)
+    if (chart === undefined) {
+      strays.push(node)
+      continue
+    }
+    node.parent = chart.id
+    diagnostics.push({
+      code: 'orphan_node',
+      path: `nodes.${node.id}`,
+      message: '<series> sits beside its chart; it was placed in the chart before it',
+      repair: 'Indent series lines under their chart line.',
+    })
+  }
+  for (const stray of strays) {
+    diagnostics.push({
+      code: 'orphan_node',
+      path: `nodes.${stray.id}`,
+      message: '<series> belongs inside a chart; it was left out',
+      repair: 'Indent series lines under the chart line they belong to.',
+    })
+  }
+  const dropped = new Set(strays)
+  for (const chart of nodes.filter(node => node.type === 'chart')) {
+    const series = nodes.filter(node => node.parent === chart.id && node.type === 'series')
+    for (const extra of series.slice(MAX_CHART_SERIES)) dropped.add(extra)
+    if (series.length > MAX_CHART_SERIES) {
+      diagnostics.push(limitDiagnostic('series in one chart', MAX_CHART_SERIES, `${series.length - MAX_CHART_SERIES} later series were left out`))
+    }
+    const kept = series.slice(0, MAX_CHART_SERIES)
+    if (kept.length > 0 && chart.props.values !== undefined) {
+      delete chart.props.values
+      diagnostics.push({
+        code: 'invalid_literal',
+        path: `nodes.${chart.id}.values`,
+        message: 'chart has both values= and series lines; values= was ignored',
+        repair: 'Give a chart either values=[…] or indented series lines, not both.',
+      })
+    }
+    if (kept.length === 0 && chart.props.values === undefined) {
+      dropped.add(chart)
+      diagnostics.push({
+        code: 'invalid_literal',
+        path: `nodes.${chart.id}`,
+        message: 'chart has neither values= nor series lines; it was left out',
+        repair: 'Write values=[…] on the chart, or indent series "Name" values=[…] lines under it.',
+      })
+      continue
+    }
+    const labels = Array.isArray(chart.props.labels) ? chart.props.labels.length : 0
+    const lists = kept.length > 0 ? kept.map(entry => entry.props.values) : [chart.props.values]
+    if (lists.some(entry => !Array.isArray(entry) || entry.length !== labels)) {
+      diagnostics.push({
+        code: 'invalid_literal',
+        path: `nodes.${chart.id}.labels`,
+        message: `chart has ${labels} labels but a series with a different number of values; extra values are not drawn and missing ones are blank`,
+        repair: 'Give every series exactly one value per label.',
+      })
+    }
+    const shape = chart.props.shape
+    const slices = Array.isArray(lists[0]) ? lists[0].length : 0
+    if (shape === 'pie' && slices > MAX_PIE_SLICES) {
+      chart.props.shape = 'bar'
+      diagnostics.push({
+        code: 'invalid_literal',
+        path: `nodes.${chart.id}.shape`,
+        message: `a pie of ${slices} slices is hard to read; it was drawn as a bar chart`,
+        repair: `Keep a pie to ${MAX_PIE_SLICES} slices, or use shape=bar.`,
+      })
+    } else if (shape === 'pie' && kept.length > 1) {
+      diagnostics.push({
+        code: 'invalid_literal',
+        path: `nodes.${chart.id}.shape`,
+        message: 'a pie draws one series; only the first series is shown',
+        repair: 'Use one series for a pie, or shape=bar to compare several.',
+      })
+    }
+    if (chart.props.stacked !== undefined && (chart.props.shape === 'line' || chart.props.shape === 'pie')) {
+      delete chart.props.stacked
+      diagnostics.push({
+        code: 'invalid_literal',
+        path: `nodes.${chart.id}.stacked`,
+        message: `stacked= applies to bar and area charts; it was ignored on a ${String(chart.props.shape)} chart`,
+        repair: 'Use stacked=true with shape=bar or shape=area.',
+      })
+    }
+  }
+  if (dropped.size > 0) nodes.splice(0, nodes.length, ...nodes.filter(node => !dropped.has(node)))
 }
 
 /**
@@ -1100,6 +1224,7 @@ export function fallbackLines(program: Pick<UIProgram, 'nodes' | 'constants' | '
       case 'diagram': return diagramText(node)
       case 'code': return codeText(node)
       case 'chart': return chartText(node)
+      case 'series': return undefined
       default: return undefined
     }
   }
@@ -1193,10 +1318,35 @@ export function fallbackLines(program: Pick<UIProgram, 'nodes' | 'constants' | '
     return [...head, `${fence}${lang}`, kept, fence, ...mark].join('\n')
   }
 
+  /**
+   * One series: `Q1: 12 · Q2: 15`, a pie's slices with their shares, or several
+   * series as a small table of one row per label.
+   */
   function chartText(node: UINode): string {
     const labels = list(node.props.labels)
-    const series = Array.isArray(node.props.values) ? node.props.values : []
-    return labels.map((label, index) => `${label}: ${valueText(series[index], values)}`).join(' · ')
+    const unit = typeof node.props.unit === 'string' && node.props.unit !== '' ? ` ${node.props.unit}` : ''
+    const head = node.props.caption === undefined ? [] : [text(node, 'caption')]
+    const series = (children.get(node.id) ?? []).filter(child => child.type === 'series')
+    const lists = series.length > 0
+      ? series.map(child => (Array.isArray(child.props.values) ? child.props.values : []))
+      : [Array.isArray(node.props.values) ? node.props.values : []]
+    if (node.props.shape === 'pie') {
+      const numbers = (lists[0] ?? []).map(entry => evalExpr(entry, key => values.get(key)))
+      const total = numbers.reduce<number>((sum, entry) => sum + (typeof entry === 'number' && entry > 0 ? entry : 0), 0)
+      const slices = labels.map((label, index) => {
+        const entry = numbers[index]
+        const share = typeof entry === 'number' && total > 0 ? ` (${formatSignificant(Math.max(entry, 0) / total * 100, 3)}%)` : ''
+        return `${label}: ${valueText(lists[0]?.[index], values)}${unit}${share}`
+      })
+      return [...head, slices.join(' · ')].join('\n')
+    }
+    if (series.length <= 1) {
+      const only = lists[0] ?? []
+      return [...head, labels.map((label, index) => `${label}: ${valueText(only[index], values)}${unit}`).join(' · ')].join('\n')
+    }
+    const names = series.map((child, index) => (child.props.name === undefined ? `Series ${index + 1}` : text(child, 'name')))
+    const rows = labels.map((label, index) => `${label} | ${lists.map(entry => (index < entry.length ? `${valueText(entry[index], values)}${unit}` : '—')).join(' | ')}`)
+    return [...head, `| ${names.join(' | ')}`, ...rows].join('\n')
   }
 
   function list(value: JsonValue | undefined): string[] {

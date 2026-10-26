@@ -82,7 +82,7 @@ const MATH_LINES = [
 export const UI_TOOL_DESCRIPTION = [
   'Show an interactive card in the chat instead of describing data in prose: an estimate the reader adjusts with sliders or inputs, a comparison table, a small chart, a proportion, a short form, a question with answer buttons, or a process the reader plays step by step. Use plain text for a short factual answer or a single number.',
   '',
-  'Put the program in `source` (DIL, below); `title` optionally labels the card. Controls recompute the card in the browser and send you nothing. A button sends its `prompt` as the reader\'s next message. Reply in prose as usual; the card is shown with your reply. If the result lists problems, fix them and call ui_render again in the same turn.',
+  'Put the program in `source` (DIL, below); `title` optionally labels the card. Controls recompute the card in the browser and send you nothing. A button sends its `prompt` as the reader\'s next message. Reply in prose as usual; the card is shown with your reply. If the result lists problems, fix them and call ui_render again in the same turn. To change a card you drew, call ui_render with revises=<its card id>; states with the same names keep the reader\'s values.',
   '',
   'DIL: one statement per line. Indent a component two spaces to put it inside the container above it. Comments start with //.',
   '  @state <name> = <initial> [min=] [max=] [step=] [options=a|b|c]    a number, "text", true/false, or a choice when options= is given',
@@ -98,7 +98,7 @@ export const UI_TOOL_DESCRIPTION = [
   'Components:',
   ...CATALOG.map(describeComponent),
   '',
-  'Animation (code running, an algorithm, a motion): one frame state driven by player (drawn at the bottom of its card); derive each frame\'s figures from it, with pick(frame, …) for per-frame values. current= on code, steps, list, table, or diagram highlights that 1-based line or item. Playing sends you nothing.',
+  'Animation (running code, an algorithm, a motion): one frame state driven by player; derive per-frame values with pick(frame, …). current= on code, steps, list, table, or diagram highlights that 1-based line or item.',
   '',
   'Example — an adjustable estimate:',
   indent(ESTIMATE_EXAMPLE),
@@ -115,7 +115,7 @@ export const UI_TOOL_DESCRIPTION = [
   'Example — code the reader plays line by line:',
   indent(ANIMATION_EXAMPLE),
   '',
-  'A JSON object {"states":[…],"calcs":[…],"nodes":[{"type":"card","children":[…]}]} is also accepted in `source`.',
+  '`source` also accepts JSON: {"states":[…],"calcs":[…],"nodes":[{"type":"card","children":[…]}]}.',
 ].join('\n')
 
 /** One catalog line: the component, its main text, its props, and its purpose. */
@@ -124,7 +124,7 @@ function describeComponent(descriptor: ComponentDescriptor): string {
   const props = Object.entries(descriptor.props)
     .filter(([name]) => name !== descriptor.primary)
     .map(([name, spec]) => `${name}${spec.required === true ? '' : '?'}=${hint(spec)}`)
-  const children = descriptor.container ? ' Holds indented components.' : ''
+  const children = !descriptor.container ? '' : descriptor.holds === undefined ? ' Holds indented components.' : ` Holds indented ${descriptor.holds.join(', ')} lines.`
   return `  ${descriptor.type}${primary}${props.length === 0 ? '' : ` ${props.join(' ')}`} — ${descriptor.description}${children}`
 }
 
