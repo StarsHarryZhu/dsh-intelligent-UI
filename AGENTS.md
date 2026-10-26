@@ -130,9 +130,10 @@ the files that actually exist; `tests/agents-md.test.ts` enforces both rules.
 **Release tags are short and bilingual.** An annotated tag's message starts with
 the tag name alone on its first line — GitHub shows that line as the release
 title — then one blank line. After it come two versions of the same items, the
-Chinese one first and then the English one. Each version has exactly two parts,
-Added and Fixed, with one short phrase or sentence per item, and nothing else: no
-scope notes, no other prose. The English half reads `English version:`, then
+Chinese one first and then the English one. Each version has two parts, Added
+and Fixed, with one short phrase or sentence per item, and nothing else: no scope
+notes, no other prose. A release that fixes nothing leaves Fixed out rather than
+writing an empty section or inventing a fix. The English half reads `English version:`, then
 `Added:` and `Fixed:`, each followed by `- ` items; the Chinese half has the same
 shape with Chinese labels.
 

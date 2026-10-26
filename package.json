@@ -1,6 +1,6 @@
 {
   "name": "dsh-intelligent-ui",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Intelligent UI for DeepSeek Harness: the model writes a small catalogued interface program, the chat renders it as a native card with sliders, tables, charts, function plots, and typeset formulas, and every control change recomputes in the browser with zero model calls.",
   "keywords": [
     "dsh-plugin",
