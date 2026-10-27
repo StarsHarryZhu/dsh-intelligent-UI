@@ -84,7 +84,8 @@ the parent folder cover the dark theme.
   the host's light syntax palette (`--shiki-token-*`) supplied to the static
   page, because the host's theme injects it at run time; `table` and `chart`
   redrawn and `series` added on 2026-10-26, after tables gained their copy
-  buttons and charts their series.
+  buttons and charts their series; `checklist` redrawn the same day with
+  `names=` filling a sentence.
 
 **Not done.**
 

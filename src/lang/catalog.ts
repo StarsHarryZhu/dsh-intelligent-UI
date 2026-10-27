@@ -52,9 +52,11 @@ export type PropSpec =
   | { kind: 'tone'; required?: boolean; default?: string }
   | { kind: 'size'; required?: boolean; default?: string }
   | { kind: 'rows'; required?: boolean }
-  | { kind: 'series'; required?: boolean }
+  /** Numbers or numeric expressions; `literal` admits plain numbers only. */
+  | { kind: 'series'; required?: boolean; literal?: boolean }
   | { kind: 'items'; required?: boolean }
   | { kind: 'options'; required?: boolean }
+  /** A state the component writes: the prop named `bind` becomes the node's binding, any other is kept as the state's key. */
   | { kind: 'bind'; required?: boolean; state: StateKind }
   /** One to four numeric expressions over the component's variable, such as a plot's curves. */
   | { kind: 'fns'; required?: boolean }
@@ -221,7 +223,7 @@ export const CATALOG: readonly ComponentDescriptor[] = [
   },
   {
     type: 'player',
-    description: 'Plays a number state: play/pause, step, scrub; duration= seconds per run.',
+    description: 'Plays a number state (play, step, scrub); duration= seconds per run.',
     container: false,
     primary: 'label',
     props: {
@@ -281,10 +283,16 @@ export const CATALOG: readonly ComponentDescriptor[] = [
   },
   {
     type: 'checklist',
-    description: 'Items the reader ticks off; bind= receives the ticked count.',
+    description: 'Items the reader ticks; bind= gets the count, or the sum of values=; names= the ticked names.',
     container: false,
     primary: 'label',
-    props: { label: { kind: 'text' }, items: { kind: 'items', required: true }, bind: { kind: 'bind', state: 'number' } },
+    props: {
+      label: { kind: 'text' },
+      items: { kind: 'items', required: true },
+      values: { kind: 'series', literal: true },
+      bind: { kind: 'bind', state: 'number' },
+      names: { kind: 'bind', state: 'string' },
+    },
   },
   {
     type: 'chart',
@@ -419,7 +427,7 @@ function propSignature(props: Record<string, PropSpec>): string {
     .sort()
     .map((name) => {
       const spec = props[name] as PropSpec
-      const bound = spec.kind === 'bind' ? `:${spec.state}` : spec.kind === 'expr' ? `:${spec.of}` : ''
+      const bound = spec.kind === 'bind' ? `:${spec.state}` : spec.kind === 'expr' ? `:${spec.of}` : spec.kind === 'series' && spec.literal === true ? ':literal' : ''
       return `${name}=${spec.kind}${bound}${spec.required === true ? '!' : ''}`
     })
     .join(',')

@@ -490,14 +490,15 @@ What a text-only reader sees:
 
 ## 30. `checklist`
 
-Items the reader ticks off, with a done count. `bind=` is optional; when given, the bound number state receives how many items are ticked, so a progress bar or a calc can read it. Pictured with two items ticked.
+Items the reader ticks off, with a done count. `bind=` and `names=` are optional. A bound number state receives how many items are ticked — or, when `values=[…]` gives each item a number, the sum of the ticked ones — and a text state bound with `names=` receives the ticked items' names, joined by "、" when any is written in CJK and by ", " otherwise, so a progress bar, a sentence, or a button's prompt can read them. Pictured with two items ticked.
 
 ```dil
 @state done = 0
+@state packed = ""
 card "checklist · 勾选清单"
-  checklist "出发前" items=["护照", "机票", "充电器", "雨伞"] bind=done
+  checklist "出发前" items=["护照", "机票", "充电器", "雨伞"] bind=done names=packed
   progress "准备进度" value=done max=4
-  text "bind= 收到已勾选的数量，别的组件可以引用它。" tone="muted" size="sm"
+  text "已带：{packed}" tone="muted" size="sm"
 ```
 
 Result:
@@ -512,7 +513,7 @@ What a text-only reader sees:
   - [ ] 充电器
   - [ ] 雨伞
   准备进度: 0 / 4
-  bind= 收到已勾选的数量，别的组件可以引用它。
+  已带：
 ```
 
 4 components, 1 control, zero repairs.

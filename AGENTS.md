@@ -226,6 +226,10 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
   to four `series` as grouped or stacked bars, lines, or areas, or draws a pie,
   with a legend that hides series and a readout moved by keyboard
   (`tests/compile.test.ts`, `tests/client.test.tsx`).
+- Checklist values and names (2026-10-26): `values=` makes `bind=` the sum of
+  the ticked items' numbers, and `names=` hands their names to a text state, so
+  a total and a button's prompt can say what was picked
+  (`tests/compile.test.ts`, `tests/client.test.tsx`).
 - **Live run of 2026-10-26, web UI and macOS desktop app** (`docs/VERIFY.md`
   step 17): a model-written card with three series, a pie, and a 30-row table
   drew with zero repairs; its settings survived a page reload and an app

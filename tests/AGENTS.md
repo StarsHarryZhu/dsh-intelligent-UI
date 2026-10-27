@@ -70,7 +70,7 @@ needs the build first: run `node build.js` before the suite.
   tables, choices, every repair the compiler makes, what still fails, real model
   sources, content safety, streaming compiles, the API version, the
   animation props, and the newest components: tabs and their repairs,
-  checklists, sortable tables, diagram arrows, code blocks with their
+  checklists with their values and names, sortable tables, diagram arrows, code blocks with their
   limits and text view, and charts of several series with their repairs.
 - `limits.test.ts` — each bound at its limit and one past it, and bounded JSON
   recovery.
@@ -81,7 +81,7 @@ needs the build first: run `node build.js` before the suite.
   model is told, the card id and `revises`, and the persisted metadata.
 - `client.test.tsx` — the browser half through its real registration: the row's
   stages, buttons, the turn data Definition, the tail, shared edits, the player,
-  tabs, checklists, sorting, diagrams and their layout, code blocks (colours,
+  tabs, checklists (counts, sums, and names), sorting, diagrams and their layout, code blocks (colours,
   the moving highlight that scrolls only the block, copying, `value=`), edits
   kept across a reload and the store's storage rules, revised cards, long
   tables (filter, pages, copies), charts of several series and pies, and every

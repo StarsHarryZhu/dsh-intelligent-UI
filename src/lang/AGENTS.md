@@ -151,6 +151,10 @@ https, images must be inline `data:image/…` rasters.
   misplaced or surplus series repaired and reported, and writes several series
   as a small table and a pie with its shares in the text view
   (`tests/compile.test.ts`).
+- A checklist binds up to two states: `bind=` the ticked count, or the sum of
+  plain-number `values=` evened out to one per item, and `names=` the ticked
+  names; any `bind` prop other than `bind` itself is kept as the state's key
+  (`tests/compile.test.ts`).
 - `pick(i, a, b, …)` chooses the i-th option lazily, floored and held inside the
   options, and `current=` and `mono=` give `steps`, `list`, and `table` a
   highlighted item and code type (`tests/expr.test.ts`, `tests/compile.test.ts`).

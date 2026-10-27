@@ -522,6 +522,26 @@ describe('pages, checklists, sortable tables, and diagrams', () => {
     expect(text.diagnostics[0]?.message).toContain('binds number state')
   })
 
+  it('reads checklist values and a names state, and evens out a values list of the wrong length', () => {
+    const program = ok('@state extra = 0\n@state picked = ""\ncard\n  checklist "Add-ons" items=["Case", "Charger"] values=[99, 149] bind=extra names=picked')
+    expect(program.diagnostics).toEqual([])
+    const node = first(program, 'checklist')
+    expect(node.bind).toEqual({ key: 'extra', kind: 'number' })
+    expect(node.props.names).toBe('picked')
+    expect(node.props.values).toEqual([99, 149])
+    expect(program.fallback).toBe('Add-ons (0/2 done)\n- [ ] Case (99)\n- [ ] Charger (149)')
+    const short = ok('card\n  checklist items=["a", "b", "c"] values=[1, 2]')
+    expect(first(short, 'checklist').props.values).toEqual([1, 2, 0])
+    expect(short.diagnostics[0]?.message).toContain('3 items but 2 values; the missing ones count as 0')
+    const long = ok('card\n  checklist items=["a"] values=[1, 2]')
+    expect(first(long, 'checklist').props.values).toEqual([1])
+    // Values are plain numbers, so the bound sum never goes stale; names= wants text state.
+    const wrong = ok('@state n = 0\n@state k = 2\ncard\n  checklist items=["a"] values=["k"] names=n')
+    expect(first(wrong, 'checklist').props).not.toHaveProperty('values')
+    expect(first(wrong, 'checklist').props).not.toHaveProperty('names')
+    expect(wrong.diagnostics.map(entry => entry.message).join('\n')).toMatch(/not a plain number[\s\S]*binds text state/u)
+  })
+
   it('resolves arrows by text or number, keeps labels, and reports a dangling one', () => {
     const program = ok([
       '@state at = 2',

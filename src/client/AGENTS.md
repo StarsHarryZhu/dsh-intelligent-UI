@@ -45,8 +45,10 @@ program of an API version this build does not know.
 open tab, the ticked items of a checklist, and a table's sort live in the edits
 store under the node's id (`CardMemory.ui`), so both copies of a card agree; they
 are kept like every edit. A table keeps its filter and page under the node's id
-with `:q` and `:p` appended, and a chart the series or slices the reader hid. A checklist reports only its count, and only
-through a bound number state, so the program's state kinds stay as they were.
+with `:q` and `:p` appended, and a chart the series or slices the reader hid. A checklist writes ordinary states: `bind=` gets the
+ticked count, or the sum of the items' `values=`, and `names=` a text state the
+ticked names joined by "、" when any is CJK and ", " otherwise, so the
+program's state kinds stay as they were.
 
 **The boundary sits above the renderer.** `Card` wraps `CardBody` in its failure
 boundary because a component's own render error is caught only by an ancestor;
@@ -179,7 +181,7 @@ accepts no other non-theme colour. Copying writes the block's exact text.
   cycles 1×, 2×, and 0.5×; `current=` and `mono=` highlight and set code type
   (`tests/client.test.tsx`).
 - Tabs switch by click and arrow keys and keep their page in both copies; a
-  checklist counts into its bound state; a sortable table cycles ascending,
+  checklist counts, sums, and names into its bound states; a sortable table cycles ascending,
   descending, and written order with the highlight on its row; a diagram
   highlights the current box and lays out loops on a side lane
   (`tests/client.test.tsx`); one card using all four drew in the web UI on

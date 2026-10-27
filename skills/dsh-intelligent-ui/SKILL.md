@@ -46,7 +46,6 @@ explores.
 - Name each derived value once with `@calc` and reuse the name; a `@calc` may
   only read calcs declared above it.
 - Put live values into sentences: `text "{seats} seats cost {monthly} USD a month."`
-- Quote any expression that contains spaces: `value="mins / 60"`.
 
 ## What to say around it
 
@@ -58,9 +57,8 @@ initial values. In your reply:
   different way, so the reply and the card always agree;
 - do not restate the whole card in prose.
 
-A figure shown as "—" could not be computed reliably (for example a divergent
-limit or an equation with no root in its interval). Fix the program, or tell the
-reader why there is no value.
+A figure shown as "—" could not be computed reliably. Fix the program, or tell
+the reader why there is no value.
 
 ## Questions answered by clicking
 
@@ -75,10 +73,9 @@ reader why there is no value.
 
 ## Animate
 
-A `player` drives one number state through time: the reader plays, pauses,
-steps one frame back or forward, scrubs, and changes the speed. It is always
-drawn at the bottom of its card, as the card's control bar, so write it last. Everything that
-reads the state recomputes on every frame, in the browser, without calling you.
+A `player` drives one number state through time: play, pause, step, scrub, and
+speed. It is always drawn at the bottom of its card, so write it last. Everything
+that reads the state recomputes on every frame, in the browser, without calling you.
 
 - Use one frame state, `@state frame = 1 min=1 max=N step=1`, for a process in
   steps; use a fine `step=` such as 0.01 for continuous motion.
@@ -100,7 +97,9 @@ reads the state recomputes on every frame, in the browser, without calling you.
   idea, worked example, practice. Every page shares the card's state, and you
   still read all pages in the result.
 - Use `checklist items=[…]` for steps the reader ticks off; add `bind=done` with
-  `@state done = 0` when another figure should follow the count.
+  `@state done = 0` when another figure should follow the count. For priced
+  options add `values=[…]` and `bind=` gets the sum; `names=` fills a text state
+  with the ticked names, so a button's prompt can say which (see `recipes.md`).
 - Add `sortable=true` to a `table` the reader may want to rank. Give a table all
   its rows: past 8 the reader can filter, past 20 it pages, and any table copies.
 - Draw a process or decision flow with `diagram nodes=[…] edges=["A -> B", "B -> C: yes"]`.
@@ -151,5 +150,5 @@ Read these from this skill's base directory when the card needs them:
 - `math.md`: functions, the calculus operators and their accuracy, `plot` and
   `formula`, and six calculus recipes.
 - `recipes.md`: complete cards for prices, loans, unit conversion, probability,
-  projectile motion, quiz series, a chart of several series, and two
+  projectile motion, quiz series, priced add-ons, a chart of several series, and two
   animations: code traced line by line and a tangent sweeping a curve.

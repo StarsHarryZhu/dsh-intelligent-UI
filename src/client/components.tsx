@@ -323,13 +323,15 @@ export const REGISTRY: Readonly<Record<string, Renderer>> = {
   checklist: (node, _children, scope) => {
     const items = list(node.props.items, scope)
     const ticked = readTicked(scope.ui(node.id), items.length)
+    const worth = Array.isArray(node.props.values) ? node.props.values.map(entry => typeof entry === 'number' ? entry : 0) : undefined
     const toggle = (index: number, on: boolean): void => {
       const next = new Set(ticked)
       if (on) next.add(index)
       else next.delete(index)
       const value = [...next].sort((a, b) => a - b)
       scope.setUi(node.id, value)
-      if (node.bind !== undefined) scope.setValue(node.bind, value.length)
+      if (node.bind !== undefined) scope.setValue(node.bind, worth === undefined ? value.length : tidy(value.reduce((sum, at) => sum + (worth[at] ?? 0), 0)))
+      if (typeof node.props.names === 'string') scope.setValue(node.props.names, joinNames(value.map(at => items[at] ?? '')))
     }
     return (
       <div className="dsh-iui-field dsh-iui-checklist">
@@ -605,6 +607,13 @@ function readTicked(value: JsonValue | undefined, count: number): Set<number> {
   }
   return ticked
 }
+
+/** Ticked item names as one text: joined with "、" when any is written in CJK, otherwise with ", ". */
+export function joinNames(names: readonly string[]): string {
+  return names.join(names.some(name => CJK.test(name)) ? '、' : ', ')
+}
+
+const CJK = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/u
 
 /** Remove binary noise from a stepped value, so 0.1 + 0.2 shows as 0.3. */
 function tidy(value: number): number {

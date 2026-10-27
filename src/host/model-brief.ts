@@ -31,7 +31,7 @@ export const ESTIMATE_EXAMPLE = [
 export const COMPARISON_EXAMPLE = [
   'card "Fares to Boston"',
   '  table columns=["Operator","Price","Time"] rows=[["Amtrak","$89","3h 40m"],["Bus","$29","4h 30m"]]',
-  '  callout "Prices checked today; they change daily."',
+  '  callout "Prices change daily."',
 ].join('\n')
 
 /** Worked example: a question answered with one click. */
@@ -75,7 +75,7 @@ export const ANIMATION_EXAMPLE = [
 const MATH_LINES = [
   `Math works in every expression: ^ (power), n! (factorial), implicit products such as 2x or 3(x + 1), the constants ${Object.keys(MATH_CONSTANTS).join(' ')}, and the functions ${Object.keys(MATH_FUNCTIONS).join(' ')}; trigonometry is in radians.`,
   `Calculus names its variable in the second argument, and that variable exists only inside the first: integral(f, x, a, b) (a or b may be inf or -inf), deriv(f, x, at[, n]) (n up to ${MAX_DERIVATIVE_ORDER}), limit(f, x, at[, 1|-1]) (at may be inf; 1 or -1 picks a side), sum(f, k, from, to) and prod(f, k, from, to) (whole numbers, at most ${MAX_SERIES_TERMS} terms), solve(f = g, x, lo, hi) (a root inside [lo, hi]), taylor(f, x, center, n, at) (degree n up to ${MAX_SERIES_ORDER}, evaluated at at).`,
-  'Results are computed in the browser to about ten significant digits; a value that cannot be computed reliably (a divergent limit, an equation without a root in its interval) shows "—", never a guess. The result you receive lists the computed values, so quote those numbers in your reply.',
+  'Results carry about ten significant digits; a value that cannot be computed reliably (a divergent limit, an equation without a root in its interval) shows "—", never a guess. The result you receive lists the computed values, so quote those numbers in your reply.',
 ]
 
 /** What the model must know before writing a program. */
@@ -139,7 +139,7 @@ function hint(spec: PropSpec): string {
     case 'tone': return 'tone'
     case 'size': return 'size'
     case 'rows': return '[["…"]]'
-    case 'series': return '[n|"expr"]'
+    case 'series': return spec.literal === true ? '[n]' : '[n|"expr"]'
     case 'items': return '["…"]'
     case 'options': return '["…"]'
     case 'bind': return `<${spec.state === 'string' ? 'text' : spec.state === 'select' ? 'choice' : spec.state === 'boolean' ? 'true/false' : 'number'} state>`

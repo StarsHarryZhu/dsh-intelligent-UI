@@ -218,7 +218,7 @@ node node_modules/vitest/vitest.mjs run
 
 <img src="assets/catalog/checklist.png" alt="checklist" width="720">
 
-可勾选的清单，显示完成数；`bind=` 把完成数交给卡片里的其他组件。
+可勾选的清单，显示完成数；`bind=` 把完成数（或已勾选项 `values=` 的总和）交给卡片里的其他组件，`names=` 收到已勾选项的名字。
 
 ### `button` — 动作
 

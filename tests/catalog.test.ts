@@ -25,7 +25,7 @@ describe('every descriptor is internally consistent', () => {
   it('binds each control to one state kind', () => {
     const controls = CATALOG.filter(descriptor => descriptor.props.bind !== undefined)
     expect(controls.map(descriptor => descriptor.type)).toEqual(['slider', 'numberInput', 'textInput', 'select', 'checkbox', 'player', 'checklist'])
-    // A checklist works on its own; bind= only reports its count.
+    // A checklist works on its own; bind= and names= only report what is ticked.
     for (const descriptor of controls) expect(descriptor.props.bind?.required === true, descriptor.type).toBe(descriptor.type !== 'checklist')
   })
 

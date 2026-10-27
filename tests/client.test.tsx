@@ -20,6 +20,7 @@ import { buildPresentationMeta, createUIRenderTool } from '../src/host/tool.ts'
 import { createEditsStore, type StorageLike } from '../src/client/edits.ts'
 import { compareCells, toCsv, toMarkdown, visibleRows } from '../src/client/table.tsx'
 import { layoutDiagram } from '../src/client/diagram.tsx'
+import { joinNames } from '../src/client/components.tsx'
 
 type Component = (props: Record<string, unknown>) => React.ReactNode
 
@@ -735,6 +736,21 @@ describe('pages, checklists, sorting, and diagrams', () => {
     act(() => { fireEvent.click(screen.getByRole('checkbox', { name: 'Tickets' })) })
     expect(screen.getByText('1 / 3')).toBeTruthy()
     expect(screen.getByRole('checkbox', { name: 'Charger' }).closest('label')?.hasAttribute('data-done')).toBe(true)
+  })
+
+  it('sums the values of ticked items and names them', async () => {
+    await draw('@state extra = 0\n@state picked = ""\ncard\n  checklist "Add-ons" items=["Case", "Charger", "Film"] values=[99, 149.9, 39] bind=extra names=picked\n  text "Total {399 + extra}: {picked}"', 'check-2')
+    act(() => { fireEvent.click(screen.getByRole('checkbox', { name: 'Film' })) })
+    act(() => { fireEvent.click(screen.getByRole('checkbox', { name: 'Case' })) })
+    expect(screen.getByText('Total 537: Case, Film')).toBeTruthy()
+    act(() => { fireEvent.click(screen.getByRole('checkbox', { name: 'Charger' })) })
+    expect(screen.getByText('Total 686.9: Case, Charger, Film')).toBeTruthy()
+  })
+
+  it('joins names written in Chinese with an enumeration comma', () => {
+    expect(joinNames(['护照', 'Wi-Fi 卡'])).toBe('护照、Wi-Fi 卡')
+    expect(joinNames(['Passport', 'Tickets'])).toBe('Passport, Tickets')
+    expect(joinNames([])).toBe('')
   })
 
   it('sorts by a column ascending, then descending, then back, keeping the highlight on its row', async () => {

@@ -218,7 +218,7 @@ An on/off switch.
 
 <img src="assets/catalog/checklist.png" alt="checklist" width="720">
 
-Items to tick off with a done count; `bind=` hands the count to the rest of the card.
+Items to tick off with a done count; `bind=` hands the count — or the sum of the ticked items' `values=` — to the rest of the card, and `names=` the ticked names.
 
 ### `button` — Action
 

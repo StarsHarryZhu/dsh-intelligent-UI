@@ -73,16 +73,21 @@ export type PropSpec = {
 } | {
     kind: 'rows';
     required?: boolean;
-} | {
+}
+/** Numbers or numeric expressions; `literal` admits plain numbers only. */
+ | {
     kind: 'series';
     required?: boolean;
+    literal?: boolean;
 } | {
     kind: 'items';
     required?: boolean;
 } | {
     kind: 'options';
     required?: boolean;
-} | {
+}
+/** A state the component writes: the prop named `bind` becomes the node's binding, any other is kept as the state's key. */
+ | {
     kind: 'bind';
     required?: boolean;
     state: StateKind;

@@ -112,6 +112,24 @@ When the answer arrives, reply in prose: right or wrong, a two-line explanation,
 then the next card. After the last question, summarise the score in prose; a
 `table` of question, answer, and result works well for a review.
 
+## Priced add-ons
+
+Give each item its price in `values=`, in the same order as `items=`: `bind=`
+receives the sum of the ticked prices and `names=` the ticked names, so the
+total follows the ticks and the button tells you what the reader chose.
+
+```dil
+@state extra = 0
+@state picked = ""
+@calc total = 699 + extra
+card "Phone with add-ons"
+  checklist "Add-ons" items=["Case","Charger","Screen film"] values=[99, 149, 39] bind=extra names=picked
+  metric "Total" value=total unit="CNY"
+  button "Order these" prompt="I'll take the phone with: {picked}. Total {total} CNY."
+```
+
+Start the bound states at 0 and `""`, which is what nothing ticked gives.
+
 ## Revenue by source, with its split
 
 Indent one `series` per quantity under the chart; `stacked=true` shows the total

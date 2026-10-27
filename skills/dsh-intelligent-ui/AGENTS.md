@@ -54,8 +54,8 @@ them on every platform.
   `plot` and `formula`, and six calculus recipes.
 - `recipes.md` — complete cards for a subscription estimate, a loan, a unit
   conversion, binomial and normal probabilities, projectile motion, a quiz
-  series, revenue by source as stacked series with a pie, and code played line
-  by line.
+  series, priced add-ons on a checklist with `values=` and `names=`, revenue
+  by source as stacked series with a pie, and code played line by line.
 
 ## 4. Progress
 
@@ -73,6 +73,9 @@ them on every platform.
   `revises=` and keeping state names, when to compare series or draw a pie, and
   giving a table all its rows; the quiz example moved to `recipes.md` to keep
   `SKILL.md` under its size.
+- Checklist sums and names (2026-10-26): one line in `SKILL.md` and the priced
+  add-ons recipe; room was made by shortening the animation intro and dropping a
+  line the tool description already carries.
 
 **Not done.**
 
