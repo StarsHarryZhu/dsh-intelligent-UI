@@ -28,7 +28,12 @@ export interface CardMemory {
 /** A small keyed store with change notification, so both copies of a card stay in step. */
 export interface EditsStore {
   get(key: string): CardMemory | undefined
-  set(key: string, memory: CardMemory): void
+  /**
+   * Remember a card's memory and tell its copies.
+   * @param keep - false for a passing value, such as one frame of an animation: the
+   *   page shows it, and storage gets the memory with the next kept change.
+   */
+  set(key: string, memory: CardMemory, keep?: boolean): void
   subscribe(key: string, listener: () => void): () => void
 }
 
@@ -118,10 +123,10 @@ export function createEditsStore(storage: StorageLike | undefined = browserStora
       }
       return stored
     },
-    set(key, memory) {
+    set(key, memory, keep = true) {
       looked.add(key)
       remember(key, memory)
-      persist(key, memory)
+      if (keep) persist(key, memory)
       for (const listener of [...listeners.get(key) ?? []]) listener()
     },
     subscribe(key, listener) {

@@ -12,7 +12,7 @@ The skill row (`src/skill.ts`) reads the frontmatter of `SKILL.md` when the
 plugin loads and lists the skill under the plugin's own name,
 `dsh-intelligent-ui`. The model sees only the name and the description in its
 skill catalog, loads the body with the host's `skill` tool when the description
-matches the task, and reads the two reference files from this directory, which
+matches the task, and reads the three reference files from this directory, which
 the host names as the skill's base. A reader can also load it by typing
 `/dsh-intelligent-ui`. The body is read again on every load.
 
@@ -52,6 +52,9 @@ them on every platform.
   reference list.
 - `math.md` — the math vocabulary, the calculus operators and their accuracy,
   `plot` and `formula`, and six calculus recipes.
+- `drawing.md` — `canvas` and `shape`: coordinates, shapes or SVG, what the reader
+  can drag and click, moving pictures (`loop=`, `autoplay=`, turns, curves, placed
+  parts), and five recipes.
 - `recipes.md` — complete cards for a subscription estimate, a loan, a unit
   conversion, binomial and normal probabilities, projectile motion, a quiz
   series, priced add-ons on a checklist with `values=` and `names=`, revenue
@@ -76,6 +79,11 @@ them on every platform.
 - Checklist sums and names (2026-10-26): one line in `SKILL.md` and the priced
   add-ons recipe; room was made by shortening the animation intro and dropping a
   line the tool description already carries.
+
+- Drawings (2026-11-05): `drawing.md`, with one line in `SKILL.md` leading to it.
+- Moving drawings (2026-11-05): a "Moving pictures" section and two recipes in
+  `drawing.md`, and one bullet under "Animate" in `SKILL.md`; room was made by
+  shortening the player's intro and the reference list.
 
 **Not done.**
 

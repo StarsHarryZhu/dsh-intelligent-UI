@@ -10,13 +10,14 @@
  * @module dsh-intelligent-ui/client/components
  */
 
-import { Fragment, isValidElement, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { Fragment, isValidElement, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import { SIZES, TONES } from '../lang/catalog.ts'
 import { isDataImage } from '../lang/compile.ts'
 import { evalExpr, formatNumber } from '../lang/expr.ts'
 import { MAX_SPACE } from '../lang/limits.ts'
 import { formatSignificant } from '../lang/math.ts'
 import type { JsonValue } from '../lang/types.ts'
+import { CanvasFigure } from './canvas.tsx'
 import { ChartFigure } from './chart.tsx'
 import { CodeFigure } from './code.tsx'
 import { DiagramFigure } from './diagram.tsx'
@@ -30,10 +31,15 @@ import type { NodeRow, Program, StateRow } from './program.ts'
 /** Everything a renderer needs to draw one node. */
 export interface RenderScope {
   program: Program
+  /** The card's memory key: the same for both copies of one card, and no other card's. */
+  card: string
   /** Current state and derived values. */
   values: ReadonlyMap<string, JsonValue>
-  /** Change one bound state value. */
-  setValue(key: string, value: JsonValue): void
+  /**
+   * Change one bound state value.
+   * @param passing - true for one frame of an animation, which the page shows but storage does not keep.
+   */
+  setValue(key: string, value: JsonValue, passing?: boolean): void
   /** What the reader set on one component itself, such as its open tab; shared by both copies of the card. */
   ui(id: string): JsonValue | undefined
   /** Remember what the reader set on one component. */
@@ -285,8 +291,11 @@ export const REGISTRY: Readonly<Record<string, Renderer>> = {
         step={step > 0 ? step : 1}
         duration={numberProp(node, 'duration') ?? defaultDuration(min, max, step)}
         unit={stringProp(node, 'unit')}
+        loop={flag(node, 'loop', scope)}
+        autoplay={flag(node, 'autoplay', scope)}
+        claim={`${scope.card}:${node.id}`}
         tr={scope.tr}
-        onChange={(value) => { scope.setValue(key, value) }}
+        onChange={(value, passing) => { scope.setValue(key, value, passing) }}
       />
     )
   },
@@ -357,6 +366,9 @@ export const REGISTRY: Readonly<Record<string, Renderer>> = {
   series: () => null,
   plot: (node, _children, scope) => <PlotFigure node={node} scope={scope} />,
   diagram: (node, _children, scope) => <DiagramFigure node={node} scope={scope} />,
+  canvas: (node, _children, scope) => <CanvasFigure node={node} scope={scope} />,
+  // A shape is drawn by the canvas that holds it.
+  shape: () => null,
   code: (node, _children, scope) => <CodeFigure node={node} scope={scope} />,
   formula: (node, _children, scope) => renderFormula(node, scope),
   badge: (node, _children, scope) => <span className="dsh-iui-badge" data-tone={tone(node)}>{scope.text(node.props.text)}</span>,
@@ -421,12 +433,55 @@ function defaultDuration(min: number, max: number, step: number): number {
 }
 
 /**
+ * Which copy of a card runs each player, by card and node. One card can be drawn
+ * twice; the copy that starts a run takes the player over and the other stops, so
+ * two clocks never drive one value.
+ */
+const RUNNING = new Map<string, symbol>()
+
+/**
+ * Whether an element's card is on screen. Without an observer to ask, it counts as
+ * shown; a copy kept hidden in the page never is.
+ * @param box - an element inside the card.
+ * @param watch - whether anyone needs to know; nothing is observed otherwise.
+ */
+function useShown(box: RefObject<HTMLElement | null>, watch: boolean): boolean {
+  const [shown, setShown] = useState(typeof IntersectionObserver !== 'function')
+  useEffect(() => {
+    const element = box.current
+    if (!watch || element === null || typeof IntersectionObserver !== 'function') return undefined
+    const observer = new IntersectionObserver((entries) => {
+      const last = entries.at(-1)
+      if (last !== undefined) setShown(last.isIntersecting)
+    })
+    observer.observe(element.closest('.dsh-iui-surface') ?? element)
+    return () => { observer.disconnect() }
+  }, [box, watch])
+  return shown
+}
+
+/** Whether the reader asked the system for less motion; then nothing plays by itself. */
+function prefersLessMotion(): boolean {
+  try {
+    return globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
+  } catch {
+    return false
+  }
+}
+
+/**
  * An animation control: play and pause, one step back or forward, scrubbing, and speed.
  *
  * Playback only moves the bound value; every figure that reads it recomputes
  * locally, as it does when the reader drags a slider, and nothing reaches the
  * model. Whether it is playing and how fast belong to this copy of the card; the
- * value goes through the shared store, so both copies show the same frame.
+ * value goes through the shared store, so both copies show the same frame. Frames
+ * are passing values: the store keeps the one a run stops on.
+ *
+ * With `loop`, a run starts over after its last step instead of stopping. With
+ * `autoplay`, the player runs by itself while its card is on screen, like a moving
+ * picture, unless the reader asked the system for less motion; once the reader
+ * presses a control, it plays only when they say.
  */
 function Player(props: {
   label: string
@@ -436,57 +491,94 @@ function Player(props: {
   step: number
   duration: number
   unit: string | undefined
+  loop: boolean
+  autoplay: boolean
+  claim: string
   tr: RenderScope['tr']
-  onChange(value: number): void
+  onChange(value: number, passing?: boolean): void
 }): ReactNode {
   const [playing, setPlaying] = useState(false)
+  /** The reader has pressed a control, or a run that started by itself has ended. */
+  const [taken, setTaken] = useState(false)
   const [speed, setSpeed] = useState(1)
+  const [lessMotion] = useState(prefersLessMotion)
+  const box = useRef<HTMLDivElement>(null)
+  const shown = useShown(box, props.autoplay && !taken)
+  const running = taken ? playing : props.autoplay && !lessMotion && shown
   const latest = useRef(props)
   latest.current = props
+  const { claim } = props
   useEffect(() => {
-    if (!playing) return undefined
+    if (!running) return undefined
     const frames = globalThis as { requestAnimationFrame?: (callback: (now: number) => void) => number; cancelAnimationFrame?: (handle: number) => void }
     const { min, max, value } = latest.current
-    if (typeof frames.requestAnimationFrame !== 'function' || !(max > min)) {
+    const stop = (): void => {
+      setTaken(true)
       setPlaying(false)
+    }
+    if (typeof frames.requestAnimationFrame !== 'function' || !(max > min)) {
+      stop()
       return undefined
     }
     const request = frames.requestAnimationFrame.bind(globalThis)
+    const token = Symbol(claim)
+    RUNNING.set(claim, token)
     // Play from where the reader left it, or from the start once a run has ended.
     let position = value >= max ? min : Math.max(min, value)
-    if (position !== value) latest.current.onChange(position)
-    let shown = position
+    let last = value
     let previous: number | undefined
     let emitted = -Infinity
     let handle = 0
+    let live = true
+    const show = (next: number, now: number): void => {
+      last = next
+      emitted = now
+      latest.current.onChange(next, true)
+    }
+    if (position !== value) show(position, -Infinity)
     // The clock, not the frame count, sets the pace; a page that paints no frames, such as a hidden tab, pauses.
     const tick = (now: number): void => {
-      const { step, duration } = latest.current
+      if (!live) return
+      if (RUNNING.get(claim) !== token) {
+        stop()
+        return
+      }
+      const { step, duration, loop } = latest.current
       const elapsed = previous === undefined ? 0 : Math.min(MAX_FRAME_MS, Math.max(0, now - previous))
       previous = now
-      position = Math.min(max, position + (elapsed / 1000) * speed * (max - min) / Math.max(0.1, duration))
+      position += (elapsed / 1000) * speed * (max - min) / Math.max(0.1, duration)
+      // A loop gives its last step a step's time too, then starts over.
+      const period = max - min + step
+      if (loop && position >= min + period) position = min + (position - min) % period
+      if (!loop) position = Math.min(max, position)
       const snapped = position >= max ? max : Math.min(max, tidy(min + Math.floor((position - min) / step + 1e-9) * step))
-      if (snapped !== shown && (now - emitted >= MIN_EMIT_MS || snapped === max)) {
-        shown = snapped
-        emitted = now
-        latest.current.onChange(snapped)
-      }
-      if (position >= max) {
-        setPlaying(false)
+      if (snapped !== last && (now - emitted >= MIN_EMIT_MS || snapped === max)) show(snapped, now)
+      if (!loop && position >= max) {
+        stop()
         return
       }
       handle = request(tick)
     }
     handle = request(tick)
-    return () => { frames.cancelAnimationFrame?.(handle) }
-  }, [playing, speed])
+    return () => {
+      live = false
+      frames.cancelAnimationFrame?.(handle)
+      if (RUNNING.get(claim) === token) RUNNING.delete(claim)
+      // Keep the frame the run stopped on, unless the reader has just moved it elsewhere.
+      if (last !== value && latest.current.value === last) latest.current.onChange(last)
+    }
+  }, [running, speed, claim])
   const { label, value, min, max, step, unit, tr } = props
+  const take = (play: boolean): void => {
+    setTaken(true)
+    setPlaying(play)
+  }
   const move = (delta: number): void => {
-    setPlaying(false)
+    take(false)
     props.onChange(Math.max(min, Math.min(max, tidy(value + delta))))
   }
   return (
-    <div className="dsh-iui-field dsh-iui-player">
+    <div ref={box} className="dsh-iui-field dsh-iui-player">
       <span className="dsh-iui-field-head">
         <span>{label}</span>
         <span className="dsh-iui-field-value">{`${formatNumber(value)}${unit === undefined ? '' : ` ${unit}`}`}</span>
@@ -499,13 +591,13 @@ function Player(props: {
           type="button"
           className="dsh-iui-player-button"
           data-primary=""
-          aria-label={tr(playing ? 'player.pause' : 'player.play')}
-          title={tr(playing ? 'player.pause' : 'player.play')}
-          aria-pressed={playing}
+          aria-label={tr(running ? 'player.pause' : 'player.play')}
+          title={tr(running ? 'player.pause' : 'player.play')}
+          aria-pressed={running}
           disabled={!(max > min)}
-          onClick={() => { setPlaying(!playing) }}
+          onClick={() => { take(!running) }}
         >
-          <Glyph path={playing ? 'M3 2h2.2v8H3zM6.8 2H9v8H6.8z' : 'M3.5 1.8l6.5 4.2-6.5 4.2z'} />
+          <Glyph path={running ? 'M3 2h2.2v8H3zM6.8 2H9v8H6.8z' : 'M3.5 1.8l6.5 4.2-6.5 4.2z'} />
         </button>
         <button type="button" className="dsh-iui-player-button" aria-label={tr('player.next')} title={tr('player.next')} disabled={value >= max} onClick={() => { move(step) }}>
           <Glyph path="M4.5 3.5v5L8 6z" />
@@ -519,7 +611,7 @@ function Player(props: {
           value={value}
           aria-label={label}
           onChange={(event) => {
-            setPlaying(false)
+            take(false)
             props.onChange(Number(event.currentTarget.value))
           }}
         />

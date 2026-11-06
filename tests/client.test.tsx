@@ -695,6 +695,109 @@ describe('animation', () => {
     act(() => { fireEvent.click(speed()) })
     expect(speed().textContent).toBe('1×')
   })
+  const LOOPING = [
+    '@state t = 0 min=0 max=4 step=1',
+    'card "Loop"',
+    '  text "{pick(t + 1, \\"start\\", \\"one\\", \\"two\\", \\"three\\", \\"done\\")}"',
+    '  player "Step" bind=t duration=4 loop=true autoplay=true',
+  ].join('\n')
+
+  async function drawLoop(callId: string) {
+    const { ToolView } = loadClient()
+    const meta = await settle(LOOPING)
+    return render(<ToolView phase="result" block={resultBlock(meta)} callId={callId} useDisclosure={useHostDisclosure} {...kit()} />)
+  }
+
+  const stored = (callId: string): unknown => JSON.parse(localStorage.getItem(`dsh-intelligent-ui.card.v1:session-1:${callId}`) ?? 'null')
+
+  it('plays by itself, gives the last step its time, and starts over, until the reader pauses it', async () => {
+    const clock = frames()
+    await drawLoop('loop-1')
+    expect(screen.getByRole('button', { name: 'Pause' }).getAttribute('aria-pressed')).toBe('true')
+    clock.run(17, 250)
+    expect(screen.getByText('done')).toBeTruthy()
+    clock.run(3, 250)
+    expect(screen.getByText('done')).toBeTruthy()
+    clock.run(2, 250)
+    expect(screen.getByText('start')).toBeTruthy()
+    // Frames pass through the page; storage keeps where the reader stopped it.
+    expect(stored('loop-1')).toBeNull()
+    clock.run(5, 250)
+    expect(screen.getByText('one')).toBeTruthy()
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Pause' })) })
+    expect(stored('loop-1')).toEqual({ values: { t: 1 } })
+    clock.run(20, 250)
+    expect(screen.getByText('one')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Play' }).getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('keeps the step the reader takes while it plays, not the frame it was on', async () => {
+    const clock = frames()
+    await drawLoop('loop-2')
+    clock.run(10, 250)
+    expect(screen.getByText('two')).toBeTruthy()
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Step forward' })) })
+    expect(screen.getByText('three')).toBeTruthy()
+    expect(stored('loop-2')).toEqual({ values: { t: 3 } })
+    clock.run(10, 250)
+    expect(screen.getByText('three')).toBeTruthy()
+  })
+
+  it('waits for the reader when the system asks for less motion', async () => {
+    const clock = frames()
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('reduce') }))
+    await drawLoop('loop-3')
+    expect(screen.getByRole('button', { name: 'Play' }).getAttribute('aria-pressed')).toBe('false')
+    expect(clock.pending).toBe(0)
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Play' })) })
+    clock.run(5, 250)
+    expect(screen.getByText('one')).toBeTruthy()
+  })
+
+  it('plays by itself only while its card is on screen', async () => {
+    const clock = frames()
+    const reports: Array<(entries: Array<{ isIntersecting: boolean }>) => void> = []
+    const watched: Element[] = []
+    class Observer {
+      constructor(report: (entries: Array<{ isIntersecting: boolean }>) => void) { reports.push(report) }
+      observe(element: Element): void { watched.push(element) }
+      disconnect(): void {}
+    }
+    vi.stubGlobal('IntersectionObserver', Observer)
+    await drawLoop('loop-4')
+    expect(watched[0]?.classList.contains('dsh-iui-surface')).toBe(true)
+    expect(clock.pending).toBe(0)
+    act(() => { reports[0]?.([{ isIntersecting: true }]) })
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeTruthy()
+    clock.run(5, 250)
+    expect(screen.getByText('one')).toBeTruthy()
+    act(() => { reports[0]?.([{ isIntersecting: false }]) })
+    expect(screen.getByRole('button', { name: 'Play' })).toBeTruthy()
+    clock.run(8, 250)
+    expect(screen.getByText('one')).toBeTruthy()
+    act(() => { reports[0]?.([{ isIntersecting: true }]) })
+    clock.run(6, 250)
+    expect(screen.getByText('two')).toBeTruthy()
+  })
+
+  it('runs in one copy of a card at a time, at its own pace', async () => {
+    const clock = frames()
+    const { ToolView } = loadClient()
+    const meta = await settle(LOOPING)
+    render(
+      <>
+        <ToolView phase="result" block={resultBlock(meta)} callId="loop-5" useDisclosure={useHostDisclosure} {...kit()} />
+        <ToolView phase="result" block={resultBlock(meta)} callId="loop-5" useDisclosure={useHostDisclosure} {...kit()} />
+      </>,
+    )
+    expect(screen.getAllByRole('button', { name: 'Pause' })).toHaveLength(2)
+    clock.run(1, 250)
+    expect(screen.getAllByRole('button', { name: 'Pause' })).toHaveLength(1)
+    clock.run(4, 250)
+    expect(screen.getAllByText('one')).toHaveLength(2)
+    clock.run(4, 250)
+    expect(screen.getAllByText('two')).toHaveLength(2)
+  })
 })
 
 describe('pages, checklists, sorting, and diagrams', () => {
@@ -1173,5 +1276,431 @@ describe('charts', () => {
     act(() => { fireEvent.click(screen.getByRole('button', { name: /Rent/u })) })
     expect(view.container.querySelectorAll('.dsh-iui-chart-slice')).toHaveLength(2)
     expect(fun.textContent).toContain('2 · 66.7%')
+  })
+})
+
+describe('drawings', () => {
+  const VIEW = { left: 100, top: 50, width: 600, height: 300, right: 700, bottom: 350, x: 100, y: 50, toJSON: () => ({}) }
+
+  /** Draw one source in a tool row; the canvas's box on the page is fixed, as a test has no layout. */
+  async function draw(source: string, callId: string, client = loadClient()) {
+    const meta = await settle(source)
+    const { ToolView } = client
+    const view = render(<ToolView phase="result" block={resultBlock(meta)} callId={callId} useDisclosure={useHostDisclosure} {...kit()} />)
+    const plot = view.container.querySelector('.dsh-iui-canvas-plot') as SVGSVGElement
+    plot.getBoundingClientRect = () => VIEW as DOMRect
+    return { view, plot, meta }
+  }
+
+  const point = (x: number, y: number, more: Record<string, unknown> = {}) => ({ clientX: x, clientY: y, pointerId: 1, button: 0, ...more })
+
+  it('maps shapes to the box, with y downward by default and upward when the view says so', async () => {
+    const down = await draw('card\n  canvas\n    shape kind=circle x=160 y=100 r=10\n    shape kind=rect x=0 y=0 w=32 h=20\n    shape kind=line x=0 y=0 x2=320 y2=200', 'draw-1')
+    expect(down.plot.getAttribute('viewBox')).toBe('0 0 600 375')
+    const circle = down.plot.querySelector('circle')
+    expect([circle?.getAttribute('cx'), circle?.getAttribute('cy'), circle?.getAttribute('r')]).toEqual(['300', '187.5', '18.75'])
+    const rect = down.plot.querySelector('rect')
+    expect([rect?.getAttribute('x'), rect?.getAttribute('y'), rect?.getAttribute('width'), rect?.getAttribute('height')]).toEqual(['0', '0', '60', '37.5'])
+    expect(down.plot.querySelector('line')?.getAttribute('y2')).toBe('375')
+    cleanup()
+    const up = await draw('card\n  canvas view=[-2, 2, -1, 1]\n    shape kind=circle x=1 y=0.5 r=0.5\n    shape kind=rect x=0 y=0 w=1 h=0.5', 'draw-2')
+    expect(up.plot.getAttribute('viewBox')).toBe('0 0 600 300')
+    const dot = up.plot.querySelector('circle')
+    expect([dot?.getAttribute('cx'), dot?.getAttribute('cy'), dot?.getAttribute('r')]).toEqual(['450', '75', '75'])
+    const box = up.plot.querySelector('rect')
+    expect([box?.getAttribute('x'), box?.getAttribute('y'), box?.getAttribute('height')]).toEqual(['300', '75', '75'])
+  })
+
+  it('draws as wide as it is on the page, so its marks stay the same size on a narrow screen', async () => {
+    const reports: Array<(entries: Array<{ contentRect: { width: number } }>) => void> = []
+    class Observer {
+      constructor(report: (entries: Array<{ contentRect: { width: number } }>) => void) { reports.push(report) }
+      observe(): void {}
+      disconnect(): void {}
+    }
+    vi.stubGlobal('ResizeObserver', Observer)
+    try {
+      const { plot } = await draw('card\n  canvas view=[0, 10, 5, 0]\n    shape kind=circle x=5 y=2 r=1\n    shape kind=point x=5 y=2', 'wide-1')
+      expect(plot.getAttribute('viewBox')).toBe('0 0 600 300')
+      act(() => { reports[0]?.([{ contentRect: { width: 300 } }]) })
+      expect(plot.getAttribute('viewBox')).toBe('0 0 300 150')
+      expect(plot.querySelector('circle')?.getAttribute('r')).toBe('30')
+      expect(plot.querySelector('.dsh-iui-shape-dot')?.getAttribute('r')).toBe('6')
+      // A hidden copy reports no width, and keeps the last one.
+      act(() => { reports[0]?.([{ contentRect: { width: 0 } }]) })
+      expect(plot.getAttribute('viewBox')).toBe('0 0 300 150')
+      cleanup()
+      const tall = await draw('card\n  canvas view=[0, 10, 20, 0]\n    shape kind=circle x=5 y=2 r=1', 'wide-2')
+      act(() => { reports.at(-1)?.([{ contentRect: { width: 600 } }]) })
+      expect(tall.plot.getAttribute('viewBox')).toBe('0 0 240 480')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('draws polygons, polylines, paths, text, arrows, and tones', async () => {
+    const { plot } = await draw([
+      '@state a = 2',
+      'card',
+      '  canvas view=[0, 10, 10, 0]',
+      '    shape kind=polygon points=[0, 0, "a", 0, 2, 2] tone=primary fill=true',
+      '    shape kind=polyline points=[0, 0, 1, 1] dash=true',
+      '    shape kind=path d="M0 0 L{a} 1"',
+      '    shape "Hi {a}" kind=text x=5 y=5 anchor=start size=lg',
+      '    shape kind=line x=0 y=0 x2=10 y2=0 arrow=true',
+    ].join('\n'), 'draw-3')
+    expect(plot.querySelector('polygon')?.getAttribute('points')).toBe('0,0 96,0 96,96')
+    expect(plot.querySelector('polygon')?.parentElement?.getAttribute('data-tone')).toBe('primary')
+    expect(plot.querySelector('polygon')?.parentElement?.hasAttribute('data-fill')).toBe(true)
+    expect(plot.querySelector('polyline')?.parentElement?.hasAttribute('data-dash')).toBe(true)
+    const path = plot.querySelector('path')
+    expect(path?.getAttribute('d')).toBe('M0 0 L2 1')
+    expect(path?.getAttribute('transform')).toBe('matrix(48 0 0 48 0 0)')
+    const text = plot.querySelector('text')
+    expect(text?.textContent).toBe('Hi 2')
+    expect(text?.getAttribute('text-anchor')).toBe('start')
+    expect(text?.parentElement?.getAttribute('data-size')).toBe('lg')
+    expect(plot.querySelector('.dsh-iui-shape-head')?.getAttribute('points')).toBe('480,0 469,4 469,-4')
+    expect(plot.getAttribute('role')).toBe('img')
+  })
+
+  it('draws a shape from the state it reads, hides it with show=, and skips one it cannot compute', async () => {
+    const { plot } = await draw([
+      '@state a = 1 min=0 max=4',
+      'card',
+      '  slider "A" bind=a',
+      '  canvas view=[0, 10, 10, 0]',
+      '    shape kind=circle x=a y=0 r=1',
+      '    shape kind=rect x=0 y=0 w=1 h=1 show="a > 2"',
+      '    shape kind=line x="1 / (a - 1)" y=0 x2=1 y2=1',
+      '    shape kind=path d="M0 0 L{a} 1"',
+    ].join('\n'), 'draw-4')
+    expect(plot.querySelector('circle')?.getAttribute('cx')).toBe('48')
+    expect(plot.querySelector('rect')).toBeNull()
+    expect(plot.querySelector('line')).toBeNull()
+    act(() => { fireEvent.change(screen.getByRole('slider', { name: 'A' }), { target: { value: '3' } }) })
+    expect(plot.querySelector('circle')?.getAttribute('cx')).toBe('144')
+    expect(plot.querySelector('rect')).not.toBeNull()
+    expect(plot.querySelector('line')).not.toBeNull()
+  })
+
+  it('moves a dragged point with the pointer, keeping where it was grabbed, on the state\'s steps and limits', async () => {
+    const { plot } = await draw([
+      '@state a = 100 min=50 max=200 step=10',
+      '@state b = 100',
+      'card',
+      '  canvas "Plan"',
+      '    shape "P" kind=point x=a y=b drag=true',
+      '  text "at {a}, {b}"',
+    ].join('\n'), 'drag-1')
+    expect(plot.getAttribute('role')).toBe('group')
+    const handle = screen.getByRole('slider', { name: 'P' })
+    expect(handle.getAttribute('aria-valuetext')).toBe('100, 100')
+    expect(handle.getAttribute('aria-valuemin')).toBe('50')
+    // A canvas 320 wide on a box 600 wide: 300px across is 160 units.
+    act(() => { fireEvent.pointerDown(handle, point(400, 200)) })
+    act(() => { fireEvent.pointerMove(handle, point(413, 200)) })
+    expect(screen.getByText('at 110, 100')).toBeTruthy()
+    act(() => { fireEvent.pointerMove(handle, point(1000, 200)) })
+    expect(screen.getByText('at 200, 100')).toBeTruthy()
+    act(() => { fireEvent.pointerMove(handle, point(-500, 200)) })
+    expect(screen.getByText('at 50, 100')).toBeTruthy()
+    act(() => { fireEvent.pointerUp(handle, point(-500, 200)) })
+    act(() => { fireEvent.pointerMove(handle, point(400, 200)) })
+    expect(screen.getByText('at 50, 100')).toBeTruthy()
+  })
+
+  it('moves only the axis that is a state, so a point follows a curve, in a picture centred in a wider box', async () => {
+    const { plot } = await draw([
+      '@state t = 1 min=-2 max=2 step=0.5',
+      '@calc y = 2 - t^2',
+      'card',
+      '  canvas view=[-3, 3, -3, 3]',
+      '    shape kind=point x=t y=y drag=true',
+      '  text "t {t} y {y}"',
+    ].join('\n'), 'drag-2')
+    const handle = screen.getByRole('slider')
+    expect(plot.querySelector('.dsh-iui-shape-dot')?.getAttribute('cx')).toBe('320')
+    expect(plot.querySelector('.dsh-iui-shape-dot')?.getAttribute('cy')).toBe('160')
+    act(() => { fireEvent.pointerDown(handle, point(500, 250)) })
+    // A square picture in a box 600 by 300 is 300 wide, so 100px across is two units.
+    act(() => { fireEvent.pointerMove(handle, point(400, 50)) })
+    expect(screen.getByText('t -1 y 1')).toBeTruthy()
+    expect(plot.querySelector('.dsh-iui-shape-dot')?.getAttribute('cy')).toBe('160')
+  })
+
+  it('leaves focus to the keyboard, so a pointer does not leave a focus ring on a shape', async () => {
+    await draw('@state a = 10\n@state p = 1\ncard\n  canvas\n    shape "A" kind=point x=a y=9 drag=true\n    shape "B" kind=rect x=0 y=0 w=9 h=9 bind=p value=2', 'drag-6')
+    expect(fireEvent.mouseDown(screen.getByRole('slider', { name: 'A' }))).toBe(false)
+    expect(fireEvent.mouseDown(screen.getByRole('button', { name: 'B' }))).toBe(false)
+    expect(screen.getByRole('slider', { name: 'A' }).getAttribute('tabindex')).toBe('0')
+    expect(screen.getByRole('button', { name: 'B' }).getAttribute('tabindex')).toBe('0')
+  })
+
+  it('keeps a touch that starts on a dragged point from scrolling the page, and no other', async () => {
+    const { plot } = await draw('@state a = 10\ncard\n  canvas\n    shape kind=point x=a y=9 drag=true\n    shape kind=point x=1 y=1', 'drag-5')
+    expect(fireEvent.touchStart(screen.getByRole('slider'))).toBe(false)
+    const still = plot.querySelectorAll('.dsh-iui-shape')[1] as Element
+    expect(fireEvent.touchStart(still)).toBe(true)
+  })
+
+  it('moves a point by the arrow keys, the way the screen goes on either axis', async () => {
+    await draw('@state a = 1 step=0.5\n@state b = 1\ncard\n  canvas view=[-5, 5, -5, 5]\n    shape kind=point x=a y=b drag=true\n  text "at {a}, {b}"', 'drag-3')
+    const handle = screen.getByRole('slider')
+    act(() => { fireEvent.keyDown(handle, { key: 'ArrowRight' }) })
+    expect(screen.getByText('at 1.5, 1')).toBeTruthy()
+    act(() => { fireEvent.keyDown(handle, { key: 'ArrowUp' }) })
+    expect(screen.getByText('at 1.5, 1.1')).toBeTruthy()
+    act(() => { fireEvent.keyDown(handle, { key: 'ArrowDown' }) })
+    act(() => { fireEvent.keyDown(handle, { key: 'ArrowLeft' }) })
+    expect(screen.getByText('at 1, 1')).toBeTruthy()
+    cleanup()
+    await draw('@state a = 10\n@state b = 10\ncard\n  canvas\n    shape kind=point x=a y=b drag=true\n  text "at {a}, {b}"', 'drag-4')
+    act(() => { fireEvent.keyDown(screen.getByRole('slider'), { key: 'ArrowUp' }) })
+    expect(screen.getByText('at 10, 9')).toBeTruthy()
+    act(() => { fireEvent.keyDown(screen.getByRole('slider'), { key: 'Tab' }) })
+    expect(screen.getByText('at 10, 9')).toBeTruthy()
+  })
+
+  it('stores a value when a shape is clicked, by pointer or key, and shows which is pressed', async () => {
+    await draw([
+      '@state part = "none"',
+      '@state on = false',
+      'card',
+      '  canvas',
+      '    shape "Top" kind=hotspot x=0 y=0 w=10 h=10 bind=part value="top"',
+      '    shape kind=rect x=20 y=0 w=10 h=10 bind=part value="side"',
+      '    shape "Switch" kind=circle x=50 y=50 r=5 bind=on',
+      '  text "{part} {on}"',
+    ].join('\n'), 'tap-1')
+    const top = screen.getByRole('button', { name: 'Top' })
+    expect(top.getAttribute('aria-pressed')).toBe('false')
+    act(() => { fireEvent.click(top) })
+    expect(screen.getByText('top false')).toBeTruthy()
+    expect(top.getAttribute('aria-pressed')).toBe('true')
+    act(() => { fireEvent.keyDown(screen.getByRole('button', { name: 'side' }), { key: 'Enter' }) })
+    expect(screen.getByText('side false')).toBeTruthy()
+    expect(top.getAttribute('aria-pressed')).toBe('false')
+    const flip = screen.getByRole('button', { name: 'Switch' })
+    act(() => { fireEvent.keyDown(flip, { key: ' ' }) })
+    expect(screen.getByText('side true')).toBeTruthy()
+    act(() => { fireEvent.click(flip) })
+    expect(screen.getByText('side false')).toBeTruthy()
+    act(() => { fireEvent.keyDown(flip, { key: 'x' }) })
+    expect(screen.getByText('side false')).toBeTruthy()
+  })
+
+  it('keeps a dragged point and a clicked shape after a reload, and tells the reader this stays local', async () => {
+    const source = '@state a = 100\n@state part = "none"\ncard\n  canvas\n    shape kind=point x=a y=50 drag=true\n    shape "Top" kind=hotspot x=0 y=0 w=10 h=10 bind=part value="top"\n  text "{a} {part}"'
+    await draw(source, 'keep-draw')
+    const handle = screen.getByRole('slider')
+    act(() => { fireEvent.pointerDown(handle, point(400, 200)) })
+    act(() => { fireEvent.pointerMove(handle, point(430, 200)) })
+    act(() => { fireEvent.pointerUp(handle, point(430, 200)) })
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Top' })) })
+    cleanup()
+    await draw(source, 'keep-draw')
+    expect(screen.getByText('120 top')).toBeTruthy()
+    expect(screen.getByText(/this browser keeps your changes/u)).toBeTruthy()
+  })
+
+  it('draws an SVG drawing under its shapes, in the viewBox of the drawing', async () => {
+    const { plot } = await draw([
+      'card',
+      '  canvas "Lamp" svg="""',
+      '    <svg viewBox="10 20 100 50" stroke="red">',
+      '      <title>A lamp</title>',
+      '      <defs><linearGradient id="g"><stop offset="0" stop-color="#f80"/></linearGradient></defs>',
+      '      <rect id="r" width="10" height="10" fill="url(#g)" stroke-width="2"/>',
+      '      <use href="#r" x="20"/>',
+      '      <text font-size="5">Hi</text>',
+      '    </svg>',
+      '    """',
+      '    shape kind=point x=60 y=45',
+    ].join('\n'), 'svg-1')
+    expect(plot.getAttribute('viewBox')).toBe('0 0 600 300')
+    const layer = plot.querySelector('.dsh-iui-canvas-drawing')
+    expect(layer?.getAttribute('transform')).toBe('scale(6) translate(-10 -20)')
+    expect(layer?.firstElementChild?.getAttribute('stroke')).toBe('red')
+    expect(layer?.querySelector('rect')?.getAttribute('stroke-width')).toBe('2')
+    expect(layer?.querySelector('title')?.textContent).toBe('A lamp')
+    expect(layer?.querySelector('text')?.getAttribute('font-size')).toBe('5')
+    expect(layer?.querySelector('stop')?.getAttribute('stop-color')).toBe('#f80')
+    expect(plot.querySelector('.dsh-iui-shape-dot')?.getAttribute('cx')).toBe('300')
+    expect(plot.lastElementChild?.getAttribute('data-kind')).toBe('point')
+  })
+
+  it('gives each copy of a drawing its own ids, with its references following', async () => {
+    const source = 'card\n  canvas svg="""\n    <svg viewBox="0 0 9 9"><clipPath id="c"><rect width="1"/></clipPath><rect id="r" fill="url(#c)" clip-path="url(#c)"/><use href="#r"/></svg>\n    """'
+    const client = loadClient()
+    const meta = await settle(source)
+    const { ToolView, Tail } = client
+    const turn = { turn: 1, end: { data: { reason: { kind: 'completed' } } }, data: { get: () => ({ cards: [{ seq: 3, callId: 'ids-1', meta }] }) } }
+    const view = render(
+      <>
+        <ToolView phase="result" block={resultBlock(meta)} callId="ids-1" useDisclosure={useHostDisclosure} {...kit()} />
+        <Tail turn={turn} seq={9} {...kit()} />
+      </>,
+    )
+    const ids = [...view.container.querySelectorAll('.dsh-iui-canvas-drawing clipPath')].map(entry => entry.id)
+    expect(ids).toHaveLength(2)
+    expect(ids[0]).not.toBe(ids[1])
+    for (const [index, plot] of [...view.container.querySelectorAll('.dsh-iui-canvas-plot')].entries()) {
+      const id = ids[index] as string
+      expect(id).toMatch(/^dsh-iui-draw-[\w-]+-c$/u)
+      const rect = plot.querySelector('rect[fill]')
+      expect(rect?.getAttribute('fill')).toBe(`url(#${id})`)
+      expect(rect?.getAttribute('clip-path')).toBe(`url(#${id})`)
+      expect(plot.querySelector('use')?.getAttribute('href')).toBe(`#${id.replace(/c$/u, 'r')}`)
+    }
+  })
+
+  it('draws nothing from a forged stored program that is not on the lists', async () => {
+    const meta = await settle('card\n  canvas svg="""\n    <svg viewBox="0 0 9 9"><rect width="1"/></svg>\n    """')
+    const forged = JSON.parse(JSON.stringify(meta)) as { program: { nodes: Array<{ type: string; props: Record<string, unknown> }> } }
+    const canvas = forged.program.nodes.find(node => node.type === 'canvas')
+    if (canvas === undefined) throw new Error('no canvas')
+    canvas.props.svg = {
+      viewBox: [0, 0, 9, 9],
+      attrs: { onload: 'alert(1)' },
+      children: [
+        ['script', {}, 'alert(1)'],
+        ['foreignObject', {}, ['iframe', { src: 'https://x.test' }]],
+        ['image', { href: 'https://x.test/a.png' }],
+        ['rect', { onclick: 'alert(1)', style: 'fill:red', fill: 'url(https://x.test)', width: '1' }],
+        ['toString', {}],
+      ],
+    }
+    const { ToolView } = loadClient()
+    const view = render(<ToolView phase="result" block={resultBlock(forged)} callId="forged-1" useDisclosure={useHostDisclosure} {...kit()} />)
+    const layer = view.container.querySelector('.dsh-iui-canvas-drawing')
+    expect(layer?.querySelectorAll('script, foreignObject, iframe, image')).toHaveLength(0)
+    const rect = layer?.querySelector('rect')
+    expect(rect?.getAttributeNames()).toEqual(['width'])
+    expect(view.container.innerHTML).not.toMatch(/alert|x\.test|onclick|onload/u)
+  })
+
+  it('falls back to the default coordinates on a stored view it cannot use, and ignores stored path data that is not path data', async () => {
+    const meta = await settle('card\n  canvas view=[0, 10, 10, 0]\n    shape kind=path d="M0 0"\n    shape kind=point x=1 y=1')
+    const forged = JSON.parse(JSON.stringify(meta)) as { program: { nodes: Array<{ type: string; props: Record<string, unknown> }> } }
+    for (const node of forged.program.nodes) {
+      if (node.type === 'canvas') node.props.view = [1, 1, 'x', 0]
+      if (node.props.kind === 'path') node.props.d = 'M0 0 url(https://x.test)'
+    }
+    const { ToolView } = loadClient()
+    const view = render(<ToolView phase="result" block={resultBlock(forged)} callId="forged-2" useDisclosure={useHostDisclosure} {...kit()} />)
+    expect(view.container.querySelector('.dsh-iui-canvas-plot')?.getAttribute('viewBox')).toBe('0 0 600 375')
+    expect(view.container.querySelector('.dsh-iui-canvas-plot path')).toBeNull()
+  })
+  it('turns, scales, moves, and fades shapes, turning the way the canvas\'s y axis goes', async () => {
+    const down = await draw([
+      '@state a = 90',
+      'card',
+      '  canvas view=[0, 10, 5, 0]',
+      '    shape kind=line x=1 y=1 x2=3 y2=1 rotate=a',
+      '    shape kind=polygon points=[0, 0, 1, 0, 0, 1] x=2 y=3 rotate=45 scale=2 opacity=0.5',
+      '    shape kind=rect x=0 y=0 w=1 h=1 opacity=3',
+    ].join('\n'), 'turn-1')
+    expect(down.plot.querySelector('line')?.parentElement?.getAttribute('transform')).toBe('translate(60 60) rotate(90) translate(-60 -60)')
+    const polygon = down.plot.querySelector('polygon')?.parentElement
+    expect(polygon?.getAttribute('transform')).toBe('translate(120 180) rotate(45) scale(2) translate(0 0)')
+    expect(polygon?.getAttribute('opacity')).toBe('0.5')
+    const rect = down.plot.querySelector('rect')?.parentElement
+    expect(rect?.hasAttribute('transform')).toBe(false)
+    expect(rect?.getAttribute('opacity')).toBe('1')
+    cleanup()
+    const up = await draw('card\n  canvas view=[0, 10, 0, 5]\n    shape kind=line x=1 y=1 x2=3 y2=1 rotate=90', 'turn-2')
+    expect(up.plot.querySelector('line')?.parentElement?.getAttribute('transform')).toBe('translate(60 240) rotate(-90) translate(-60 -240)')
+  })
+
+  it('samples a curve across the canvas, broken where it has no value, and traces one by a pair', async () => {
+    const { plot } = await draw([
+      'card',
+      '  canvas view=[-1, 1, -1, 1]',
+      '    shape kind=curve fn="sqrt(x)" tone=primary',
+      '    shape kind=curve fn=["cos(t)", "sin(t)"] var=t from=0 to=tau',
+    ].join('\n'), 'curve-1')
+    const [half, circle] = [...plot.querySelectorAll('path')].map(path => path.getAttribute('d') ?? '')
+    // sqrt has no value left of 0, so the curve starts there.
+    expect(half).toMatch(/^M241 224\.\d+L/u)
+    expect(half.match(/M/gu)).toHaveLength(1)
+    expect(half.match(/L/gu)).toHaveLength(119)
+    expect(circle?.startsWith('M480 240L')).toBe(true)
+    expect(circle?.endsWith('L480 240')).toBe(true)
+    expect(circle?.match(/L/gu)).toHaveLength(239)
+    expect(plot.querySelector('path')?.parentElement?.getAttribute('data-tone')).toBe('primary')
+  })
+
+  const PARTS = [
+    '@state turn = 30',
+    '@state picked = ""',
+    'card',
+    '  canvas svg="""',
+    '    <svg viewBox="0 0 320 200" stroke="black">',
+    '      <defs><g id="wheel"><circle r="20" fill="#e8a33d"/><line x2="20"/></g></defs>',
+    '      <rect width="320" height="10"/>',
+    '    </svg>',
+    '    """',
+    '    shape kind=use ref=wheel x=100 y=50 rotate=turn',
+    '    shape kind=use ref="#wheel" x=200 y=50 scale=0.5 opacity=0.4 bind=picked value="small wheel"',
+    '  text "Picked: {picked}"',
+  ].join('\n')
+
+  it('places, turns, and scales a part of the drawing by its id, in the drawing\'s colours', async () => {
+    const { plot } = await draw(PARTS, 'part-1')
+    const parts = [...plot.querySelectorAll('.dsh-iui-shape-part')]
+    expect(parts).toHaveLength(2)
+    const [big, small] = parts.map(part => part.firstElementChild)
+    expect(big?.getAttribute('transform')).toBe('translate(187.5 93.75) rotate(30) scale(1.875)')
+    expect(big?.getAttribute('stroke')).toBe('currentColor')
+    expect(small?.getAttribute('transform')).toBe('translate(375 93.75) scale(0.9375)')
+    expect(parts[1]?.getAttribute('opacity')).toBe('0.4')
+    const href = big?.querySelector('use')?.getAttribute('href') ?? ''
+    expect(href).toMatch(/^#dsh-iui-draw-.+-wheel$/u)
+    expect(plot.querySelector(`[id="${href.slice(1)}"]`)?.tagName).toBe('g')
+    expect(parts[0]?.hasAttribute('role')).toBe(false)
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'small wheel' })) })
+    expect(screen.getByText('Picked: small wheel')).toBeTruthy()
+    expect(parts[1]?.getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('places nothing for a stored part whose id the drawing does not have', async () => {
+    const meta = await settle(PARTS)
+    const forged = JSON.parse(JSON.stringify(meta)) as { program: { nodes: Array<{ type: string; props: Record<string, unknown> }> } }
+    const part = forged.program.nodes.find(node => node.props.kind === 'use')
+    if (part === undefined) throw new Error('no part')
+    part.props.ref = 'gone" onload="alert(1)'
+    const { ToolView } = loadClient()
+    const view = render(<ToolView phase="result" block={resultBlock(forged)} callId="forged-3" useDisclosure={useHostDisclosure} {...kit()} />)
+    expect(view.container.querySelectorAll('.dsh-iui-shape-part')).toHaveLength(1)
+    expect(view.container.innerHTML).not.toMatch(/alert|gone/u)
+  })
+
+  it('turns a part by itself when a player plays the state it reads', async () => {
+    let queue: Array<(now: number) => void> = []
+    vi.stubGlobal('requestAnimationFrame', (callback: (now: number) => void) => { queue.push(callback); return queue.length })
+    vi.stubGlobal('cancelAnimationFrame', () => undefined)
+    try {
+      const { plot } = await draw([
+        '@state turn = 0 min=0 max=360 step=1',
+        'card',
+        '  canvas svg="""',
+        '    <svg viewBox="0 0 320 200"><defs><g id="wheel"><circle r="20"/></g></defs></svg>',
+        '    """',
+        '    shape kind=use ref=wheel x=160 y=100 rotate=turn',
+        '  player "Turn" bind=turn duration=4 loop=true autoplay=true',
+      ].join('\n'), 'part-2')
+      const turn = (): string | null | undefined => plot.querySelector('.dsh-iui-shape-part')?.firstElementChild?.getAttribute('transform')
+      expect(turn()).toBe('translate(300 187.5) scale(1.875)')
+      for (const now of [0, 1000, 2000]) {
+        const pending = queue
+        queue = []
+        act(() => { for (const callback of pending) callback(now) })
+      }
+      expect(turn()).toBe('translate(300 187.5) rotate(180) scale(1.875)')
+      expect(queue).toHaveLength(1)
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })

@@ -22,6 +22,15 @@ export declare const CHART_SHAPES: readonly ["bar", "line", "area", "pie"];
 export declare const MAX_CHART_SERIES = 4;
 /** Slices a pie keeps; a pie with more is drawn as bars. */
 export declare const MAX_PIE_SLICES = 8;
+/** What a shape can be. */
+export declare const SHAPE_KINDS: readonly ["line", "rect", "circle", "polygon", "polyline", "path", "curve", "text", "point", "hotspot", "use"];
+/** The props each kind of shape cannot be drawn without. */
+export declare const SHAPE_NEEDS: Readonly<Record<(typeof SHAPE_KINDS)[number], readonly string[]>>;
+/**
+ * Shapes drawn around their own 0 0: `x=` and `y=` move them, and they turn and
+ * scale about where that origin lands. Every other kind turns about its `x y`.
+ */
+export declare const SHAPES_MOVED: ReadonlySet<string>;
 /**
  * A prop spec. `kind` is the validator's switch and the renderer's hint; the
  * two are one field so a new kind cannot be half-implemented.
@@ -90,12 +99,26 @@ export type PropSpec = {
  | {
     kind: 'bind';
     required?: boolean;
-    state: StateKind;
+    state: StateKind | 'any';
 }
-/** One to four numeric expressions over the component's variable, such as a plot's curves. */
+/** One SVG drawing, read into a checked tree; see `svg.ts`. */
+ | {
+    kind: 'svg';
+    required?: boolean;
+}
+/** A literal number, true/false, or text, as a value to store in a state. */
+ | {
+    kind: 'scalar';
+    required?: boolean;
+}
+/**
+ * One to four numeric expressions over the component's variable, such as a plot's
+ * curves; with `pair`, one curve y = f(x) or a pair [x(t), y(t)] that traces one.
+ */
  | {
     kind: 'fns';
     required?: boolean;
+    pair?: boolean;
 }
 /** An expression of any type, kept whole for typesetting. */
  | {
@@ -128,6 +151,8 @@ export interface ComponentDescriptor {
     holds?: readonly string[];
     /** Prop that a bare quoted string on a DIL line fills: `title "Total"`. */
     primary?: string;
+    /** Props the description's catalog line leaves out, because a paragraph of their own explains them. */
+    explained?: readonly string[];
     /** Props the compiler accepts. An unknown prop is dropped with `unknown_prop`. */
     props: Record<string, PropSpec>;
 }

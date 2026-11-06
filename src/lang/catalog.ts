@@ -32,6 +32,30 @@ export const MAX_CHART_SERIES = 4
 /** Slices a pie keeps; a pie with more is drawn as bars. */
 export const MAX_PIE_SLICES = 8
 
+/** What a shape can be. */
+export const SHAPE_KINDS = ['line', 'rect', 'circle', 'polygon', 'polyline', 'path', 'curve', 'text', 'point', 'hotspot', 'use'] as const
+
+/** The props each kind of shape cannot be drawn without. */
+export const SHAPE_NEEDS: Readonly<Record<(typeof SHAPE_KINDS)[number], readonly string[]>> = {
+  line: ['x', 'y', 'x2', 'y2'],
+  rect: ['x', 'y', 'w', 'h'],
+  circle: ['x', 'y', 'r'],
+  polygon: ['points'],
+  polyline: ['points'],
+  path: ['d'],
+  curve: ['fn'],
+  text: ['text', 'x', 'y'],
+  point: ['x', 'y'],
+  hotspot: ['x', 'y', 'w', 'h', 'bind'],
+  use: ['ref'],
+}
+
+/**
+ * Shapes drawn around their own 0 0: `x=` and `y=` move them, and they turn and
+ * scale about where that origin lands. Every other kind turns about its `x y`.
+ */
+export const SHAPES_MOVED: ReadonlySet<string> = new Set(['polygon', 'polyline', 'path', 'curve', 'use'])
+
 /**
  * A prop spec. `kind` is the validator's switch and the renderer's hint; the
  * two are one field so a new kind cannot be half-implemented.
@@ -57,9 +81,16 @@ export type PropSpec =
   | { kind: 'items'; required?: boolean }
   | { kind: 'options'; required?: boolean }
   /** A state the component writes: the prop named `bind` becomes the node's binding, any other is kept as the state's key. */
-  | { kind: 'bind'; required?: boolean; state: StateKind }
-  /** One to four numeric expressions over the component's variable, such as a plot's curves. */
-  | { kind: 'fns'; required?: boolean }
+  | { kind: 'bind'; required?: boolean; state: StateKind | 'any' }
+  /** One SVG drawing, read into a checked tree; see `svg.ts`. */
+  | { kind: 'svg'; required?: boolean }
+  /** A literal number, true/false, or text, as a value to store in a state. */
+  | { kind: 'scalar'; required?: boolean }
+  /**
+   * One to four numeric expressions over the component's variable, such as a plot's
+   * curves; with `pair`, one curve y = f(x) or a pair [x(t), y(t)] that traces one.
+   */
+  | { kind: 'fns'; required?: boolean; pair?: boolean }
   /** An expression of any type, kept whole for typesetting. */
   | { kind: 'math'; required?: boolean }
   /** A name the component binds inside its `fns`; never a declared key's value. */
@@ -82,6 +113,8 @@ export interface ComponentDescriptor {
   holds?: readonly string[]
   /** Prop that a bare quoted string on a DIL line fills: `title "Total"`. */
   primary?: string
+  /** Props the description's catalog line leaves out, because a paragraph of their own explains them. */
+  explained?: readonly string[]
   /** Props the compiler accepts. An unknown prop is dropped with `unknown_prop`. */
   props: Record<string, PropSpec>
 }
@@ -223,7 +256,7 @@ export const CATALOG: readonly ComponentDescriptor[] = [
   },
   {
     type: 'player',
-    description: 'Plays a number state (play, step, scrub); duration= seconds per run.',
+    description: 'Plays a number state in step= steps over duration= seconds; loop=true repeats; autoplay=true starts on screen.',
     container: false,
     primary: 'label',
     props: {
@@ -234,6 +267,8 @@ export const CATALOG: readonly ComponentDescriptor[] = [
       step: { kind: 'number' },
       duration: { kind: 'number', min: 0.5, max: 600 },
       unit: { kind: 'string', maxLength: 24 },
+      loop: { kind: 'expr', of: 'boolean' },
+      autoplay: { kind: 'expr', of: 'boolean' },
     },
   },
   {
@@ -346,6 +381,61 @@ export const CATALOG: readonly ComponentDescriptor[] = [
       edges: { kind: 'edges' },
       direction: { kind: 'string', enum: ['down', 'right'], default: 'down' },
       current: { kind: 'expr', of: 'number' },
+    },
+  },
+  {
+    type: 'canvas',
+    description: 'Shape lines over any svg=, in its viewBox or view=[left,right,bottom,top] (default [0,320,200,0]).',
+    container: true,
+    holds: ['shape'],
+    primary: 'caption',
+    props: {
+      caption: { kind: 'text' },
+      view: { kind: 'series', literal: true },
+      svg: { kind: 'svg' },
+    },
+  },
+  {
+    type: 'shape',
+    description: 'Drawn in order. point drag=true moves its plain state x= or y=; a click stores value= in bind=.',
+    container: false,
+    primary: 'text',
+    explained: ['x', 'y', 'x2', 'y2', 'w', 'h', 'r', 'points', 'd', 'fn', 'var', 'from', 'to', 'ref'],
+    props: {
+      text: { kind: 'text' },
+      kind: {
+        kind: 'string',
+        required: true,
+        enum: SHAPE_KINDS,
+        aliases: { rectangle: 'rect', square: 'rect', label: 'text', dot: 'point', handle: 'point' },
+      },
+      x: { kind: 'expr', of: 'number' },
+      y: { kind: 'expr', of: 'number' },
+      x2: { kind: 'expr', of: 'number' },
+      y2: { kind: 'expr', of: 'number' },
+      w: { kind: 'expr', of: 'number' },
+      h: { kind: 'expr', of: 'number' },
+      r: { kind: 'expr', of: 'number' },
+      points: { kind: 'series' },
+      d: { kind: 'text' },
+      fn: { kind: 'fns', pair: true },
+      var: { kind: 'variable', default: 'x' },
+      from: { kind: 'expr', of: 'number' },
+      to: { kind: 'expr', of: 'number' },
+      ref: { kind: 'string', maxLength: 65 },
+      rotate: { kind: 'expr', of: 'number' },
+      scale: { kind: 'expr', of: 'number' },
+      opacity: { kind: 'expr', of: 'number' },
+      tone: { kind: 'tone' },
+      size: { kind: 'size' },
+      anchor: { kind: 'string', enum: ['start', 'middle', 'end'], default: 'middle' },
+      fill: { kind: 'expr', of: 'boolean' },
+      dash: { kind: 'expr', of: 'boolean' },
+      arrow: { kind: 'expr', of: 'boolean' },
+      show: { kind: 'expr', of: 'boolean' },
+      drag: { kind: 'expr', of: 'boolean' },
+      bind: { kind: 'bind', state: 'any' },
+      value: { kind: 'scalar' },
     },
   },
   {

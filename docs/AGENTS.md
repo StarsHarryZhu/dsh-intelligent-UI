@@ -45,7 +45,7 @@ proven.
 - `VERIFY.md` — the checklist in three parts: the web UI (activation, persisted
   cards, math cards, the skill, buttons, a bad program, reload, themes, the
   uninstall regression, an animated card, the newer components, a code block,
-  and the skill row), the macOS and Windows desktop apps, and what only
+  the skill row, kept edits with revised cards, drawings, and drawings that play by themselves), the macOS and Windows desktop apps, and what only
   Windows shows; plus the recorded runs. All three parts are required: Part 1
   passed on the web UI, Parts 2 and 3 on both desktop apps of 0.2.1-rc.2, and
   only W4 has no recorded pass.
@@ -65,12 +65,12 @@ proven.
   check that costs no model call: a persisted card, and a card from before the
   version fields showing its text. The web part was run on 2026-10-16 and the
   desktop parts on 2026-10-17; both are recorded there.
-- `SAMPLES.md` carries all thirty-three components: samples 1 to 27 as they were
-  actually drawn, samples 28 to 33 as compiled by the built tool (28 to 31 drew
+- `SAMPLES.md` carries all thirty-five components: samples 1 to 27 as they were
+  actually drawn, samples 28 to 35 as compiled by the built tool (28 to 31 drew
   together in one web-UI card on 2026-10-19; a model-written code card drew
   live on both the web UI and the macOS app on 2026-10-22), and
   doubles as a compile corpus: `tests/compile.test.ts` compiles the samples a
-  live model wrote and pins sample 33 to its recorded text view.
+  live model wrote and pins samples 33 to 35 to their recorded text views.
 - Screenshots of rendered cards live in the repository's `assets/`.
 
 **Not done.**
@@ -86,6 +86,13 @@ proven.
 
 - `VERIFY.md` names one specific historical session for the zero-cost check; on
   another machine, any session with a settled `ui_render` call serves instead.
+
+- **Step 18 has no desktop record.** Drawings ran on the web UI on 2026-11-05;
+  the macOS app was open and did not exit when asked to quit, and the command line
+  refuses to change its profile.
+- **Step 19 has not run live.** Drawings that play by themselves ran only in
+  headless Chrome on the built bundle (recorded); the web UI and the desktop apps
+  have no record.
 
 **Next goal.** Rerun Parts 2 and 3 of `VERIFY.md` on each new desktop version, in
 a throwaway session first, and record the output of W4.

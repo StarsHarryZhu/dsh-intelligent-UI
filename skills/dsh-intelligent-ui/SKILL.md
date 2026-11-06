@@ -1,6 +1,6 @@
 ---
 name: dsh-intelligent-ui
-description: Use when the ui_render tool is available and an answer would be clearer as an interactive card - an estimate the reader adjusts, a comparison, a chart or function plot, a formula with live values, a short form, a multiple-choice question answered by clicking, or a process the reader plays step by step. Covers choosing a card over prose, designing one, math cards, code blocks, animation, and repairing a failed call.
+description: Use when the ui_render tool is available and an answer would be clearer as an interactive card - an estimate the reader adjusts, a comparison, a chart or function plot, a drawing, a formula with live values, a short form, a multiple-choice question answered by clicking, or a process the reader plays step by step. Covers choosing a card over prose, designing one, math cards, drawings, code blocks, animation, and repairing a failed call.
 ---
 
 # Answering with interactive cards
@@ -8,8 +8,7 @@ description: Use when the ui_render tool is available and an answer would be cle
 `ui_render` draws a card in the chat from a small program written in DIL. The
 card's controls recompute in the reader's browser without calling you; a button
 sends its prompt as the reader's next message. The tool description is the
-language reference. This skill is about judgement: when to draw a card, how to
-shape it, and what to say around it.
+language reference; this skill is the judgement around it.
 
 ## When a card is the right answer
 
@@ -24,13 +23,14 @@ side, or answer with a click:
   quantities with indented `series` lines; show one whole's split with `shape=pie`.
 - A function, a derivative, an integral, a limit, or a series: `plot` and
   `formula`. Read `math.md` first.
+- A drawing to reshape or watch move: a triangle, a force diagram, a labelled
+  picture. `canvas`, with draggable points and areas to click; read `drawing.md`.
 - A practice question: the stem in `text` and one `button` per option.
 - A process that unfolds: code running line by line, an algorithm's passes, a
   point moving along a curve. Drive it with a `player`; see "Animate" below.
 
-Answer in prose instead when the answer is one number or one sentence, when
-nothing would be adjusted or compared, or when the user asked for text, code, or
-a file. A card never replaces the explanation; it carries the part the reader
+Answer in prose when the answer is one number or sentence, when nothing would be
+adjusted or compared, or when the user asked for text, code, or a file. A card never replaces the explanation; it carries the part the reader
 explores.
 
 ## Shape of a good card
@@ -73,9 +73,9 @@ the reader why there is no value.
 
 ## Animate
 
-A `player` drives one number state through time: play, pause, step, scrub, and
-speed. It is always drawn at the bottom of its card, so write it last. Everything
-that reads the state recomputes on every frame, in the browser, without calling you.
+A `player` drives one number state through time. It is always drawn at the bottom
+of its card, so write it last. Everything that reads the state recomputes on every
+frame, in the browser, without calling you.
 
 - Use one frame state, `@state frame = 1 min=1 max=N step=1`, for a process in
   steps; use a fine `step=` such as 0.01 for continuous motion.
@@ -86,10 +86,11 @@ that reads the state recomputes on every frame, in the browser, without calling 
 - Show code as a `code` block with `current=line numbers=true`: the running
   line is highlighted and the block scrolls to it. A `table` or `keys` beside
   it shows the variables of that frame.
-- `duration=` is seconds for one run at 1×; without it a run takes one second
-  per step, between two and ten seconds.
-- In your reply, say what the reader will see when they press play; the text
-  view you receive shows the first frame only.
+- `duration=` is seconds per run at 1×; by default a second per step, two to ten.
+- `loop=true autoplay=true` plays a cycle by itself while the card is on screen,
+  like a GIF; see `drawing.md` for moving pictures.
+- In your reply, say what the reader will see when it plays; the text view you
+  receive shows the first frame only.
 
 ## Pages, checklists, and flows
 
@@ -117,8 +118,6 @@ that reads the state recomputes on every frame, in the browser, without calling 
   highlights one line.
 - For text that changes, such as what the reader typed into a `textInput`,
   write `value=name` with a text state or calc instead of a literal.
-- Show only the lines the answer is about; the reader can copy the block.
-- Keep `steps mono=true` for numbered instructions, not for code.
 
 ## Revising a card
 
@@ -139,9 +138,9 @@ The result lists each problem with a repair. Apply every repair and call
 - a state named `e`, `pi`, `tau`, or `inf`, which are constants;
 - a component or prop that is not in the catalog.
 
-A program that compiles with repairs still renders; the result says what was
-changed, so the next card can be written cleanly. If a second attempt still
-fails, answer in prose and say the card could not be drawn.
+A program that compiles with repairs still renders, and the result says what
+changed. If a second attempt fails, answer in prose and say the card could not be
+drawn.
 
 ## Reference files
 
@@ -149,6 +148,8 @@ Read these from this skill's base directory when the card needs them:
 
 - `math.md`: functions, the calculus operators and their accuracy, `plot` and
   `formula`, and six calculus recipes.
-- `recipes.md`: complete cards for prices, loans, unit conversion, probability,
-  projectile motion, quiz series, priced add-ons, a chart of several series, and two
-  animations: code traced line by line and a tangent sweeping a curve.
+- `drawing.md`: `canvas` and `shape`, coordinates, SVG rules, moving pictures,
+  and five recipes.
+- `recipes.md`: complete cards for prices, loans, units, probability, projectiles,
+  quizzes, priced add-ons, several series, code traced line by line, and a tangent
+  sweeping a curve.

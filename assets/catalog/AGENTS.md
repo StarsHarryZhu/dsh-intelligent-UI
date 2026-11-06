@@ -2,13 +2,13 @@
 
 ## 1. Role
 
-One picture per catalog component, thirty-three in all, for the README's component
+One picture per catalog component, thirty-five in all, for the README's component
 gallery. Each is the card that one sample program of `docs/SAMPLES.md` draws,
 cropped to the card's frame. Samples 1 to 24 were first drawn in a live chat on
 2026-10-15 and samples 25 to 27 on 2026-10-16; samples 28 to 31 were written on
 2026-10-18 and drew together in one live card on 2026-10-19; sample 32 was
 written on 2026-10-22, the day a model-written code card first drew live, and
-sample 33 on 2026-10-26. These pictures redraw the
+sample 33 on 2026-10-26, and samples 34 and 35 on 2026-11-05. These pictures redraw the
 programs with the current build, so the gallery shows the cards as they look
 today.
 
@@ -85,7 +85,7 @@ the parent folder cover the dark theme.
   page, because the host's theme injects it at run time; `table` and `chart`
   redrawn and `series` added on 2026-10-26, after tables gained their copy
   buttons and charts their series; `checklist` redrawn the same day with
-  `names=` filling a sentence.
+  `names=` filling a sentence; `canvas` and `shape` added on 2026-11-05.
 
 **Not done.**
 

@@ -97,12 +97,12 @@ function CardBody(props: CardProps): ReactNode {
 
   if (!program.supported) return <TextVersion text={program.fallback} note={tr('card.newer')} />
 
-  const setValue = (key: string, value: JsonValue): void => {
+  const setValue = (key: string, value: JsonValue, passing = false): void => {
     const row = program.state.find(entry => entry.key === key)
     const accepted = row === undefined ? undefined : acceptEdit(row, value)
     if (accepted === undefined) return
     const current = store.get(memoryKey) ?? base
-    store.set(memoryKey, { ...current, values: { ...current.values, [key]: accepted } })
+    store.set(memoryKey, { ...current, values: { ...current.values, [key]: accepted } }, !passing)
   }
   const setUi = (id: string, value: JsonValue): void => {
     const current = store.get(memoryKey) ?? base
@@ -136,6 +136,7 @@ function CardBody(props: CardProps): ReactNode {
     .filter((node): node is NodeRow => node !== undefined)
   const scope: RenderScope = {
     program,
+    card: memoryKey,
     values,
     setValue,
     ui: id => memory.ui?.[id],

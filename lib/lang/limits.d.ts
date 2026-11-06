@@ -29,6 +29,12 @@ export declare const LIMITS: {
     readonly maxCodeChars: 8000;
     /** Lines in one code block. */
     readonly maxCodeLines: 400;
+    /** Characters of one SVG drawing; a longer one is cut and the cut reported. */
+    readonly maxSvgChars: 32000;
+    /** Elements in one SVG drawing. */
+    readonly maxSvgElements: 1000;
+    /** Nesting depth inside one SVG drawing. */
+    readonly maxSvgDepth: 16;
     /** `{…}` interpolations in one piece of text. */
     readonly maxInterpolations: 32;
     /** Positions tried when trimming junk around a JSON envelope; keeps recovery linear. */

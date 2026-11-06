@@ -65,6 +65,30 @@ tab before it (`arrangeTabs` in `compile.ts`); both are reported. A diagram's
 arrows name their ends by a node's exact text or its 1-based number and compile
 to number pairs; an arrow that names no node is dropped and reported.
 
+**SVG is data, read against lists.** A `canvas`'s `svg=` is parsed without a DOM
+into a JSON tree of allowlisted elements and attributes (`svg.ts`), and the program
+stores only that tree. Nothing outside the lists survives: no scripts, handlers,
+styles, links, images, embedded documents, filters, or animation, and every
+reference names an id inside the drawing, so a drawing cannot run or load
+anything. Entities are decoded before any check. What was dropped is reported.
+`checkDrawing` holds a stored tree to the same lists, because the browser does not
+trust a stored program. Black becomes `currentColor`, which follows the theme;
+other colours stay as written, the one place a model picks a colour.
+
+**A canvas holds only shapes.** A shape joins and strays as a series does
+(`arrangeCanvases` in `compile.ts`). A shape missing what its kind needs
+(`SHAPE_NEEDS` in `catalog.ts`) is left out, and so is a canvas with nothing to
+draw. `drag=` resolves at compile time to the plain number states in `x=` and `y=`;
+any `bind` prop other than `bind` is kept as a state's key, while a dragged point's
+binding names its first state so it counts as a control. A click's `value=` is
+checked against the kind of the state it stores into. Props that only some kinds
+use (`fn=` on a curve, `ref=` on a placed part, `arrow=` on a line; `rotate=` and
+`scale=` on anything but a point) are dropped elsewhere with a repair. A traced
+curve `fn=[x, y]` needs `from=` and `to=`, and a `use` shape's `ref=` must name an
+id of its canvas's drawing (`drawingIds` in `svg.ts`); either is left out
+otherwise. `explained` in a catalog entry leaves props out of its line in the tool
+description, because a paragraph of their own covers them.
+
 **A chart holds only series.** A container may name the only types it holds
 (`holds` in `catalog.ts`); such a container belongs inside another one, like a
 leaf, and anything else written under it moves to its parent. A `series` written
@@ -106,7 +130,7 @@ https, images must be inline `data:image/…` rasters.
 - `AGENTS.md` — this file: what the language permits and why.
 - `catalog.ts` — the component table: name, purpose, container flag and what a
   narrow container holds, primary text prop, and prop specs, plus the semantic
-  hash and the chart bounds.
+  hash, the chart bounds, and what each kind of shape needs.
 - `types.ts` — the wire vocabulary: expressions, declarations, nodes, templates,
   diagnostics, the program, and the operator set.
 - `dil.ts` — the DIL line parser: declarations, indentation nesting, primary
@@ -117,6 +141,8 @@ https, images must be inline `data:image/…` rasters.
 - `infix.ts` — the readable expression syntax and its lowering: powers,
   factorials, implicit products, typeset symbols, constants, function and calculus
   calls.
+- `svg.ts` — a drawing written as SVG: the tolerant parser, the element and
+  attribute lists, and the check on a stored drawing.
 - `text.ts` — `{…}` interpolation parsing and the renderer for hoisted text.
 - `expr.ts` — expression validation, static typing, bounded evaluation, the
   calculus operators, and number display.
@@ -138,8 +164,8 @@ https, images must be inline `data:image/…` rasters.
 
 **Done.**
 
-- Thirty-three components, `player`, `tabs`, `tab`, `checklist`, `diagram`,
-  `code`, and `series` among them; the catalog drives validation, the description, and the registry
+- Thirty-five components, `player`, `tabs`, `tab`, `checklist`, `diagram`,
+  `code`, `series`, `canvas`, and `shape` among them; the catalog drives validation, the description, and the registry
   check (`tests/catalog.test.ts`).
 - DIL nests by indentation, fills primary text from a bare quoted string, infers
   state kinds, keeps a spaced bare expression whole, reads `"""` text blocks,
@@ -151,6 +177,9 @@ https, images must be inline `data:image/…` rasters.
   misplaced or surplus series repaired and reported, and writes several series
   as a small table and a pie with its shares in the text view
   (`tests/compile.test.ts`).
+- A canvas draws shape lines over a checked SVG tree; hostile SVG in any spelling
+  is left out and reported, and each repair of a shape is reported
+  (`tests/svg.test.ts`, `tests/compile.test.ts`).
 - A checklist binds up to two states: `bind=` the ticked count, or the sum of
   plain-number `values=` evened out to one per item, and `names=` the ticked
   names; any `bind` prop other than `bind` itself is kept as the state's key

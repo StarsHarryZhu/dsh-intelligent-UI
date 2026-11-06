@@ -12,8 +12,9 @@ recomputes in the browser with **zero model calls**.
 A reply can carry an interactive interface: an estimate the reader adjusts, a
 comparison table, a small chart, a function plot with a tangent or a shaded
 integral, a typeset formula with its live value, a short form, or a quiz question
-answered with one click. The model never writes HTML, CSS, or JavaScript, and the
-browser never evaluates model text. What crosses the wire is a validated program
+answered with one click, or a drawing the reader can reshape. The model never
+writes HTML, CSS, or JavaScript, and the browser never evaluates model text; SVG
+it writes for a drawing is read into a checked tree of allowed elements. What crosses the wire is a validated program
 over a fixed component catalog and a closed expression language, so a card
 inherits the host's own typography, spacing, and theme instead of approximating
 them.
@@ -230,6 +231,22 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
   the ticked items' numbers, and `names=` hands their names to a text state, so
   a total and a button's prompt can say what was picked
   (`tests/compile.test.ts`, `tests/client.test.tsx`).
+- Drawings (2026-11-05): `canvas` holds `shape` lines over an optional SVG read
+  into a checked tree; a dragged point writes the number states in its `x=` and
+  `y=`, and a clicked shape stores its `value=`
+  (`tests/svg.test.ts`, `tests/compile.test.ts`, `tests/client.test.tsx`).
+- **Live run of 2026-11-05, web UI** (`docs/VERIFY.md` step 18): model-written
+  cards with draggable vertices, a point held to a curve, and a 135-element SVG
+  with clickable parts drew with zero repairs and kept their settings across a
+  reload; touch was checked in Chrome's emulation. The desktop apps were not run.
+- Moving drawings (2026-11-05): `player loop=true autoplay=true` plays a card by
+  itself while it is on screen, not under reduced motion, and in one copy of a
+  card at a time; frames are not stored. Shapes turn, scale, and fade
+  (`rotate=`, `scale=`, `opacity=`), `kind=curve` samples a function or a
+  traced pair, and `kind=use` places a part of the SVG by id
+  (`tests/compile.test.ts`, `tests/client.test.tsx`). Checked in headless Chrome
+  on the built bundle; not yet run live (`docs/VERIFY.md` step 19). The tool
+  description no longer carries the comparison example, to stay under 9800.
 - **Live run of 2026-10-26, web UI and macOS desktop app** (`docs/VERIFY.md`
   step 17): a model-written card with three series, a pie, and a 30-row table
   drew with zero repairs; its settings survived a page reload and an app

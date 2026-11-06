@@ -173,6 +173,36 @@ Then send:
 
 Pass: the result names the earlier card in `revises`; the new card starts with the slider where it was left (held at 20 if it was past it), and the earlier card says that a newer version follows. A quiz card whose button was pressed before a reload stays locked after it.
 
+## 18. A drawing the reader reshapes
+
+Send, in a new session:
+
+> Draw one card, reply in Chinese: a triangle with three draggable vertices on a canvas with y upward, its area as a metric, and a button that sends me the vertex coordinates.
+
+Pass: the program compiles with no repair and uses `canvas view=` with `shape kind=point … drag=true`. Dragging a vertex with the pointer moves the triangle and the area together, on the state's steps and inside its limits; Tab reaches a vertex and the arrow keys move it the way the screen goes. No request appears in the network panel while dragging. The button sends the coordinates as they stand, and a reload leaves the vertices where they were dragged.
+
+Then send:
+
+> Draw a labelled desk lamp as SVG on a canvas, reply in Chinese, with an invisible area over each of the shade, the stem, and the base; clicking one shows a sentence about that part under the picture.
+
+Pass: the card uses `svg="""` and `shape kind=hotspot`; a click and the Enter key both change the sentence and mark the area; the picture is legible in the light and dark themes. Then send:
+
+> Draw a parabola on a canvas with a point that can only move along it, and a dashed tangent line through the point. Reply in Chinese.
+
+Pass: the point stays on the curve however the pointer moves, and the tangent follows. With the pane at a phone width, dragging a point moves the point and does not scroll the page, and dragging elsewhere on the canvas scrolls it.
+
+## 19. A drawing that plays by itself
+
+Keep the Browser window in view, as for step 13. Send, in a new session:
+
+> Draw one card, reply in Chinese: a wheel drawn as SVG that rolls along the ground by itself on repeat, with a dot on its rim leaving its path behind it.
+
+Pass: the program compiles with no repair and uses `shape kind=use ref=…` with `rotate=`, `shape kind=curve fn=[…] var= from= to=`, and `player … loop=true autoplay=true`. The wheel starts rolling as soon as the card is drawn, turns as far as it travels, starts over after its last step, and the trail follows the dot. Pausing stops it where it is, and it stays paused when the card is scrolled away and back; a reload shows the frame it was paused on. With the card scrolled out of view, playback stops, and it resumes when the card returns. No request appears in the network panel while it plays. Then send:
+
+> Show a travelling sine wave that moves by itself, with a slider for the wave number. Reply in Chinese.
+
+Pass: the card uses `shape kind=curve fn="…"`; the wave moves smoothly, and the slider changes the wavelength while it plays. With the system set to reduce motion, a newly drawn card waits on its play button.
+
 # Part 2 — Desktop apps (macOS and Windows)
 
 **Passed on 0.2.1-rc.2, on both apps.** D1 to D4 passed on the macOS app and on the Windows app of DeepSeek Harness 0.2.1-rc.2, installed on macOS from the working checkout as a `link:` dependency and on Windows through W1. The failure of 2026-10-16 on 0.2.0-rc.2 — no card drawn, and past conversations that would not open with the plugin loaded — did not recur on this build. Run this part again on any new desktop version, in a throwaway session first, before claiming that version.
@@ -263,6 +293,8 @@ Pass: the linker creates directory junctions without asking for administrator ri
   - Found and fixed in this run: the running host defines no `--shiki-background`, so the block fell back to a lighter layer than the host's code blocks; it now falls back to `--dsw-alias-markdown-code-block`. And on its first desktop call the model opened the block with `"""` on a line of its own under `code`, which dropped the block until the model retried; such a block now attaches to the component above it, with a repair note.
 
 - 2026-10-26, web UI and the macOS desktop app, DeepSeek Harness 0.2.1-rc.2, DeepSeek-V4.1-Flash, both profiles linked to the working checkout, run by Claude Code as on 2026-10-22: step 17 passed on both hosts, with notes.
+- 2026-11-05, web UI, DeepSeek Harness 0.2.2-alpha.2 (the working checkout), DeepSeek-V4.1-Flash at Max, the profile linked to the working checkout: step 18 passed. The triangle compiled with no repair; a real mouse drag moved a vertex onto its 0.5 steps with the area following (C to (6.5, 5.5), area 14), the arrow keys moved another, no request of the plugin's appeared while dragging, a reload kept the vertices, and the button sent `A(3.5, 3)、B(9.5, 3)、C(6.5, 5.5)`. An SVG lamp of 135 elements with gradients compiled with no repair and read well in both themes; clicking a hotspot changed the sentence and marked the area, and a reload kept it. The first lamp prompt told the model to read no file but the skill, so it missed `drawing.md` and drew with shapes, wrote `tone=<calc>`, was told of the repair, and revised its own card with `revises=`; `drawing.md` now says that a tone is a fixed word. The parabola compiled with no repair: the dragged point stayed on the curve at (2.4, 1.44) and the tangent followed; asked for a lower limit, the revision started at 2 and the earlier card kept 2.4 and said a newer version follows. In Chrome with touch emulation, a touch on a point moved the point and left the page still, and a touch elsewhere on the canvas scrolled the page. Two defects were found and fixed in this run: a pointer left the keyboard focus ring on a shape, and at a phone's width the canvas shrank its text and points with it, so its viewBox now takes the canvas's width on the page. The macOS desktop app was **not** run: the app was open, did not exit when asked to quit, and the command line refuses to change its profile, so D1 to D4 have no record for drawings.
+- 2026-11-05, the built bundle in headless Chrome, on a static page with the host's built stylesheets (no running harness and no model): step 19 is **not** run live yet. The two moving recipes of `drawing.md` and an orbit compiled with no repair. The wheel started by itself, its part changed 61 times in two seconds and had turned 181° after two of its four seconds, and its trail was drawn; nothing was written to storage while it played, and pausing kept that frame (`a = 3.45`). A card below the fold showed its play button and frame 1 until scrolled to, then played. With reduced motion emulated, the wheel waited on its play button.
   - Both programs of each host compiled with zero repairs: one card with a slider, a stacked area chart of three `series`, a pie, and a 30-row table, and its revision. Each result named its card id, and each revision carried `revises` with that id.
   - The legend hid a series and the area chart redrew without it; ← and Home moved the readout to March and January; hiding a pie slice recomputed the other shares (41.6% and 58.4%). The table showed its filter, "30 / 30 行", and two pages; filtering for one customer left one row with no pages, a filter matching nothing said so, and the next-page button turned to rows 21 to 30. No `/api` request left the page while doing any of this. Copy said it could not copy in the in-app browser, which refuses the clipboard, as step 15 allows.
   - After a page reload (web UI) and after quitting and reopening the app (desktop), the slider, the hidden series and slice, the filter, and the second table page were all as left, in the dark and the light theme.

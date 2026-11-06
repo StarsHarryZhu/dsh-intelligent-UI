@@ -14,7 +14,7 @@
  * @module dsh-intelligent-ui/lang/compile
  */
 
-import { CATALOG_BY_TYPE, catalogHash, MAX_CHART_SERIES, MAX_PIE_SLICES, SIZES, TONES, type ComponentDescriptor, type PropSpec } from './catalog.ts'
+import { CATALOG_BY_TYPE, catalogHash, MAX_CHART_SERIES, MAX_PIE_SLICES, SHAPE_NEEDS, SIZES, TONES, type ComponentDescriptor, type PropSpec } from './catalog.ts'
 import { parseDil, type Envelope, type RawCalc, type RawNode, type RawState } from './dil.ts'
 import { checkExpr, evalExpr, type ExprType } from './expr.ts'
 import { API_VERSION } from './identity.ts'
@@ -22,6 +22,7 @@ import { asNode, parseInfix } from './infix.ts'
 import { LIMITS, MAX_SPACE } from './limits.ts'
 import { formatSignificant, isMathConstant, MATH_CONSTANTS } from './math.ts'
 import { printExpr } from './print.ts'
+import { checkDrawing, drawingIds, drawingWords, parseSvg, PATH_DATA, SVG_ID } from './svg.ts'
 import { parseTemplate, renderText, valueText } from './text.ts'
 import {
   type CalcDeclaration, type Diagnostic, type ExprNode, type JsonValue, type StateDeclaration, type StateKind,
@@ -157,6 +158,7 @@ export function compileEnvelope(envelope: Envelope, inherited: Diagnostic[] = []
   connect(nodes, ids, diagnostics)
   arrangeTabs(nodes, ids, diagnostics)
   arrangeSeries(nodes, diagnostics)
+  arrangeCanvases(nodes, state, diagnostics)
   dockPlayers(nodes)
 
   const program: UIProgram = {
@@ -405,6 +407,20 @@ function readNode(raw: RawNode, context: NodeContext, diagnostics: Diagnostic[])
   }
   for (const [name, value] of Object.entries(asRecord(raw.props))) rawProps[name] = value
   if (raw.bind !== undefined) rawProps.bind = raw.bind
+  // A canvas's text block is its drawing when that is what it holds; its caption is one line.
+  if (type === 'canvas' && rawProps.svg === undefined && typeof rawProps.caption === 'string' && /^\s*<svg\b/iu.test(rawProps.caption)) {
+    rawProps.svg = rawProps.caption
+    delete rawProps.caption
+  }
+  if (type === 'shape' && typeof rawProps.d === 'string' && !PATH_DATA.test(rawProps.d.replace(/\{[^{}]*\}/gu, '0'))) {
+    delete rawProps.d
+    diagnostics.push({
+      code: 'invalid_literal',
+      ...where(`nodes.${id}.d`),
+      message: '<shape> d= holds characters that are not SVG path data; it was ignored',
+      repair: 'Write path commands and numbers, such as d="M0 0 L10 10 Z"; {name} may fill in a number.',
+    })
+  }
 
   const props: Record<string, JsonValue> = {}
   let bind: UINode['bind']
@@ -566,6 +582,19 @@ function readProp(
       if (typeof written !== 'string') return bad('must be text', `Write ${name}=""" on its line, the text below, and """ to close it.`)
       return readCode(written)
     }
+    case 'svg': {
+      if (typeof value !== 'string') return bad('must be SVG text', `Write ${name}=""" on its line, the <svg> below, and """ to close it.`)
+      const read = parseSvg(value)
+      if (read.drawing === undefined) {
+        return bad(`has nothing a card can draw${read.problems[0] === undefined ? '' : `: it ${read.problems[0].message}`}`, read.problems[0]?.repair ?? 'Write <svg viewBox="0 0 320 200"> with shapes such as <path> or <circle> inside.')
+      }
+      return { ok: true, value: read.drawing as unknown as JsonValue, ...(read.problems.length > 0 ? { problems: read.problems } : {}) }
+    }
+    case 'scalar': {
+      if (typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))) return { ok: true, value }
+      if (typeof value === 'string' && value.length <= 2000) return { ok: true, value }
+      return bad('must be a number, true/false, or text', `Write ${name}="…".`)
+    }
     case 'text': {
       const read = readText(value, context)
       if (read === undefined) return bad('must be text, optionally with {name} interpolation', `Write ${name}="…".`)
@@ -664,6 +693,9 @@ function readProp(
     case 'fns': {
       const variable = plotVariable(rawProps.var)
       const entries = Array.isArray(value) ? value : [value]
+      if (spec.pair === true && (entries.length === 0 || entries.length > 2)) {
+        return bad('takes one expression, y of the variable, or a pair [x, y] of the variable', `Write ${name}="sin(${variable})", or ${name}=["cos(t)","sin(t)"] var=t for a curve traced by t.`)
+      }
       if (entries.length === 0 || entries.length > MAX_CURVES) {
         return bad(`takes one to ${MAX_CURVES} expressions`, `Write ${name}="sin(${variable})" or ${name}=["sin(${variable})","cos(${variable})"].`)
       }
@@ -727,7 +759,7 @@ function readProp(
       if (declared === undefined) {
         return bad(`names "${key}", which is not a declared @state`, `Declare "@state ${key || 'name'} = …" and bind it.`)
       }
-      const compatible = declared.kind === spec.state
+      const compatible = spec.state === 'any' || declared.kind === spec.state
         || (spec.state === 'select' && declared.kind === 'string' && Array.isArray(rawProps.options))
       if (!compatible) {
         return bad(`binds ${spec.state === 'string' ? 'text' : spec.state} state, but "${key}" is ${declared.kind === 'string' ? 'text' : declared.kind}`, `Bind a ${spec.state === 'string' ? 'text' : spec.state} @state.`)
@@ -980,6 +1012,54 @@ function arrangeTabs(nodes: UINode[], ids: Set<string>, diagnostics: Diagnostic[
 }
 
 /**
+ * Put each part written beside its whole into the whole just before it, as a
+ * series joins its chart. A part with no such whole is reported and returned, for
+ * the caller to leave out.
+ * @param nodes - the flat node list; parents change in place.
+ * @param part - the type of the parts.
+ * @param whole - the type that holds them.
+ * @param diagnostics - where each repair is reported.
+ * @returns the parts that have no whole.
+ */
+function gatherParts(nodes: readonly UINode[], part: string, whole: string, diagnostics: Diagnostic[]): UINode[] {
+  const byId = new Map(nodes.map(node => [node.id, node]))
+  const last = new Map<string | null, UINode | undefined>()
+  const strays: UINode[] = []
+  for (const node of nodes) {
+    if (node.type === whole) {
+      last.set(node.parent, node)
+      continue
+    }
+    if (node.type !== part) {
+      last.set(node.parent, undefined)
+      continue
+    }
+    if (node.parent !== null && byId.get(node.parent)?.type === whole) continue
+    const home = last.get(node.parent)
+    if (home === undefined) {
+      strays.push(node)
+      continue
+    }
+    node.parent = home.id
+    diagnostics.push({
+      code: 'orphan_node',
+      path: `nodes.${node.id}`,
+      message: `<${part}> sits beside its ${whole}; it was placed in the ${whole} before it`,
+      repair: `Indent ${part} lines under their ${whole} line.`,
+    })
+  }
+  for (const stray of strays) {
+    diagnostics.push({
+      code: 'orphan_node',
+      path: `nodes.${stray.id}`,
+      message: `<${part}> belongs inside a ${whole}; it was left out`,
+      repair: `Indent ${part} lines under the ${whole} line they belong to.`,
+    })
+  }
+  return strays
+}
+
+/**
  * Give every series a chart and every chart something to draw.
  *
  * A series written beside its chart instead of under it joins the chart just
@@ -990,41 +1070,7 @@ function arrangeTabs(nodes: UINode[], ids: Set<string>, diagnostics: Diagnostic[
  */
 function arrangeSeries(nodes: UINode[], diagnostics: Diagnostic[]): void {
   if (!nodes.some(node => node.type === 'series' || node.type === 'chart')) return
-  const byId = new Map(nodes.map(node => [node.id, node]))
-  const lastChart = new Map<string | null, UINode | undefined>()
-  const strays: UINode[] = []
-  for (const node of nodes) {
-    if (node.type === 'chart') {
-      lastChart.set(node.parent, node)
-      continue
-    }
-    if (node.type !== 'series') {
-      lastChart.set(node.parent, undefined)
-      continue
-    }
-    if (node.parent !== null && byId.get(node.parent)?.type === 'chart') continue
-    const chart = lastChart.get(node.parent)
-    if (chart === undefined) {
-      strays.push(node)
-      continue
-    }
-    node.parent = chart.id
-    diagnostics.push({
-      code: 'orphan_node',
-      path: `nodes.${node.id}`,
-      message: '<series> sits beside its chart; it was placed in the chart before it',
-      repair: 'Indent series lines under their chart line.',
-    })
-  }
-  for (const stray of strays) {
-    diagnostics.push({
-      code: 'orphan_node',
-      path: `nodes.${stray.id}`,
-      message: '<series> belongs inside a chart; it was left out',
-      repair: 'Indent series lines under the chart line they belong to.',
-    })
-  }
-  const dropped = new Set(strays)
+  const dropped = new Set(gatherParts(nodes, 'series', 'chart', diagnostics))
   for (const chart of nodes.filter(node => node.type === 'chart')) {
     const series = nodes.filter(node => node.parent === chart.id && node.type === 'series')
     for (const extra of series.slice(MAX_CHART_SERIES)) dropped.add(extra)
@@ -1093,6 +1139,220 @@ function arrangeSeries(nodes: UINode[], diagnostics: Diagnostic[]): void {
 }
 
 /**
+ * Settle every canvas and shape. A shape beside its canvas joins it and one with
+ * no canvas is left out; a shape missing what its kind needs is left out, a canvas
+ * with nothing to draw too. Props that do not apply are dropped. Each is reported.
+ */
+function arrangeCanvases(nodes: UINode[], state: readonly StateDeclaration[], diagnostics: Diagnostic[]): void {
+  if (!nodes.some(node => node.type === 'shape' || node.type === 'canvas')) return
+  const dropped = new Set(gatherParts(nodes, 'shape', 'canvas', diagnostics))
+  for (const node of nodes) {
+    if (node.type === 'shape' && !dropped.has(node) && !settleShape(node, state, diagnostics)) dropped.add(node)
+  }
+  for (const canvas of nodes.filter(node => node.type === 'canvas')) {
+    settleView(canvas, diagnostics)
+    for (const part of nodes.filter(node => node.parent === canvas.id && node.props.kind === 'use' && !dropped.has(node))) {
+      if (!settlePart(part, canvas, diagnostics)) dropped.add(part)
+    }
+    const shapes = nodes.filter(node => node.parent === canvas.id && node.type === 'shape' && !dropped.has(node))
+    if (shapes.length > 0 || canvas.props.svg !== undefined) continue
+    dropped.add(canvas)
+    diagnostics.push({
+      code: 'invalid_literal',
+      path: `nodes.${canvas.id}`,
+      message: 'canvas has neither svg= nor shape lines; it was left out',
+      repair: 'Indent shape kind=… lines under the canvas, or write svg=""" with a drawing.',
+    })
+  }
+  if (dropped.size > 0) nodes.splice(0, nodes.length, ...nodes.filter(node => !dropped.has(node)))
+}
+
+/** Most uneven sides a canvas draws without a word: the card's width is fixed, so a thin view is hard to read. */
+const MAX_VIEW_RATIO = 3
+
+/** Check a canvas's coordinates; an SVG drawing brings its own. */
+function settleView(canvas: UINode, diagnostics: Diagnostic[]): void {
+  const view = canvas.props.view
+  if (view === undefined) return
+  const report = (message: string, repair: string): void => {
+    diagnostics.push({ code: 'invalid_literal', path: `nodes.${canvas.id}.view`, message, repair })
+  }
+  if (canvas.props.svg !== undefined) {
+    delete canvas.props.view
+    report('canvas has both view= and svg=; view= was ignored, and shapes use the coordinates of the svg\'s viewBox', 'Write shape coordinates in the viewBox of the drawing, and leave view= out.')
+    return
+  }
+  const [left, right, bottom, top] = Array.isArray(view) ? view as number[] : []
+  if (!Array.isArray(view) || view.length !== 4 || left === right || bottom === top) {
+    delete canvas.props.view
+    report('view= must be [left, right, bottom, top] with two different ends on each axis; the default was used', 'Write view=[-5, 5, -3, 3] for y upward, or view=[0, 320, 200, 0] for y downward.')
+    return
+  }
+  const across = Math.abs((right as number) - (left as number))
+  const down = Math.abs((bottom as number) - (top as number))
+  if (across / down > MAX_VIEW_RATIO || down / across > MAX_VIEW_RATIO) {
+    report(`view= is more than ${MAX_VIEW_RATIO} times longer one way than the other, so the drawing comes out thin`, 'Choose a view closer to the shape of a card, wider than it is tall.')
+  }
+}
+
+/** The state a prop reads when it is exactly one number state. */
+function plainNumberState(value: JsonValue | undefined, state: readonly StateDeclaration[]): string | undefined {
+  if (!Array.isArray(value) || value[0] !== 'ref' || typeof value[1] !== 'string') return undefined
+  const key = value[1]
+  return state.some(entry => entry.key === key && entry.kind === 'number') ? key : undefined
+}
+
+/**
+ * Settle one shape.
+ * @returns false when it cannot be drawn and is left out.
+ */
+function settleShape(node: UINode, state: readonly StateDeclaration[], diagnostics: Diagnostic[]): boolean {
+  const kind = node.props.kind as keyof typeof SHAPE_NEEDS
+  const report = (prop: string, message: string, repair: string): void => {
+    diagnostics.push({ code: 'invalid_literal', path: `nodes.${node.id}.${prop}`, message, repair })
+  }
+  const missing = SHAPE_NEEDS[kind].filter(name => (name === 'bind' ? node.bind === undefined : node.props[name] === undefined))
+  if (missing.length > 0) {
+    report(missing[0] as string, `shape kind=${kind} needs ${missing.join(', ')}; it was left out`, `Write shape kind=${kind} with ${SHAPE_NEEDS[kind].map(name => `${name}=…`).join(' ')}.`)
+    return false
+  }
+  if (kind === 'polygon' || kind === 'polyline') {
+    const points = node.props.points as JsonValue[]
+    if (points.length < 4) {
+      report('points', `shape kind=${kind} needs at least two points; it was left out`, 'Write points=[x1, y1, x2, y2, …].')
+      return false
+    }
+    if (points.length % 2 === 1) {
+      node.props.points = points.slice(0, -1)
+      report('points', 'points= has an odd count, so its last number was ignored', 'Write points=[x1, y1, x2, y2, …], a pair for each point.')
+    }
+  }
+  for (const [prop, applies, repair] of KIND_PROPS) {
+    if (node.props[prop] === undefined || applies(kind)) continue
+    delete node.props[prop]
+    report(prop, `${prop}= does not apply to kind=${kind}; it was ignored`, repair)
+  }
+  if (kind === 'curve' && Array.isArray(node.props.fn) && node.props.fn.length === 2 && (node.props.from === undefined || node.props.to === undefined)) {
+    report('to', 'a curve traced by a pair fn=[x, y] needs from= and to= for its variable; it was left out', 'Write fn=["cos(t)","sin(t)"] var=t from=0 to=tau.')
+    return false
+  }
+  if (kind === 'use') {
+    const ref = typeof node.props.ref === 'string' ? node.props.ref.trim().replace(/^#/u, '') : ''
+    if (!SVG_ID.test(ref)) {
+      report('ref', 'ref= must be the id of an element of the canvas\'s svg=; it was left out', 'Give the part id="wheel" inside <defs> and write ref=wheel.')
+      return false
+    }
+    node.props.ref = ref
+  }
+  if (node.props.drag !== undefined) settleDrag(node, kind, state, report)
+  settleTap(node, state, report)
+  if (kind === 'hotspot' && node.bind === undefined) {
+    report('bind', 'a hotspot without a usable bind= does nothing; it was left out', 'Give it bind=<state> and value=….')
+    return false
+  }
+  return true
+}
+
+/** Props that only some kinds of shape use: the prop, which kinds it applies to, and the repair. */
+const KIND_PROPS: ReadonlyArray<readonly [string, (kind: string) => boolean, string]> = [
+  ['arrow', kind => kind === 'line', 'Use arrow=true on shape kind=line.'],
+  ['fn', kind => kind === 'curve', 'Use fn= on shape kind=curve.'],
+  ['var', kind => kind === 'curve', 'Use var= with fn= on shape kind=curve.'],
+  ['from', kind => kind === 'curve', 'Use from= and to= on shape kind=curve.'],
+  ['to', kind => kind === 'curve', 'Use from= and to= on shape kind=curve.'],
+  ['ref', kind => kind === 'use', 'Use ref= on shape kind=use.'],
+  ['rotate', kind => kind !== 'point', 'Turn the shapes around a point, not the point itself.'],
+  ['scale', kind => kind !== 'point', 'Give a point r= to size it.'],
+]
+
+/**
+ * Check that a placed part names an element of its canvas's drawing.
+ * @returns false when it cannot be drawn and is left out.
+ */
+function settlePart(part: UINode, canvas: UINode, diagnostics: Diagnostic[]): boolean {
+  const drawing = checkDrawing(canvas.props.svg)
+  const ids = drawing === undefined ? new Set<string>() : drawingIds(drawing)
+  const ref = part.props.ref as string
+  if (ids.has(ref)) return true
+  const known = [...ids].slice(0, 12)
+  diagnostics.push({
+    code: 'invalid_literal',
+    path: `nodes.${part.id}.ref`,
+    message: drawing === undefined
+      ? 'shape kind=use places a part of the canvas\'s svg=, and this canvas has none; it was left out'
+      : `ref=${ref} names no element of the canvas's svg=${known.length > 0 ? ` (its ids: ${known.join(', ')})` : ''}; it was left out`,
+    repair: 'Draw the part inside <defs> of svg=, around its own 0 0, as <g id="wheel">…</g>, and write shape kind=use ref=wheel x=… y=….',
+  })
+  return false
+}
+
+/** Name the states a dragged point moves; the node's binding marks it as a control. */
+function settleDrag(node: UINode, kind: string, state: readonly StateDeclaration[], report: (prop: string, message: string, repair: string) => void): void {
+  if (kind !== 'point') {
+    delete node.props.drag
+    report('drag', `drag= applies to points; it was ignored on kind=${kind}`, 'Use shape kind=point with drag=true.')
+    return
+  }
+  const x = plainNumberState(node.props.x, state)
+  const y = plainNumberState(node.props.y, state)
+  if (x === undefined && y === undefined) {
+    delete node.props.drag
+    report('drag', 'drag= needs x= or y= to be one number @state; the point was drawn but cannot be moved', 'Declare "@state a = 40" and write x=a; the other axis may be an expression, so the point follows a curve.')
+    return
+  }
+  if (node.bind !== undefined || node.props.value !== undefined) {
+    delete node.props.value
+    report('bind', 'a dragged point cannot also be clicked; bind= was ignored', 'Use drag=true or bind=, not both.')
+  }
+  if (x !== undefined) node.props.dragX = x
+  if (y !== undefined) node.props.dragY = y
+  node.bind = { key: (x ?? y) as string, kind: 'number' }
+}
+
+/** Check what a click stores against the state it stores into. */
+function settleTap(node: UINode, state: readonly StateDeclaration[], report: (prop: string, message: string, repair: string) => void): void {
+  if (node.props.dragX !== undefined || node.props.dragY !== undefined) return
+  const value = node.props.value
+  if (node.bind === undefined) {
+    if (value === undefined) return
+    delete node.props.value
+    report('value', 'value= says what a click stores, but this shape has no bind=; it was ignored', 'Add bind=<state>.')
+    return
+  }
+  const key = node.bind.key
+  const declared = state.find(entry => entry.key === key)
+  const drop = (message: string, repair: string): void => {
+    delete node.bind
+    delete node.props.value
+    report('bind', message, repair)
+  }
+  if (value === undefined) {
+    if (declared?.kind !== 'boolean') drop(`bind=${key} needs value= to say what a click stores; the shape cannot be clicked`, `Write bind=${key} value=….`)
+    return
+  }
+  switch (declared?.kind) {
+    case 'number': {
+      const number = typeof value === 'string' && value.trim() !== '' ? Number(value) : value
+      if (typeof number === 'number' && Number.isFinite(number)) node.props.value = number
+      else drop(`value= must be a number, because ${key} is a number state; the shape cannot be clicked`, `Write value=1, or bind a text state.`)
+      return
+    }
+    case 'boolean': {
+      const flag = value === 'true' ? true : value === 'false' ? false : value
+      if (typeof flag === 'boolean') node.props.value = flag
+      else drop(`value= must be true or false, because ${key} is a true/false state; the shape cannot be clicked`, 'Write value=true, or leave value= out so a click toggles it.')
+      return
+    }
+    case 'select':
+      node.props.value = String(value)
+      if (!(declared.options ?? []).includes(String(value))) drop(`value= must be one of the options of ${key}; the shape cannot be clicked`, `Write value=${declared.options?.[0] ?? '…'}.`)
+      return
+    default:
+      node.props.value = typeof value === 'string' ? value : String(value)
+  }
+}
+
+/**
  * Put every player at the bottom of the card that holds it, as the card's control
  * bar, wherever the source wrote it. It joins the outermost card above it and
  * follows every other node, so it is that card's last child; players keep their
@@ -1143,6 +1403,9 @@ export function buildFallback(program: UIProgram): string {
   const text = lines.filter(line => line.trim() !== '').join('\n').replaceAll(KEPT_BLANK, '')
   return text === '' ? 'Interactive interface (no readable summary was produced).' : text
 }
+
+/** Pieces of a drawing's text its text version repeats. */
+const MAX_DRAWING_WORDS = 24
 
 /** Stands for an empty line inside a code block, so the empty-line filter keeps it. */
 const KEPT_BLANK = '\u0000'
@@ -1238,6 +1501,8 @@ export function fallbackLines(program: Pick<UIProgram, 'nodes' | 'constants' | '
       case 'code': return codeText(node)
       case 'chart': return chartText(node)
       case 'series': return undefined
+      case 'canvas': return canvasText(node)
+      case 'shape': return undefined
       default: return undefined
     }
   }
@@ -1360,6 +1625,25 @@ export function fallbackLines(program: Pick<UIProgram, 'nodes' | 'constants' | '
     const names = series.map((child, index) => (child.props.name === undefined ? `Series ${index + 1}` : text(child, 'name')))
     const rows = labels.map((label, index) => `${label} | ${lists.map(entry => (index < entry.length ? `${valueText(entry[index], values)}${unit}` : '—')).join(' | ')}`)
     return [...head, `| ${names.join(' | ')}`, ...rows].join('\n')
+  }
+
+  function canvasText(node: UINode): string {
+    const shapes = (children.get(node.id) ?? []).filter(child => child.type === 'shape')
+    const drawing = checkDrawing(node.props.svg)
+    const parts = [...(drawing === undefined ? [] : ['an SVG drawing']), ...(shapes.length > 0 ? [`${shapes.length} shape(s)`] : [])]
+    const caption = node.props.caption === undefined ? '' : `: ${text(node, 'caption')}`
+    const words = [
+      ...(drawing === undefined ? [] : drawingWords(drawing)),
+      ...shapes.filter(child => child.props.text !== undefined && child.props.kind === 'text').map(child => text(child, 'text')),
+    ]
+    const dragged = [...new Set(shapes.flatMap(child => [child.props.dragX, child.props.dragY]).filter((key): key is string => typeof key === 'string'))]
+    const clicked = [...new Set(shapes.filter(child => child.bind !== undefined && child.props.dragX === undefined && child.props.dragY === undefined).map(child => child.bind?.key as string))]
+    return [
+      `Drawing${caption} (${parts.join(', ')})`,
+      ...(words.length > 0 ? [`Text in it: ${words.slice(0, MAX_DRAWING_WORDS).join(' · ')}`] : []),
+      ...(dragged.length > 0 ? [`The reader drags: ${dragged.map(key => `${key} = ${valueText(['ref', key], values)}`).join(', ')}`] : []),
+      ...(clicked.length > 0 ? [`The reader clicks to set: ${clicked.join(', ')}`] : []),
+    ].join('\n')
   }
 
   function list(value: JsonValue | undefined): string[] {

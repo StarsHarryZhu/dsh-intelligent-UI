@@ -1,4 +1,5 @@
-/** Bundled client modules (32):
+/** Bundled client modules (34):
+ *   client/canvas.js
  *   client/card.js
  *   client/chart.js
  *   client/clipboard.js
@@ -29,6 +30,7 @@
  *   lang/math.js
  *   lang/print.js
  *   lang/series.js
+ *   lang/svg.js
  *   lang/text.js
  *   lang/types.js
  */

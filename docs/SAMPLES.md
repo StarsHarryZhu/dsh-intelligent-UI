@@ -1,6 +1,6 @@
 # The catalog, one sample per component
 
-A live tour of the catalog: one card per component, drawn in a real chat. Samples 1 to 24 were drawn on 2026-10-15 in the order the catalog had then; samples 25 and 26, the math components, and sample 27, the animation player, were written by the model itself on 2026-10-16. Samples 28 to 31, the newest components, were written by hand on 2026-10-18 and compiled by the built tool; their results are that tool's output. Samples 32 (`code`, 2026-10-22) and 33 (`series`, 2026-10-26) were written the same way. On 2026-10-19 one card using all four — tabs, a checklist, a sortable table, and a diagram — drew in the web UI.
+A live tour of the catalog: one card per component, drawn in a real chat. Samples 1 to 24 were drawn on 2026-10-15 in the order the catalog had then; samples 25 and 26, the math components, and sample 27, the animation player, were written by the model itself on 2026-10-16. Samples 28 to 31, the newest components, were written by hand on 2026-10-18 and compiled by the built tool; their results are that tool's output. Samples 32 (`code`, 2026-10-22), 33 (`series`, 2026-10-26), and 34 and 35 (`canvas` and `shape`, 2026-11-05) were written the same way. On 2026-10-19 one card using all four — tabs, a checklist, a sortable table, and a diagram — drew in the web UI.
 
 Every block below is the exact `source` that was passed to `ui_render` and the exact result it reported, so this file doubles as a regression corpus — `tests/compile.test.ts` can compile any of them.
 
@@ -619,6 +619,84 @@ What a text-only reader sees:
 ```
 
 8 components, 1 control, zero repairs.
+
+## 34. `canvas`
+
+A drawing: `shape` lines over an optional SVG drawing written in `svg="""`. The SVG is read into a checked tree, so scripts, styles, links, and images never reach the page; black follows the host's text colour and other colours stay as written. Shapes use the viewBox of the drawing, or `view=[left, right, bottom, top]` when there is none. Pictured with one area clicked.
+
+```dil
+@state part = "点一个部件"
+card "canvas · 画布"
+  canvas "一盏台灯：SVG 底图，上面是可点的区域" svg="""
+    <svg viewBox="0 0 320 200">
+      <defs>
+        <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#f6c344"/>
+          <stop offset="1" stop-color="#e8912d"/>
+        </linearGradient>
+      </defs>
+      <ellipse cx="160" cy="186" rx="52" ry="8" fill="#8a8f98"/>
+      <path d="M160 180 L160 96" stroke="black" stroke-width="5" stroke-linecap="round"/>
+      <path d="M116 96 L204 96 L184 40 L136 40 Z" fill="url(#shade)"/>
+      <text x="160" y="24" text-anchor="middle" font-size="13">台灯</text>
+    </svg>
+    """
+    shape "灯罩" kind=hotspot x=112 y=36 w=96 h=64 bind=part value="灯罩：把光往下收"
+    shape "灯杆" kind=hotspot x=148 y=100 w=24 h=78 bind=part value="灯杆：撑起灯罩"
+    shape "底座" kind=hotspot x=104 y=176 w=112 h=20 bind=part value="底座：保持稳定"
+  text "{part}"
+```
+
+Result:
+
+```
+The card is shown: 6 component(s), 3 control(s).
+What a text-only reader sees:
+## canvas · 画布
+  Drawing: 一盏台灯：SVG 底图，上面是可点的区域 (an SVG drawing, 3 shape(s))
+  Text in it: 台灯
+  The reader clicks to set: part
+  点一个部件
+```
+
+6 components, 3 controls, zero repairs.
+
+## 35. `shape`
+
+One thing drawn on a canvas, later ones on top: `line`, `rect`, `circle`, `polygon`, `polyline`, `path`, `text`, `point`, and `hotspot`, an invisible area to click. Every coordinate is an expression. A `point` with `drag=true` moves whichever of its `x=` and `y=` is one number state, so with a calculated `y=` it follows a curve. With `bottom` below `top` in `view=`, y grows upward.
+
+```dil
+@state ax = 0 min=-4 max=4 step=0.5
+@state ay = 2 min=-1 max=3 step=0.5
+@state t = 1.5 min=-2 max=2 step=0.1
+@calc area = 3 * abs(ay + 2)
+card "shape · 形状"
+  canvas "拖动顶点 A；P 只能沿曲线走" view=[-5, 5, -3, 3.5]
+    shape kind=line x=-5 y=0 x2=5 y2=0 tone=muted arrow=true
+    shape kind=line x=0 y=-3 x2=0 y2=3.5 tone=muted arrow=true
+    shape kind=polygon points=["ax", "ay", -3, -2, 3, -2] tone=primary fill=true
+    shape kind=path d="M-2 -1 Q0 7 2 -1" tone=success dash=true
+    shape "底边 6" kind=text x=-1.6 y=-2.5 tone=secondary size=xs
+    shape "A" kind=point x=ax y=ay drag=true tone=primary
+    shape "P" kind=point x=t y="3 - t^2" drag=true tone=success
+  metric "三角形面积" value=area
+  text "A 在 ({ax}, {ay})，P 的 x = {t}"
+```
+
+Result:
+
+```
+The card is shown: 11 component(s), 2 control(s).
+What a text-only reader sees:
+## shape · 形状
+  Drawing: 拖动顶点 A；P 只能沿曲线走 (7 shape(s))
+  Text in it: 底边 6
+  The reader drags: ax = 0, ay = 2, t = 1.5
+  三角形面积: 12
+  A 在 (0, 2)，P 的 x = 1.5
+```
+
+12 components, 2 controls, zero repairs.
 
 ## What this tour found
 

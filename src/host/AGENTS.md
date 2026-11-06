@@ -95,9 +95,12 @@ through the registry's own `assertSupportedJsonSchema` in the tests.
   `{ version: 1, ok: false, diagnostics }` (at most five) on failure; the program
   inside carries the same API version.
 - The description lists every component, the limits, the math vocabulary, and
-  five examples that compile cleanly, at under nine thousand characters.
+  four examples that compile cleanly, at under 9800 characters. The comparison
+  example stays exported for the tests but out of the description, because the
+  table's line already shows its form; a catalog entry's `explained` props are
+  left to their own paragraph (the shapes).
 - The skill lists under `dsh-intelligent-ui` from its own row, as a bundled
-  provider whose base directory holds its two reference files
+  provider whose base directory holds its three reference files
   (`tests/skill.test.ts`, `tests/isolation.test.ts`); the move from the runtime
   registration followed the desktop app showing no skill (2026-10-22).
   In the live run the model loaded it unprompted before its first card.

@@ -6,7 +6,7 @@ import { BUNDLED_SKILL_RANK, createSkillProvider, parseSkill, readSkillCandidate
 import { compileSource } from '../src/lang/compile.ts'
 
 /** The bundled skill's files: the instructions and the references they name. */
-const FILES = ['SKILL.md', 'math.md', 'recipes.md']
+const FILES = ['SKILL.md', 'math.md', 'recipes.md', 'drawing.md']
 
 /** The host's own skill-name rule and its convention for one rendered skill file. */
 const SKILL_NAME_RULE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u
@@ -33,7 +33,7 @@ describe('the bundled skill', () => {
 
   it('names only reference files that exist', () => {
     const named = [...new Set([...read('SKILL.md').matchAll(/`([\w-]+\.md)`/gu)].map(match => match[1] as string))]
-    expect(named.sort()).toEqual(['math.md', 'recipes.md'])
+    expect(named.sort()).toEqual(['drawing.md', 'math.md', 'recipes.md'])
     for (const name of named) expect(() => read(name)).not.toThrow()
   })
 

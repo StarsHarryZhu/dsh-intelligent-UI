@@ -13,10 +13,11 @@ Interactive cards in DeepSeek Harness chats. The model writes a small interface 
 
 ## How it works
 
-- The plugin registers one tool, `ui_render`, and one skill, `dsh-intelligent-ui`, which teaches the model when a card beats prose. The skill is its own part of the plugin: the Plugin Manager lists it with its own switch, and installing the plugin installs it. The model never writes HTML or JavaScript: its program is checked against the 33-component catalog and stored with the tool result.
+- The plugin registers one tool, `ui_render`, and one skill, `dsh-intelligent-ui`, which teaches the model when a card beats prose. The skill is its own part of the plugin: the Plugin Manager lists it with its own switch, and installing the plugin installs it. The model never writes HTML or JavaScript: its program is checked against the 35-component catalog and stored with the tool result. SVG it writes for a drawing is read into a checked tree with no scripts, styles, links, or images.
 - A card draws in the tool row while the reply streams, and under the reply once it finishes. Moving a control recomputes every figure locally, and this browser keeps what you set, so a reload shows the card as you left it.
 - Asked to change a card, the model draws a revised one that starts from your settings; the earlier card says a newer version follows.
-- A `player` animates a card: code traced line by line, an algorithm's passes, a point moving along a curve. Playback runs in the browser and sends nothing to the model.
+- A `player` animates a card: code traced line by line, an algorithm's passes, a point moving along a curve. With `loop=true autoplay=true` a drawing plays by itself while it is on screen, like a GIF: a rolling wheel, a travelling wave, an orbit. Playback runs in the browser and sends nothing to the model, and nothing starts by itself if your system asks for less motion.
+- A `canvas` draws what the model sketches, from shape lines or SVG. You can drag its points and click its parts, and everything recomputes locally; a button can tell the model what you chose.
 - Cards compute integrals (including infinite bounds), derivatives, limits, sums and products, roots, and Taylor polynomials. A value that cannot be computed reliably shows "—", never a guess.
 - Uninstalling leaves every session opening as before; earlier calls show as ordinary tool rows.
 
@@ -30,7 +31,7 @@ node node_modules/vitest/vitest.mjs run
 
 `AGENTS.md` holds the rules of the tree; `docs/VERIFY.md` is the live checklist.
 
-## The 33 components
+## The 35 components
 
 One card per component, drawn by this plugin in the host's light theme. The program behind each card is in [`docs/SAMPLES.md`](docs/SAMPLES.md).
 
@@ -172,6 +173,18 @@ One named series of a chart, stacked or side by side; the legend hides and shows
 
 A flowchart laid out in layers; loops return along the side, and `current=` highlights a box.
 
+### `canvas` — Data
+
+<img src="assets/catalog/canvas.png" alt="canvas" width="720">
+
+A drawing: `shape` lines over an optional SVG, which is read into a checked tree. Pictured with one area clicked.
+
+### `shape` — Data
+
+<img src="assets/catalog/shape.png" alt="shape" width="720">
+
+One thing on a canvas: a line, rectangle, circle, polygon, path, curve of a function, text, point, invisible area to click, or a part of the SVG placed by its id. Coordinates, turns, sizes, and fades are expressions, so a player animates them; a `point` with `drag=true` moves under the reader's pointer, and a click stores a value in a state.
+
 ### `plot` — Math
 
 <img src="assets/catalog/plot.png" alt="plot" width="720">
@@ -230,7 +243,7 @@ Sends its text as your next message, then locks the card.
 
 <img src="assets/catalog/player.png" alt="player" width="720">
 
-A control bar at the bottom of the card: plays, pauses, steps, and scrubs a number at 0.5× to 2×; everything that reads it follows.
+A control bar at the bottom of the card: plays, pauses, steps, and scrubs a number at 0.5× to 2×; everything that reads it follows. `loop=true` repeats a run, and `autoplay=true` starts it while the card is on screen.
 
 ## License
 

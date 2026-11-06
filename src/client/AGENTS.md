@@ -6,7 +6,7 @@ The browser half. `index.ts` registers the plugin's contributions; `toolview.tsx
 draws the `ui_render` row while its turn runs; `tail.tsx` draws a finished turn's
 cards under its reply; `turn-data.ts` collects those cards from events the host
 already records; `card.tsx` draws one program with its local state, and
-`components.tsx` with `table.tsx`, `chart.tsx`, `plot.tsx`, `formula.tsx`, and
+`components.tsx` with `canvas.tsx`, `table.tsx`, `chart.tsx`, `plot.tsx`, `formula.tsx`, and
 the other figure files maps each catalog type to exactly one renderer.
 
 Everything a card draws comes from `tool/result.meta`, or, while the call streams,
@@ -85,8 +85,13 @@ browser half still sets no timers. The pace comes from the clock, and one frame
 never advances more than a second of run time, so a throttled page keeps its
 pace and a tab that slept does not jump. A page that paints no frames, such as a
 hidden tab, pauses. Whether it plays and how fast belong to that copy of the
-card; the frame is in the shared store. Scrubbing, stepping, and unmounting stop
-it, and nothing reaches the model. The player always sits at the bottom of its
+card; the frame is in the shared store, as a passing value storage does not keep,
+and the frame a run stops on is kept. Scrubbing, stepping, and unmounting stop
+it, and nothing reaches the model. `loop=` starts a run over after its last step;
+`autoplay=` runs it while its card is on screen (an `IntersectionObserver`), never
+under `prefers-reduced-motion`, until the reader presses a control. A copy that
+starts a run takes the player over (`RUNNING`, keyed by card and node), and the
+other copy stops. The player always sits at the bottom of its
 card, under a hairline: `readProgram` docks it there even in a program saved
 before the compiler did.
 
@@ -124,6 +129,20 @@ the first; the legend hides and shows a series, always keeping one, and a readou
 names one column, moved by pointer or arrow keys. Only that pointer position is
 read from the DOM. A pie draws one series with its shares in the legend.
 
+**A drawing is checked again, and drawn through a table.** `canvas.tsx` reads a
+stored SVG tree through `checkDrawing` and draws it through `ELEMENTS`, one literal
+element per allowed name, so a stored name not in the table cannot become an
+element. Its ids and their references get a `useId` prefix, since every drawing on
+a page shares one id space. Shapes map by arithmetic to a viewBox as wide as the
+canvas is on the page, so weights, text, and points are real pixels whatever the
+coordinates and however narrow the screen. A dragged point and a clicked shape
+write through `setValue`, so a state's limits hold and the change is kept like any
+edit. `rotate=`, `scale=`, and `opacity=` go on a shape's group as a transform and
+an opacity, turning the way the canvas's y axis goes; a `curve` is sampled here on
+a work budget, and a `use` shape places a part of the drawing by its prefixed id,
+inheriting the drawing's root colours rather than a tone. That width and the pointer during a drag are all it reads from the page. Colours inside a
+drawing are the model's; every shape's colour is a theme token.
+
 **A code block scrolls itself, never the page.** When `current=` moves, the
 block sets its own `scrollTop` so the line stays in view; it never calls
 `scrollIntoView`, which would move the chat. Its colours are the host's syntax
@@ -145,6 +164,8 @@ accepts no other non-theme colour. Copying writes the block's exact text.
 - `components.tsx` — the type-to-renderer registry, the number field, the
   animation player, tabs, and the checklist.
 - `parts.tsx` — prop readers and the glyph that several renderers share.
+- `canvas.tsx` — drawings: shapes, the checked SVG layer, dragged points, and
+  clicked shapes.
 - `table.tsx` — tables: sorting, filtering, pages, and CSV and Markdown copies.
 - `diagram.tsx` — flowcharts: the layered layout and its SVG drawing.
 - `code.tsx` — code blocks: coloured lines, line numbers, the current line kept
@@ -179,6 +200,10 @@ accepts no other non-theme colour. Copying writes the block's exact text.
 - The player plays to the end in its duration and stops, restarts from the
   beginning, steps one frame, pauses when scrubbed, stepped, or unmounted, and
   cycles 1×, 2×, and 0.5×; `current=` and `mono=` highlight and set code type
+  (`tests/client.test.tsx`).
+- A canvas maps shapes both ways up, follows state, moves a dragged point by
+  pointer and arrow keys on its state's steps, stores a click, keeps both after a
+  reload, and draws nothing a forged program adds off the lists
   (`tests/client.test.tsx`).
 - Tabs switch by click and arrow keys and keep their page in both copies; a
   checklist counts, sums, and names into its bound states; a sortable table cycles ascending,

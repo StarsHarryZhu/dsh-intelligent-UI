@@ -9,7 +9,10 @@
  */
 /** Worked example: an estimate the reader adjusts. Also pinned by the tests, so it must compile. */
 export declare const ESTIMATE_EXAMPLE: string;
-/** Worked example: a comparison. */
+/**
+ * A comparison: the plainest card. The description leaves it out, because the
+ * table's catalog line already shows its form; the tests draw it.
+ */
 export declare const COMPARISON_EXAMPLE: string;
 /** Worked example: a question answered with one click. */
 export declare const QUIZ_EXAMPLE: string;

@@ -27,7 +27,10 @@ export const ESTIMATE_EXAMPLE = [
   '  text "{seats} seats on {plan} cost {monthly} USD a month."',
 ].join('\n')
 
-/** Worked example: a comparison. */
+/**
+ * A comparison: the plainest card. The description leaves it out, because the
+ * table's catalog line already shows its form; the tests draw it.
+ */
 export const COMPARISON_EXAMPLE = [
   'card "Fares to Boston"',
   '  table columns=["Operator","Price","Time"] rows=[["Amtrak","$89","3h 40m"],["Bus","$29","4h 30m"]]',
@@ -75,7 +78,7 @@ export const ANIMATION_EXAMPLE = [
 const MATH_LINES = [
   `Math works in every expression: ^ (power), n! (factorial), implicit products such as 2x or 3(x + 1), the constants ${Object.keys(MATH_CONSTANTS).join(' ')}, and the functions ${Object.keys(MATH_FUNCTIONS).join(' ')}; trigonometry is in radians.`,
   `Calculus names its variable in the second argument, and that variable exists only inside the first: integral(f, x, a, b) (a or b may be inf or -inf), deriv(f, x, at[, n]) (n up to ${MAX_DERIVATIVE_ORDER}), limit(f, x, at[, 1|-1]) (at may be inf; 1 or -1 picks a side), sum(f, k, from, to) and prod(f, k, from, to) (whole numbers, at most ${MAX_SERIES_TERMS} terms), solve(f = g, x, lo, hi) (a root inside [lo, hi]), taylor(f, x, center, n, at) (degree n up to ${MAX_SERIES_ORDER}, evaluated at at).`,
-  'Results carry about ten significant digits; a value that cannot be computed reliably (a divergent limit, an equation without a root in its interval) shows "—", never a guess. The result you receive lists the computed values, so quote those numbers in your reply.',
+  'Results carry about ten significant digits; a value that cannot be computed reliably shows "—", never a guess. The result you receive lists the computed values; quote those in your reply.',
 ]
 
 /** What the model must know before writing a program. */
@@ -90,7 +93,7 @@ export const UI_TOOL_DESCRIPTION = [
   '  <component> ["text"] [prop=value …]    the quoted text fills the component\'s main text (marked "…" below)',
   '  <component> … """    the lines below, up to a line of only """, are its main text, kept as written',
   'Values: numbers, true/false, "quoted text", JSON lists such as ["a","b"] or [["row","cell"]], and a name or expression wherever a prop takes expr. Quote an expression that contains spaces: value="mins / 60". Any quoted text, list item, or table cell may embed {expression}, for example "Total: {monthly} USD".',
-  `padding and gap are whole steps of 4px from 0 to ${MAX_SPACE}. tone: ${TONES.join(', ')}. size: ${SIZES.join(', ')}. Use tones and sizes, never colours or pixels.`,
+  `padding and gap are whole steps of 4px from 0 to ${MAX_SPACE}. tone: ${TONES.join(', ')}. size: ${SIZES.join(', ')}. Use tones and sizes, never colours or pixels; only svg= keeps its own colours.`,
   `Limits: ${LIMITS.maxNodes} components, depth ${LIMITS.maxDepth}, ${LIMITS.maxState} state and calc names, ${LIMITS.maxTableRows} table rows, ${LIMITS.maxSourceBytes} characters.`,
   '',
   ...MATH_LINES,
@@ -98,13 +101,12 @@ export const UI_TOOL_DESCRIPTION = [
   'Components:',
   ...CATALOG.map(describeComponent),
   '',
-  'Animation (running code, an algorithm, a motion): one frame state driven by player; derive per-frame values with pick(frame, …). current= on code, steps, list, table, or diagram highlights that 1-based line or item.',
+  'Shapes need (expressions): line x y x2 y2; rect, hotspot (invisible click area) x y w h; circle x y r; polygon, polyline points=[x1,y1,…]; path d="…"; text, point x y; curve fn="f(x)" or fn=["x(t)","y(t)"] var=t, from= to=; use ref=<id in svg=>. rotate= (degrees) and scale= act about x y, which moves polygon, polyline, path, curve, and use from 0 0.',
+  '',
+  'Animation (running code, an algorithm, a motion): one frame state driven by player; derive per-frame values with pick(frame, …). current= on code, steps, list, table, or diagram highlights that 1-based line or item. Shapes reading the played state move; a fine step= (0.01) keeps them smooth.',
   '',
   'Example — an adjustable estimate:',
   indent(ESTIMATE_EXAMPLE),
-  '',
-  'Example — a comparison:',
-  indent(COMPARISON_EXAMPLE),
   '',
   'Example — a question answered by clicking (never show the answer in the card):',
   indent(QUIZ_EXAMPLE),
@@ -122,7 +124,7 @@ export const UI_TOOL_DESCRIPTION = [
 function describeComponent(descriptor: ComponentDescriptor): string {
   const primary = descriptor.primary === undefined ? '' : ` "${descriptor.primary}…"`
   const props = Object.entries(descriptor.props)
-    .filter(([name]) => name !== descriptor.primary)
+    .filter(([name]) => name !== descriptor.primary && descriptor.explained?.includes(name) !== true)
     .map(([name, spec]) => `${name}${spec.required === true ? '' : '?'}=${hint(spec)}`)
   const children = !descriptor.container ? '' : descriptor.holds === undefined ? ' Holds indented components.' : ` Holds indented ${descriptor.holds.join(', ')} lines.`
   return `  ${descriptor.type}${primary}${props.length === 0 ? '' : ` ${props.join(' ')}`} — ${descriptor.description}${children}`
@@ -142,12 +144,14 @@ function hint(spec: PropSpec): string {
     case 'series': return spec.literal === true ? '[n]' : '[n|"expr"]'
     case 'items': return '["…"]'
     case 'options': return '["…"]'
-    case 'bind': return `<${spec.state === 'string' ? 'text' : spec.state === 'select' ? 'choice' : spec.state === 'boolean' ? 'true/false' : 'number'} state>`
-    case 'fns': return '"f(x)"|["f(x)",…]'
+    case 'bind': return `<${spec.state === 'any' ? 'any' : spec.state === 'string' ? 'text' : spec.state === 'select' ? 'choice' : spec.state === 'boolean' ? 'true/false' : 'number'} state>`
+    case 'fns': return spec.pair === true ? '"f(x)"|["x(t)","y(t)"]' : '"f(x)"|["f(x)",…]'
     case 'math': return '"expression"'
     case 'variable': return 'name'
     case 'edges': return '["a -> b: label"]'
     case 'code': return '"""…"""'
+    case 'svg': return '"""<svg…>"""'
+    case 'scalar': return 'n|"…"'
   }
 }
 

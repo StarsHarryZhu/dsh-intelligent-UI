@@ -732,3 +732,249 @@ describe('charts of several series', () => {
     expect(single.fallback).toContain('Q1: 1 · Q2: 2 · Q3: 3')
   })
 })
+
+describe('canvases and shapes', () => {
+  const shapes = (program: UIProgram): UINode[] => program.nodes.filter(node => node.type === 'shape')
+  const messages = (program: UIProgram): string => program.diagnostics.map(entry => entry.message).join('\n')
+
+  it('reads shape lines under a canvas with no repair', () => {
+    const program = ok([
+      '@state a = 1 min=0 max=3',
+      'card',
+      '  canvas "Plan" view=[-1, 1, -1, 1]',
+      '    shape kind=line x=0 y=0 x2=a y2=1 arrow=true tone=primary',
+      '    shape kind=rect x=0 y=0 w=1 h="a / 2" fill=true dash="a > 1"',
+      '    shape kind=circle x=0 y=0 r=a',
+      '    shape kind=polygon points=[0, 0, "a", 1, 1, 0]',
+      '    shape kind=polyline points=[0, 0, 1, 1]',
+      '    shape kind=path d="M0 0 L{a} 1 Z"',
+      '    shape "Label {a}" kind=text x=0 y=0 anchor=start size=lg show="a > 0"',
+      '    shape kind=point x=0 y=0',
+    ].join('\n'))
+    expect(program.diagnostics).toEqual([])
+    expect(first(program, 'canvas').props.view).toEqual([-1, 1, -1, 1])
+    expect(shapes(program)).toHaveLength(8)
+    expect(shapes(program).every(node => node.parent === first(program, 'canvas').id)).toBe(true)
+    expect(program.fallback).toContain('Drawing: Plan (8 shape(s))')
+    expect(program.fallback).toContain('Text in it: Label 1')
+  })
+
+  it('fills in spellings models reach for', () => {
+    const program = ok('card\n  canvas\n    shape kind=rectangle x=0 y=0 w=1 h=1\n    shape "x" kind=label x=0 y=0\n    shape kind=dot x=0 y=0')
+    expect(program.diagnostics).toEqual([])
+    expect(shapes(program).map(node => node.props.kind)).toEqual(['rect', 'text', 'point'])
+  })
+
+  it('takes a drawing from svg=, or from a text block with no name', () => {
+    const drawing = '<svg viewBox="0 0 10 10"><circle r="1"/></svg>'
+    const named = ok(`card\n  canvas "Lamp" svg="""\n    ${drawing}\n    """\n    shape kind=point x=1 y=1`)
+    expect(named.diagnostics).toEqual([])
+    expect(first(named, 'canvas').props.svg).toEqual({ viewBox: [0, 0, 10, 10], attrs: {}, children: [['circle', { r: '1' }]] })
+    expect(shapes(named)).toHaveLength(1)
+    expect(named.fallback).toContain('Drawing: Lamp (an SVG drawing, 1 shape(s))')
+    const loose = ok(`card\n  canvas """\n    ${drawing}\n    """`)
+    expect(first(loose, 'canvas').props.svg).toBeDefined()
+    expect(first(loose, 'canvas').props.caption).toBeUndefined()
+    const json = ok(JSON.stringify({ nodes: [{ type: 'card', children: [{ type: 'canvas', svg: drawing }] }] }))
+    expect(first(json, 'canvas').props.svg).toBeDefined()
+  })
+
+  it('reports what a drawing lost, and what it says in the text version', () => {
+    const program = ok('card\n  canvas svg="""\n    <svg viewBox="0 0 9 9"><script>x</script><rect onclick="x" width="1"/><text>Hi</text></svg>\n    """')
+    expect(messages(program)).toContain('<canvas> svg: had elements a card does not draw, which were left out: script')
+    expect(messages(program)).toContain('had attributes a card does not keep, which were ignored: onclick')
+    expect(program.fallback).toContain('Text in it: Hi')
+    expect(JSON.stringify(program.nodes)).not.toContain('onclick')
+  })
+
+  it('leaves out a canvas with nothing to draw', () => {
+    const empty = ok('card\n  text "x"\n  canvas "Empty"')
+    expect(empty.nodes.some(node => node.type === 'canvas')).toBe(false)
+    expect(messages(empty)).toContain('canvas has neither svg= nor shape lines')
+    const blocked = ok('card\n  text "x"\n  canvas svg="""\n    <svg viewBox="0 0 9 9"><script>x</script></svg>\n    """')
+    expect(blocked.nodes.some(node => node.type === 'canvas')).toBe(false)
+    expect(messages(blocked)).toContain('has nothing a card can draw')
+  })
+
+  it('places a shape beside its canvas in it, and leaves out a shape with no canvas', () => {
+    const beside = ok('card\n  canvas\n  shape kind=point x=1 y=1')
+    expect(shapes(beside)[0]?.parent).toBe(first(beside, 'canvas').id)
+    expect(messages(beside)).toContain('<shape> sits beside its canvas')
+    const stray = ok('card\n  text "x"\n  shape kind=point x=1 y=1')
+    expect(shapes(stray)).toEqual([])
+    expect(messages(stray)).toContain('<shape> belongs inside a canvas')
+  })
+
+  it('leaves out a shape missing what its kind needs, and says what that is', () => {
+    const program = ok('card\n  canvas\n    shape kind=line x=1 y=1\n    shape kind=rect x=1\n    shape kind=text x=1 y=1\n    shape kind=polygon points=[1, 2]\n    shape kind=point x=1 y=1')
+    expect(shapes(program).map(node => node.props.kind)).toEqual(['point'])
+    expect(messages(program)).toContain('shape kind=line needs x2, y2')
+    expect(messages(program)).toContain('shape kind=rect needs y, w, h')
+    expect(messages(program)).toContain('shape kind=text needs text')
+    expect(messages(program)).toContain('needs at least two points')
+    expect(program.diagnostics.find(entry => entry.message.includes('kind=line'))?.repair).toContain('x=… y=… x2=… y2=…')
+  })
+
+  it('drops an odd last number, an arrow off a line, and path data that is not path data', () => {
+    const odd = ok('card\n  canvas\n    shape kind=polygon points=[0, 0, 1, 1, 2]\n    shape kind=rect x=0 y=0 w=1 h=1 arrow=true')
+    expect(shapes(odd)[0]?.props.points).toEqual([0, 0, 1, 1])
+    expect(messages(odd)).toContain('odd count')
+    expect(shapes(odd)[1]?.props.arrow).toBeUndefined()
+    const bad = ok('card\n  text "x"\n  canvas\n    shape kind=path d="M0 0 url(https://x.test)"')
+    expect(shapes(bad)).toEqual([])
+    expect(messages(bad)).toContain('not SVG path data')
+    expect(JSON.stringify(bad)).not.toContain('x.test')
+  })
+
+  it('reads curves, placed parts, turns, and a looping player with no repair', () => {
+    const program = ok([
+      '@state t = 0 min=0 max=6.28 step=0.01',
+      'card',
+      '  canvas svg="""',
+      '    <svg viewBox="0 0 320 200"><defs><g id="wheel"><circle r="20"/></g></defs></svg>',
+      '    """',
+      '    shape kind=curve fn="sin(x - t)" from=0 to=320',
+      '    shape kind=curve fn=["cos(s)", "sin(s)"] var=s from=0 to=t',
+      '    shape kind=use ref="#wheel" x="t * 40" y=100 rotate="deg(t)" scale=1.5 opacity=0.8',
+      '    shape kind=rect x=0 y=0 w=10 h=10 rotate=t',
+      '  player "t" bind=t duration=4 loop=true autoplay=true',
+    ].join('\n'))
+    expect(program.diagnostics).toEqual([])
+    expect(shapes(program).map(node => node.props.kind)).toEqual(['curve', 'curve', 'use', 'rect'])
+    expect(shapes(program)[2]?.props.ref).toBe('wheel')
+    expect(shapes(program)[1]?.props.fn).toHaveLength(2)
+    expect(first(program, 'player').props.loop).toEqual(['lit', true])
+  })
+
+  it('drops props off the kinds they do not apply to, and a traced curve with no range', () => {
+    const program = ok([
+      'card',
+      '  canvas',
+      '    shape kind=rect x=0 y=0 w=1 h=1 fn="x" ref=a',
+      '    shape kind=point x=1 y=1 rotate=30 scale=2',
+      '    shape kind=curve fn=["cos(t)", "sin(t)"] var=t',
+      '    shape kind=curve fn=["1", "2", "3"]',
+    ].join('\n'))
+    expect(shapes(program).map(node => node.props.kind)).toEqual(['rect', 'point'])
+    expect(shapes(program)[0]?.props.fn).toBeUndefined()
+    expect(shapes(program)[1]?.props.rotate).toBeUndefined()
+    for (const text of ['fn= does not apply to kind=rect', 'ref= does not apply to kind=rect', 'rotate= does not apply to kind=point', 'scale= does not apply to kind=point', 'needs from= and to=', 'or a pair [x, y]', 'shape kind=curve needs fn']) {
+      expect(messages(program)).toContain(text)
+    }
+  })
+
+  it('leaves out a part with no drawing to take it from, or an id the drawing does not have', () => {
+    const program = ok([
+      'card',
+      '  canvas',
+      '    shape kind=use ref=wheel',
+      '    shape kind=point x=1 y=1',
+      '  canvas svg="""',
+      '    <svg viewBox="0 0 10 10"><defs><g id="arm"/><g id="leg"/></defs></svg>',
+      '    """',
+      '    shape kind=use ref=wheel',
+      '    shape kind=use ref="#arm"',
+      '    shape kind=use ref="not an id"',
+    ].join('\n'))
+    expect(shapes(program).filter(node => node.props.kind === 'use').map(node => node.props.ref)).toEqual(['arm'])
+    expect(messages(program)).toContain('this canvas has none')
+    expect(messages(program)).toContain('ref=wheel names no element of the canvas\'s svg= (its ids: arm, leg)')
+    expect(messages(program)).toContain('ref= must be the id of an element')
+    expect(program.diagnostics.find(entry => entry.message.includes('ref=wheel'))?.repair).toContain('<defs>')
+  })
+
+  it('reports a view that cannot be used, or a thin one, and one beside svg=', () => {
+    const zero = ok('card\n  canvas view=[1, 1, 0, 5]\n    shape kind=point x=1 y=1')
+    expect(first(zero, 'canvas').props.view).toBeUndefined()
+    expect(messages(zero)).toContain('view= must be [left, right, bottom, top]')
+    const short = ok('card\n  canvas view=[0, 1]\n    shape kind=point x=1 y=1')
+    expect(first(short, 'canvas').props.view).toBeUndefined()
+    const thin = ok('card\n  canvas view=[0, 100, 0, 1]\n    shape kind=point x=1 y=1')
+    expect(first(thin, 'canvas').props.view).toEqual([0, 100, 0, 1])
+    expect(messages(thin)).toContain('more than 3 times longer')
+    const both = ok('card\n  canvas view=[0, 1, 0, 1] svg="""\n    <svg viewBox="0 0 9 9"><rect width="1"/></svg>\n    """')
+    expect(first(both, 'canvas').props.view).toBeUndefined()
+    expect(messages(both)).toContain('both view= and svg=')
+    const expression = ok('@state a = 1\ncard\n  canvas view=[0, "a", 0, 1]\n    shape kind=point x=1 y=1')
+    expect(first(expression, 'canvas').props.view).toBeUndefined()
+    expect(messages(expression)).toContain('not a plain number')
+  })
+
+  it('moves the plain states of a dragged point, and only those', () => {
+    const both = ok('@state a = 1\n@state b = 2\ncard\n  canvas\n    shape kind=point x=a y=b drag=true')
+    expect(both.diagnostics).toEqual([])
+    expect(shapes(both)[0]?.props).toEqual(expect.objectContaining({ dragX: 'a', dragY: 'b' }))
+    expect(shapes(both)[0]?.bind).toEqual({ key: 'a', kind: 'number' })
+    expect(both.fallback).toContain('The reader drags: a = 1, b = 2')
+    const curve = ok('@state t = 1\ncard\n  canvas\n    shape kind=point x=t y="t^2" drag=true')
+    expect(shapes(curve)[0]?.props.dragX).toBe('t')
+    expect(shapes(curve)[0]?.props.dragY).toBeUndefined()
+    const calc = ok('@state t = 1\n@calc c = t * 2\ncard\n  canvas\n    shape kind=point x=c y=3 drag=true')
+    expect(shapes(calc)[0]?.props.drag).toBeUndefined()
+    expect(shapes(calc)[0]?.bind).toBeUndefined()
+    expect(messages(calc)).toContain('drag= needs x= or y= to be one number @state')
+    const text = ok('@state t = "a"\ncard\n  canvas\n    shape kind=point x=t y=3 drag=true')
+    expect(text.nodes.filter(node => node.type === 'shape').every(node => node.props.dragX === undefined)).toBe(true)
+    const line = ok('@state a = 1\ncard\n  canvas\n    shape kind=line x=a y=0 x2=1 y2=1 drag=true')
+    expect(shapes(line)[0]?.props.drag).toBeUndefined()
+    expect(messages(line)).toContain('drag= applies to points')
+    const clicked = ok('@state a = 1\n@state p = "x"\ncard\n  canvas\n    shape kind=point x=a y=1 drag=true bind=p value="y"')
+    expect(shapes(clicked)[0]?.bind?.key).toBe('a')
+    expect(shapes(clicked)[0]?.props.value).toBeUndefined()
+    expect(messages(clicked)).toContain('a dragged point cannot also be clicked')
+  })
+
+  it('checks what a click stores against the state it stores into', () => {
+    const source = (state: string, rest: string): UIProgram => ok(`@state s = ${state}\ncard\n  text "x"\n  canvas\n    shape kind=rect x=0 y=0 w=1 h=1 bind=s ${rest}`)
+    expect(shapes(source('1', 'value=2'))[0]?.props.value).toBe(2)
+    expect(shapes(source('1', 'value="3"'))[0]?.props.value).toBe(3)
+    expect(shapes(source('"a"', 'value="b"'))[0]?.props.value).toBe('b')
+    expect(shapes(source('"a"', 'value=2'))[0]?.props.value).toBe('2')
+    expect(shapes(source('true', ''))[0]?.bind?.key).toBe('s')
+    expect(shapes(source('true', 'value=false'))[0]?.props.value).toBe(false)
+    expect(shapes(source('"a" options=a|b', 'value=b'))[0]?.props.value).toBe('b')
+    const wrongNumber = source('1', 'value="x"')
+    expect(shapes(wrongNumber)[0]?.bind).toBeUndefined()
+    expect(messages(wrongNumber)).toContain('value= must be a number')
+    const wrongFlag = source('true', 'value="x"')
+    expect(shapes(wrongFlag)[0]?.bind).toBeUndefined()
+    expect(messages(wrongFlag)).toContain('value= must be true or false')
+    const wrongChoice = source('"a" options=a|b', 'value=c')
+    expect(shapes(wrongChoice)[0]?.bind).toBeUndefined()
+    expect(messages(wrongChoice)).toContain('one of the options')
+    const noValue = source('1', '')
+    expect(shapes(noValue)[0]?.bind).toBeUndefined()
+    expect(messages(noValue)).toContain('needs value=')
+    const noBind = ok('card\n  canvas\n    shape kind=rect x=0 y=0 w=1 h=1 value=2')
+    expect(shapes(noBind)[0]?.props.value).toBeUndefined()
+    expect(messages(noBind)).toContain('has no bind=')
+  })
+
+  it('leaves out a hotspot nobody can click', () => {
+    const none = ok('card\n  text "x"\n  canvas\n    shape kind=hotspot x=0 y=0 w=1 h=1')
+    expect(shapes(none)).toEqual([])
+    expect(messages(none)).toContain('shape kind=hotspot needs bind')
+    const wrong = ok('@state s = 1\ncard\n  text "x"\n  canvas\n    shape kind=hotspot x=0 y=0 w=1 h=1 bind=s')
+    expect(shapes(wrong)).toEqual([])
+    expect(messages(wrong)).toContain('a hotspot without a usable bind=')
+    const fine = ok('@state s = 1\ncard\n  canvas\n    shape kind=hotspot x=0 y=0 w=1 h=1 bind=s value=2')
+    expect(shapes(fine)).toHaveLength(1)
+    expect(fine.fallback).toContain('The reader clicks to set: s')
+  })
+
+  it('moves other components out of a canvas', () => {
+    const program = ok('card\n  canvas\n    text "x"\n    shape kind=point x=1 y=1')
+    expect(first(program, 'text').parent).toBe(first(program, 'card').id)
+    expect(messages(program)).toContain('holds only shape lines')
+  })
+
+  it.each([34, 35])('compiles sample %i without a repair, to the text the samples file records', (number) => {
+    const samples = readFileSync(join(import.meta.dirname, '..', 'docs', 'SAMPLES.md'), 'utf8')
+    const fence = '`'.repeat(3)
+    const match = new RegExp(`^## ${number}\\. [\\s\\S]*?${fence}dil\\n([\\s\\S]*?)${fence}\\n\\nResult:\\n\\n${fence}\\n[\\s\\S]*?What a text-only reader sees:\\n([\\s\\S]*?)\\n${fence}`, 'mu').exec(samples)
+    expect(match).not.toBeNull()
+    const program = ok((match?.[1] ?? '').replace(/\n$/u, ''))
+    expect(program.diagnostics).toEqual([])
+    expect(program.fallback).toBe(match?.[2])
+  })
+})

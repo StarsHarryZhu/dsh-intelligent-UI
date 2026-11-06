@@ -163,7 +163,7 @@
 .dsh-iui-input:focus-visible, .dsh-iui-select:focus-visible, .dsh-iui-range:focus-visible, .dsh-iui-button:focus-visible, .dsh-iui-check input:focus-visible,
 .dsh-iui-player-button:focus-visible, .dsh-iui-player-speed:focus-visible, .dsh-iui-tabs-tab:focus-visible, .dsh-iui-table-sort:focus-visible,
 .dsh-iui-table-copy:focus-visible, .dsh-iui-table-page:focus-visible, .dsh-iui-code-copy:focus-visible, .dsh-iui-chart-key:focus-visible,
-.dsh-iui-chart-plot:focus-visible {
+.dsh-iui-chart-plot:focus-visible, .dsh-iui-shape[data-tap]:focus-visible, .dsh-iui-shape[data-drag]:focus-visible, .dsh-iui-shape-part[data-tap]:focus-visible {
   outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 1px;
 }
@@ -456,9 +456,40 @@
 
 @keyframes dsh-iui-pulse { 50% { opacity: 0.45; } }
 
+/* A drawing: its viewBox is as wide as it is on the page, so weights and text are real pixels. */
+.dsh-iui-canvas-plot { display: block; width: 100%; height: auto; max-height: 480px; user-select: none; }
+.dsh-iui-canvas-drawing { color: var(--dsw-alias-label-primary); fill: var(--dsw-alias-label-primary); }
+.dsh-iui-shape { fill: var(--dsw-alias-label-primary); fill-opacity: 0; stroke: var(--dsw-alias-label-primary); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.dsh-iui-shape:not([data-tap]):not([data-drag]) { pointer-events: none; }
+.dsh-iui-shape[data-tap] { cursor: pointer; }
+.dsh-iui-shape[data-drag] { cursor: grab; }
+.dsh-iui-shape[data-drag]:active { cursor: grabbing; }
+.dsh-iui-shape[data-tone='primary'] { fill: var(--dsw-alias-brand-primary); stroke: var(--dsw-alias-brand-primary); }
+.dsh-iui-shape[data-tone='secondary'] { fill: var(--dsw-alias-label-secondary); stroke: var(--dsw-alias-label-secondary); }
+.dsh-iui-shape[data-tone='muted'] { fill: var(--dsw-alias-label-tertiary); stroke: var(--dsw-alias-label-tertiary); stroke-width: 1; }
+.dsh-iui-shape[data-tone='success'] { fill: var(--dsw-alias-state-success-primary); stroke: var(--dsw-alias-state-success-primary); }
+.dsh-iui-shape[data-tone='warn'] { fill: var(--dsw-alias-state-warn-primary); stroke: var(--dsw-alias-state-warn-primary); }
+.dsh-iui-shape[data-tone='error'] { fill: var(--dsw-alias-state-error-primary); stroke: var(--dsw-alias-state-error-primary); }
+.dsh-iui-shape[data-fill] { fill-opacity: 0.18; }
+.dsh-iui-shape[data-dash] { stroke-dasharray: 6 5; }
+.dsh-iui-shape path, .dsh-iui-shape line, .dsh-iui-shape rect, .dsh-iui-shape circle, .dsh-iui-shape polygon, .dsh-iui-shape polyline { vector-effect: non-scaling-stroke; }
+.dsh-iui-shape text { fill-opacity: 1; stroke: none; font: var(--dsw-font-xs-13); }
+.dsh-iui-shape[data-size='xs'] text { font: var(--dsw-font-xxs-12); }
+.dsh-iui-shape[data-size='lg'] text { font: var(--dsw-font-base-16); }
+.dsh-iui-shape[data-size='xl'] text { font: var(--dsw-font-m-18); }
+.dsh-iui-shape-head { fill-opacity: 1; stroke: none; }
+.dsh-iui-shape-dot { fill-opacity: 1; stroke: var(--dsw-alias-bg-layer-1); stroke-width: 2; }
+.dsh-iui-shape-hit { fill: transparent; stroke: transparent; stroke-width: 14; }
+.dsh-iui-shape[data-kind='hotspot'] { fill-opacity: 0; stroke: transparent; transition: fill-opacity 160ms ease-out; }
+.dsh-iui-shape[data-kind='hotspot']:hover { fill-opacity: 0.12; }
+.dsh-iui-shape[data-kind='hotspot'] rect { rx: 4px; }
+.dsh-iui-shape-part:not([data-tap]) { pointer-events: none; }
+.dsh-iui-shape-part[data-tap] { cursor: pointer; }
+.dsh-iui-shape[data-kind='hotspot'][aria-pressed='true'] { fill: var(--dsw-alias-brand-primary); fill-opacity: 0.1; stroke: var(--dsw-alias-brand-primary); }
+
 @media (prefers-reduced-motion: reduce) {
   .dsh-iui-row-head, .dsh-iui-button, .dsh-iui-player-button, .dsh-iui-player-speed, .dsh-iui-progress-fill, .dsh-iui-chart-bar,
-  .dsh-iui-tabs-tab, .dsh-iui-diagram-node rect, .dsh-iui-code-copy, .dsh-iui-table-copy, .dsh-iui-table-page, .dsh-iui-chart-key { transition: none; }
+  .dsh-iui-tabs-tab, .dsh-iui-diagram-node rect, .dsh-iui-code-copy, .dsh-iui-table-copy, .dsh-iui-table-page, .dsh-iui-chart-key, .dsh-iui-shape { transition: none; }
   .dsh-iui-code-scroll { scroll-behavior: auto; }
   .dsh-iui-row-head[data-state='running'] .dsh-iui-row-status { animation: none; }
 }

@@ -66,12 +66,14 @@ needs the build first: run `node build.js` before the suite.
 - `highlight.test.ts` — the code colouring of every language, constructs that
   span lines, plain text for unknown languages, and the lossless guarantee over
   the samples, the recipes, and random text.
+- `svg.test.ts` — reading SVG: the tree, tolerance, limits, each way of smuggling
+  something past the lists, and the check on a stored drawing.
 - `compile.test.ts` — both grammars end to end, interpolation in lists and
   tables, choices, every repair the compiler makes, what still fails, real model
   sources, content safety, streaming compiles, the API version, the
   animation props, and the newest components: tabs and their repairs,
   checklists with their values and names, sortable tables, diagram arrows, code blocks with their
-  limits and text view, and charts of several series with their repairs.
+  limits and text view, charts of several series with their repairs, and canvases and shapes with theirs.
 - `limits.test.ts` — each bound at its limit and one past it, and bounded JSON
   recovery.
 - `catalog.test.ts` — the catalog and the render registry in both directions,
@@ -84,7 +86,7 @@ needs the build first: run `node build.js` before the suite.
   tabs, checklists (counts, sums, and names), sorting, diagrams and their layout, code blocks (colours,
   the moving highlight that scrolls only the block, copying, `value=`), edits
   kept across a reload and the store's storage rules, revised cards, long
-  tables (filter, pages, copies), charts of several series and pies, and every
+  tables (filter, pages, copies), charts of several series and pies, drawings (geometry, drags, clicks, turns, curves, placed parts, forged programs), a player that loops and plays by itself (on screen, reduced motion, one copy, frames not stored), and every
   degradation path. `localStorage` is cleared after each spec.
 - `math.test.ts` — the quadrature rule's constants, integrals, derivatives,
   limits, sums, products, roots, Taylor polynomials, special functions,

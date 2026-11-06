@@ -73,12 +73,16 @@ describe('what the model is told', () => {
       const result = compileSource(example)
       expect(result.ok).toBe(true)
       if (result.ok) expect(result.program.diagnostics).toEqual([])
+    }
+    for (const example of [ESTIMATE_EXAMPLE, QUIZ_EXAMPLE, CALCULUS_EXAMPLE, ANIMATION_EXAMPLE]) {
       expect(UI_TOOL_DESCRIPTION).toContain(example.split('\n')[0] as string)
     }
+    // The table's catalog line shows a comparison's form, so its example stays out.
+    expect(UI_TOOL_DESCRIPTION).not.toContain(COMPARISON_EXAMPLE.split('\n')[0] as string)
   })
 
   it('stays well under the old four-thousand-token description', () => {
-    expect(UI_TOOL_DESCRIPTION.length).toBeLessThan(9000)
+    expect(UI_TOOL_DESCRIPTION.length).toBeLessThan(9800)
   })
 })
 

@@ -24,9 +24,9 @@ describe('every descriptor is internally consistent', () => {
 
   it('binds each control to one state kind', () => {
     const controls = CATALOG.filter(descriptor => descriptor.props.bind !== undefined)
-    expect(controls.map(descriptor => descriptor.type)).toEqual(['slider', 'numberInput', 'textInput', 'select', 'checkbox', 'player', 'checklist'])
-    // A checklist works on its own; bind= and names= only report what is ticked.
-    for (const descriptor of controls) expect(descriptor.props.bind?.required === true, descriptor.type).toBe(descriptor.type !== 'checklist')
+    expect(controls.map(descriptor => descriptor.type)).toEqual(['slider', 'numberInput', 'textInput', 'select', 'checkbox', 'player', 'checklist', 'shape'])
+    // A checklist works on its own, and bind= and names= only report what is ticked; a shape is a control only when bound.
+    for (const descriptor of controls) expect(descriptor.props.bind?.required === true, descriptor.type).toBe(!['checklist', 'shape'].includes(descriptor.type))
   })
 
   it('gives every layout container a gap on the 4px grid', () => {
