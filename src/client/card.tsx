@@ -93,9 +93,14 @@ function CardBody(props: CardProps): ReactNode {
   }, [store, revisedKey, revisedBy, memoryKey])
   const composerReady = useComposerReady(kit)
   const [notice, setNotice] = useState<{ key: CopyKey; text?: string } | undefined>(undefined)
+  // A replaced card folds to one line; the reader may open it again, for this view only.
+  const [unfolded, setUnfolded] = useState(false)
   const values = useMemo(() => computeValues(program, memory.values), [program, memory.values])
 
-  if (!program.supported) return <TextVersion text={program.fallback} note={tr('card.newer')} />
+  const replaced = memory.revisedBy !== undefined
+  const fold = replaced ? <Replaced open={unfolded} onToggle={() => { setUnfolded(open => !open) }} tr={tr} /> : null
+  if (replaced && !unfolded) return fold
+  if (!program.supported) return <>{fold}<TextVersion text={program.fallback} note={tr('card.newer')} /></>
 
   const setValue = (key: string, value: JsonValue, passing = false): void => {
     const row = program.state.find(entry => entry.key === key)
@@ -153,6 +158,7 @@ function CardBody(props: CardProps): ReactNode {
   const hasControls = program.nodes.some(node => node.bind !== undefined)
   return (
     <div className="dsh-iui-surface" data-dsh-intelligent-ui="card">
+      {fold}
       {roots.map((node) => {
         const element = renderNode(node, scope)
         // Every root sits in a framed surface; a card root is that frame itself.
@@ -161,7 +167,6 @@ function CardBody(props: CardProps): ReactNode {
           : <div key={node.id} className="dsh-iui-card" style={{ padding: '12px', gap: '8px' }}>{element}</div>
       })}
       {missing > 0 ? <div className="dsh-iui-note">{tr('card.partial', { count: missing })}</div> : null}
-      {memory.revisedBy === undefined ? null : <div className="dsh-iui-note" data-revised="">{tr('card.revised')}</div>}
       {notice === undefined ? null : (
         <div className="dsh-iui-note" role="status">
           {tr(notice.key)}
@@ -206,6 +211,22 @@ function numberOf(value: unknown, values: ReadonlyMap<string, JsonValue>): numbe
   return undefined
 }
 
+/**
+ * The line a replaced card folds to: what happened, and a toggle for the old card.
+ * @param props - whether the old card is open, the toggle, and the copy.
+ * @returns the line.
+ */
+function Replaced(props: { open: boolean; onToggle: () => void; tr: (key: CopyKey) => string }): ReactNode {
+  return (
+    <div className="dsh-iui-replaced" data-dsh-intelligent-ui="replaced">
+      <span className="dsh-iui-note">{props.tr('card.revised')}</span>
+      <button type="button" className="dsh-iui-replaced-toggle" aria-expanded={props.open} onClick={props.onToggle}>
+        {props.tr(props.open ? 'card.hideOld' : 'card.showOld')}
+      </button>
+    </div>
+  )
+}
+
 /** The program's plain-text stand-in, with the reason it is shown. */
 export function TextVersion(props: { text: string; note: string }): ReactNode {
   return (
@@ -220,7 +241,7 @@ export function TextVersion(props: { text: string; note: string }): ReactNode {
 
 /**
  * Contain a defect in one slot entry: render nothing rather than let an
- * unexpected host prop shape crash the row or the tail it sits in.
+ * unexpected host prop shape crash the row or the reply it sits in.
  */
 export class Contained extends Component<{ label: string; children: ReactNode }, { failed: boolean }> {
   override state = { failed: false }

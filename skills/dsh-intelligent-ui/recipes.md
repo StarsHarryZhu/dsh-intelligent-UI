@@ -112,6 +112,24 @@ When the answer arrives, reply in prose: right or wrong, a two-line explanation,
 then the next card. After the last question, summarise the score in prose; a
 `table` of question, answer, and result works well for a review.
 
+## A fill-in question
+
+When the answer is a word or a number the reader should produce rather than pick,
+write the sentence in `blanks` with `___` where each answer goes; a longer run of
+underscores draws a wider blank. The reader fills them in and presses Submit, or
+Enter in the last blank, and you receive the sentence with each answer in
+brackets. Grade it in your reply, as for a clicked answer.
+
+```dil
+card "Fill in · 2 of 5"
+  text "Complete the sentence."
+  blanks "The derivative of sin x is ______, and of e^x it is ___."
+```
+
+You receive, for example: `The derivative of sin x is [cos x], and of e^x it is [e^x].`
+Accept equivalent forms (`cos(x)`, `cosx`) and say so when you do. Ask one
+sentence per card, so each answer arrives on its own.
+
 ## Priced add-ons
 
 Give each item its price in `values=`, in the same order as `items=`: `bind=`

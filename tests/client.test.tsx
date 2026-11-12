@@ -21,6 +21,7 @@ import { createEditsStore, type StorageLike } from '../src/client/edits.ts'
 import { compareCells, toCsv, toMarkdown, visibleRows } from '../src/client/table.tsx'
 import { layoutDiagram } from '../src/client/diagram.tsx'
 import { joinNames } from '../src/client/components.tsx'
+import { readArguments } from '../src/client/card-node.ts'
 
 type Component = (props: Record<string, unknown>) => React.ReactNode
 
@@ -28,9 +29,14 @@ type Component = (props: Record<string, unknown>) => React.ReactNode
 interface Loaded {
   exports: Record<string, unknown>
   ToolView: Component
-  Tail: Component
+  /** The renderer of a card in the reply, registered under the card node kind. */
+  CardNode: Component
+  /** The data-only Definition that collects a turn's cards. */
   definition: Record<string, any>
+  /** The Definition that places each card in the reply. */
+  cardDefinition: Record<string, any>
   registrations: Array<Record<string, unknown>>
+  definitions: Array<Record<string, any>>
   dictionaries: string[]
   dispose(): void
 }
@@ -70,13 +76,15 @@ function loadClient(): Loaded {
   }
   ;(exports.apply as (...args: unknown[]) => void)(ctx, undefined)
   const row = registrations.find(entry => entry.name === 'tool.call.toolview')
-  const tail = registrations.find(entry => entry.name === 'conversation.chat.turnTail')
+  const node = registrations.find(entry => entry.name === 'conversation.chat.node')
   return {
     exports,
     ToolView: row?.component as Component,
-    Tail: tail?.component as Component,
-    definition: definitions[0] as Record<string, any>,
+    CardNode: node?.component as Component,
+    definition: definitions.find(entry => entry.kind === 'dsh-intelligent-ui') as Record<string, any>,
+    cardDefinition: definitions.find(entry => entry.kind === 'dsh-intelligent-ui.card') as Record<string, any>,
     registrations,
+    definitions,
     dictionaries,
     dispose: () => { for (const dispose of disposers.reverse()) dispose() },
   }
@@ -108,6 +116,22 @@ function resultBlock(meta: unknown, time = Date.now(), extra: Record<string, unk
   return { kind: 'tool-result', callId: 'call-1', time, meta, isError: false, content: [{ type: 'text', text: 'ok' }], ...extra }
 }
 
+/** The location of a node in a turn whose published cards are `cards`. */
+function inTurn(cards: unknown[], turn = 1) {
+  return { kind: 'step', turn: { turn, data: { get: () => ({ cards }) } } }
+}
+
+/** A card node as the Definition builds it once the call has settled. */
+function settledNode(callId: string, meta: unknown, location: unknown = inTurn([])) {
+  return { key: `card:${callId}`, kind: 'dsh-intelligent-ui.card', data: { callId, phase: 'result', args: '', meta }, location }
+}
+
+/** A card node while its call's arguments stream in. */
+function streamingNode(callId: string, args: Record<string, string>, cut = 0) {
+  const text = JSON.stringify(args)
+  return { key: `card:${callId}`, kind: 'dsh-intelligent-ui.card', data: { callId, phase: 'preparing', args: text.slice(0, text.length - cut) }, location: inTurn([]) }
+}
+
 /** A streaming args reader whose text grows as the test appends to it. */
 function streamingArgs(text: { source: string }) {
   return { text: (key: string) => (key === 'source' ? text.source : undefined) }
@@ -128,9 +152,10 @@ describe('activation through the real contract', () => {
     expect(client.exports.inject).toEqual(['slots', 'locale'])
     expect(client.registrations.map(entry => [entry.name, entry.key ?? entry.id])).toEqual([
       ['tool.call.toolview', 'ui_render'],
-      ['conversation.chat.turnTail', 'dsh-intelligent-ui'],
+      ['conversation.chat.node', 'dsh-intelligent-ui.card'],
     ])
     expect(client.definition.kind).toBe('dsh-intelligent-ui')
+    expect(client.cardDefinition).toMatchObject({ kind: 'dsh-intelligent-ui.card', target: 'chat' })
     expect(client.dictionaries).toEqual(['dsh-intelligent-ui'])
     expect(document.head.querySelectorAll('style[data-plugin="dsh-intelligent-ui"]')).toHaveLength(1)
   })
@@ -139,6 +164,7 @@ describe('activation through the real contract', () => {
     const client = loadClient()
     client.dispose()
     expect(client.registrations).toEqual([])
+    expect(client.definitions).toEqual([])
     expect(client.dictionaries).toEqual([])
     expect(document.head.querySelectorAll('style[data-plugin="dsh-intelligent-ui"]')).toHaveLength(0)
   })
@@ -326,7 +352,7 @@ describe('math cards', () => {
   })
 })
 
-describe('the turn data and the turn tail', () => {
+describe('the turn data', () => {
   /** Feed events through the Definition the way the engine would. */
   function fold(definition: Record<string, any>, events: Array<Record<string, unknown>>) {
     let state: unknown
@@ -379,43 +405,165 @@ describe('the turn data and the turn tail', () => {
     expect(data).toBeNull()
   })
 
-  it('draws the cards under a completed reply and nowhere else', async () => {
-    const { Tail } = loadClient()
+})
+
+describe('cards in the reply', () => {
+  /**
+   * Feed events through the card Definition the way the engine does: one
+   * Context per id, opened by its first start match, each build handed the node
+   * it built before.
+   */
+  function assemble(definition: Record<string, any>, events: Array<Record<string, unknown>>) {
+    const contexts = new Map<string, { key: string; id: string; matches: unknown[]; start: any; state: any; current: Map<string, unknown> }>()
+    for (const event of events) {
+      const handler = definition.match[event.type as string] as ((event: unknown) => { id: string; role: string } | null) | undefined
+      const matched = handler?.(event)
+      if (matched === null || matched === undefined) continue
+      let context = contexts.get(matched.id)
+      if (context === undefined) {
+        context = { key: `k:${matched.id}`, id: matched.id, matches: [], start: undefined, state: undefined, current: new Map() }
+        contexts.set(matched.id, context)
+      }
+      const match = { event, role: matched.role, location: event.location ?? { kind: 'step', turn: { turn: 1, status: 'open' }, step: { status: 'open' } } }
+      context.matches.push(match)
+      if (context.state === undefined && matched.role === 'start') {
+        context.start = match
+        context.state = definition.start(context, match, {})
+      } else if (context.state !== undefined) {
+        context.state = definition.update(context, match)
+      }
+      const node = definition.buildViewNode(context)
+      context.current.set('chat', node)
+    }
+    return new Map([...contexts].map(([id, context]) => [id, context.current.get('chat') as Record<string, any> | null]))
+  }
+  const delta = (seq: number, id: string, argumentsDelta: string, name?: string) =>
+    ({ type: 'assistant/live-chunk', seq, data: { turn: 1, step: 1, chunk: { type: 'tool-call-delta', index: 0, id, argumentsDelta, ...(name === undefined ? {} : { name }) } } })
+
+  it('stands each card where its call stands, after its row and outside the folded process', async () => {
+    const { cardDefinition } = loadClient()
     const meta = await settle(COMPARISON_EXAMPLE, 'Fares')
-    const value = { cards: [{ seq: 5, callId: 'call-9', meta }] }
-    const turn = (reason: string) => ({ turn: 4, end: { data: { reason: { kind: reason } } }, data: { get: () => value } })
-    const view = render(<Tail turn={turn('completed')} seq={9} {...kit()} />)
-    expect(screen.getByText('Amtrak')).toBeTruthy()
-    view.rerender(<Tail turn={turn('completed')} seq={4} {...kit()} />)
-    expect(screen.queryByText('Amtrak')).toBeNull()
-    view.rerender(<Tail turn={turn('aborted')} seq={9} {...kit()} />)
-    expect(screen.queryByText('Amtrak')).toBeNull()
+    const args = JSON.stringify({ source: COMPARISON_EXAMPLE, title: 'Fares' })
+    const live = assemble(cardDefinition, [
+      delta(7.5, 'a', '', 'ui_render'),
+      delta(7.75, 'a', args.slice(0, 40)),
+      delta(7.8, 'b', '{"command":"ls"}', 'bash'),
+    ])
+    const preparing = live.get('a')
+    expect(preparing).toMatchObject({ kind: 'dsh-intelligent-ui.card', target: 'chat', groupTree: 'turn', visibility: 'visible', anchorSeq: 7.5 + 1e-9 })
+    expect(preparing?.data).toEqual({ callId: 'a', phase: 'preparing', args: args.slice(0, 40) })
+    expect(live.get('b')).toBeNull()
+    const settled = assemble(cardDefinition, [
+      { type: 'tool/call', seq: 8, data: { turn: 1, step: 1, callId: 'a', name: 'ui_render', arguments: args } },
+      { type: 'tool/result', seq: 9, surfaceOp: 'append', data: { turn: 1, message: { source: { callId: 'a' } }, meta } },
+      { type: 'tool/call', seq: 10, data: { turn: 1, step: 1, callId: 'b', name: 'bash', arguments: '{}' } },
+    ])
+    expect(settled.get('a')).toMatchObject({ anchorSeq: 8 + 1e-9, visibility: 'visible', data: { callId: 'a', phase: 'result', args, meta } })
+    expect(settled.has('b')).toBe(false)
   })
 
-  it('follows the observable turn data source', async () => {
-    const { Tail } = loadClient()
-    const meta = await settle(COMPARISON_EXAMPLE)
-    let current: unknown
-    const listeners = new Set<() => void>()
-    const source = { getSnapshot: () => current, subscribe: (listener: () => void) => { listeners.add(listener); return () => listeners.delete(listener) } }
-    const turn = { turn: 1, end: { data: { reason: { kind: 'completed' } } }, data: { source: () => source } }
-    render(<Tail turn={turn} seq={9} {...kit()} />)
-    expect(screen.queryByText('Amtrak')).toBeNull()
-    act(() => {
-      current = { cards: [{ seq: 2, callId: 'call-10', meta }] }
-      for (const listener of listeners) listener()
-    })
-    expect(screen.getByText('Amtrak')).toBeTruthy()
+  it('builds nothing for a failed program or an errored call, and hides a preview that failed', async () => {
+    const { cardDefinition } = loadClient()
+    const failed = await settle('hologram')
+    const args = JSON.stringify({ source: 'hologram' })
+    const nodes = assemble(cardDefinition, [
+      { type: 'tool/call', seq: 2, data: { callId: 'a', name: 'ui_render', arguments: args } },
+      { type: 'tool/result', seq: 3, surfaceOp: 'append', data: { message: { source: { callId: 'a' } }, meta: failed } },
+      { type: 'tool/call', seq: 4, data: { callId: 'b', name: 'ui_render', arguments: args } },
+      { type: 'tool/result', seq: 5, surfaceOp: 'append', data: { message: { source: { callId: 'b' }, isError: true } } },
+    ])
+    expect(nodes.get('a')).toMatchObject({ visibility: 'hidden' })
+    expect(nodes.get('b')).toMatchObject({ visibility: 'hidden' })
+    // A result whose call is outside the loaded window still draws, when it is a card.
+    const alone = assemble(cardDefinition, [
+      { type: 'tool/result', seq: 5, surfaceOp: 'append', data: { message: { source: { callId: 'c' } }, meta: await settle(COMPARISON_EXAMPLE) } },
+      { type: 'tool/result', seq: 6, surfaceOp: 'append', data: { message: { source: { callId: 'd' } }, meta: failed } },
+      { type: 'tool/result', seq: 7, surfaceOp: 'replace', data: { message: { source: { callId: 'e' } }, meta: failed } },
+    ])
+    expect(alone.get('c')).toMatchObject({ visibility: 'visible', anchorSeq: 5 + 1e-9, data: { phase: 'result' } })
+    expect(alone.get('d')).toBeNull()
+    expect(alone.has('e')).toBe(false)
   })
 
-  it('shares the reader\'s edits between the row and the tail', async () => {
-    const { ToolView, Tail } = loadClient()
+  it('hides a preview whose turn was stopped before the call was recorded', () => {
+    const { cardDefinition } = loadClient()
+    const stopped = { kind: 'step', turn: { turn: 1, status: 'closed' }, step: { status: 'closed' } }
+    const nodes = assemble(cardDefinition, [{ ...delta(3.5, 'a', '{"source":"card\\n  text \\"hi\\"\\n', 'ui_render'), location: stopped }])
+    expect(nodes.get('a')).toBeNull()
+  })
+
+  it('reads string arguments from a stream cut anywhere', () => {
+    const full = JSON.stringify({ title: 'Fares "to" Boston', count: 3, nested: { a: [1, '}'] }, source: 'card\n  text "é ☃ 💡"\n' })
+    expect(readArguments(full)).toEqual({ title: 'Fares "to" Boston', source: 'card\n  text "é ☃ 💡"\n' })
+    for (let cut = 0; cut <= full.length; cut += 1) {
+      const read = readArguments(full.slice(0, cut))
+      // A prefix never invents text: each value it reports starts the real one.
+      if (read.title !== undefined) expect('Fares "to" Boston'.startsWith(read.title)).toBe(true)
+      if (read.source !== undefined) expect('card\n  text "é ☃ 💡"\n'.startsWith(read.source)).toBe(true)
+    }
+    expect(readArguments('{"source":"a\\u00')).toEqual({ source: 'a' })
+    expect(readArguments('{"source":"a\\')).toEqual({ source: 'a' })
+    expect(readArguments('not json')).toEqual({})
+    expect(readArguments('{"__proto__":"x"}')).toEqual({})
+  })
+
+  it('draws a settled card, and nothing for a failed one', async () => {
+    const { CardNode } = loadClient()
+    const view = render(<CardNode node={settledNode('call-9', await settle(COMPARISON_EXAMPLE, 'Fares'))} {...kit()} />)
+    expect(screen.getByText('Amtrak')).toBeTruthy()
+    expect(view.container.querySelector('[data-dsh-intelligent-ui="reply"]')?.getAttribute('data-state')).toBe('ready')
+    cleanup()
+    const failed = render(<CardNode node={settledNode('call-9b', await settle('hologram'))} {...kit()} />)
+    expect(failed.container.innerHTML).toBe('')
+  })
+
+  it('previews the card in the reply while its arguments stream', () => {
+    const { CardNode } = loadClient()
+    const args = { source: 'card "Team plan"\n  text "first line"\n  text "second line"\n', title: 'Plan' }
+    const view = render(<CardNode node={streamingNode('call-s', args, 32)} {...kit()} />)
+    expect(screen.getByText('Team plan')).toBeTruthy()
+    expect(screen.getByText('first line')).toBeTruthy()
+    expect(screen.queryByText('second line')).toBeNull()
+    view.rerender(<CardNode node={streamingNode('call-s', args)} {...kit()} />)
+    expect(screen.getByText('second line')).toBeTruthy()
+    expect(view.container.querySelector('[data-dsh-intelligent-ui="reply"]')?.getAttribute('data-state')).toBe('running')
+  })
+
+  it('keeps the tool row to a status line while the card is in the reply', async () => {
+    const { ToolView, CardNode } = loadClient()
+    const meta = await settle(COMPARISON_EXAMPLE, 'Fares')
+    const row = <ToolView phase="result" block={resultBlock(meta)} callId="call-12" useDisclosure={useHostDisclosure} {...kit()} />
+    const view = render(<>{row}<CardNode node={settledNode('call-12', meta)} {...kit()} /></>)
+    expect(screen.getAllByText('Amtrak')).toHaveLength(1)
+    expect(screen.getByText(/^3 components/u)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Show interface' })).toBeNull()
+    // Without the reply copy, as in a view that draws no Chat nodes, the row draws the card itself.
+    view.rerender(<>{row}</>)
+    expect(screen.getAllByText('Amtrak')).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Hide interface' })).toBeTruthy()
+  })
+
+  it('keeps the streaming preview out of the row while the reply copy draws it', () => {
+    const { ToolView, CardNode } = loadClient()
+    const args = { source: 'card "Team plan"\n  text "first line"\n' }
+    const text = { source: args.source }
+    render(
+      <>
+        <ToolView phase="preparing" block={{ callId: 'call-13', args: streamingArgs(text) }} callId="call-13" useDisclosure={useHostDisclosure} {...kit()} />
+        <CardNode node={streamingNode('call-13', args)} {...kit()} />
+      </>,
+    )
+    expect(screen.getByText('Building the interface…')).toBeTruthy()
+    expect(screen.getAllByText('first line')).toHaveLength(1)
+  })
+
+  it('shares the reader\'s edits between the row and the reply', async () => {
+    const { ToolView, CardNode } = loadClient()
     const meta = await settle(ESTIMATE_EXAMPLE)
     const row = render(<ToolView phase="result" block={resultBlock(meta)} callId="call-11" useDisclosure={useHostDisclosure} {...kit()} />)
     act(() => { fireEvent.change(screen.getByRole('slider', { name: 'Seats' }), { target: { value: '10' } }) })
     row.unmount()
-    const turn = { turn: 1, end: { data: { reason: { kind: 'completed' } } }, data: { get: () => ({ cards: [{ seq: 3, callId: 'call-11', meta }] }) } }
-    render(<Tail turn={turn} seq={9} {...kit()} />)
+    render(<CardNode node={settledNode('call-11', meta)} {...kit()} />)
     expect(screen.getByText('10 seats on Pro cost 290 USD a month.')).toBeTruthy()
   })
 })
@@ -456,27 +604,24 @@ describe('persisted programs from other builds', () => {
   const CURRENT_META = { ...LEGACY_META, version: 1, program: { ...LEGACY_META.program, version: 1 } }
 
   it('shows a card from before the version fields as its text, not as a drawing', () => {
-    const { Tail } = loadClient()
-    const turn = { turn: 11, end: { data: { reason: { kind: 'completed' } } }, data: { get: () => ({ cards: [{ seq: 2524, callId: 'legacy', meta: LEGACY_META }] }) } }
-    render(<Tail turn={turn} seq={2533} {...kit()} />)
+    const { CardNode } = loadClient()
+    render(<CardNode node={settledNode('legacy', LEGACY_META)} {...kit()} />)
     expect(screen.getByText('# Team plan')).toBeTruthy()
     expect(screen.getByText(/another version of the plugin/u)).toBeTruthy()
     expect(screen.queryByRole('slider')).toBeNull()
   })
 
   it('shows a program without a version field as its text inside a current envelope', () => {
-    const { Tail } = loadClient()
+    const { CardNode } = loadClient()
     const meta = { ...CURRENT_META, program: LEGACY_META.program }
-    const turn = { turn: 1, end: { data: { reason: { kind: 'completed' } } }, data: { get: () => ({ cards: [{ seq: 1, callId: 'unversioned', meta }] }) } }
-    render(<Tail turn={turn} seq={9} {...kit()} />)
+    render(<CardNode node={settledNode('unversioned', meta)} {...kit()} />)
     expect(screen.getByText('# Team plan')).toBeTruthy()
     expect(screen.queryByRole('slider')).toBeNull()
   })
 
   it('draws a card persisted by this build', () => {
-    const { Tail } = loadClient()
-    const turn = { turn: 11, end: { data: { reason: { kind: 'completed' } } }, data: { get: () => ({ cards: [{ seq: 2524, callId: 'current', meta: CURRENT_META }] }) } }
-    render(<Tail turn={turn} seq={2533} {...kit()} />)
+    const { CardNode } = loadClient()
+    render(<CardNode node={settledNode('current', CURRENT_META)} {...kit()} />)
     expect(screen.getByText('Team plan')).toBeTruthy()
     expect(screen.getByText('232')).toBeTruthy()
     expect(screen.getByText('556.8')).toBeTruthy()
@@ -486,41 +631,37 @@ describe('persisted programs from other builds', () => {
   })
 
   it('does not stack the call title over a heading the program already has', () => {
-    const { Tail } = loadClient()
-    const turn = { turn: 11, end: { data: { reason: { kind: 'completed' } } }, data: { get: () => ({ cards: [{ seq: 1, callId: 'titled', meta: CURRENT_META }] }) } }
-    render(<Tail turn={turn} seq={9} {...kit()} />)
+    const { CardNode } = loadClient()
+    render(<CardNode node={settledNode('titled', CURRENT_META)} {...kit()} />)
     expect(screen.queryByText('可拖动的报价器')).toBeNull()
     expect(screen.getByText('Team plan')).toBeTruthy()
   })
 
   it('uses the call title when the program has no heading', async () => {
-    const { Tail } = loadClient()
+    const { CardNode } = loadClient()
     const meta = await settle(COMPARISON_EXAMPLE.replace('card "Fares to Boston"', 'card'), 'Fares')
-    const turn = { turn: 1, end: { data: { reason: { kind: 'completed' } } }, data: { get: () => ({ cards: [{ seq: 1, callId: 'untitled', meta }] }) } }
-    render(<Tail turn={turn} seq={9} {...kit()} />)
+    render(<CardNode node={settledNode('untitled', meta)} {...kit()} />)
     expect(screen.getByText('Fares')).toBeTruthy()
   })
 
   it('shows a newer format as text instead of half-drawing it', () => {
-    const { Tail } = loadClient()
+    const { CardNode } = loadClient()
     const meta = { ...CURRENT_META, program: { ...CURRENT_META.program, version: 99, fallback: 'text version of the future' } }
-    const turn = { turn: 1, end: { data: { reason: { kind: 'completed' } } }, data: { get: () => ({ cards: [{ seq: 1, callId: 'future', meta }] }) } }
-    render(<Tail turn={turn} seq={9} {...kit()} />)
+    render(<CardNode node={settledNode('future', meta)} {...kit()} />)
     expect(screen.getByText('text version of the future')).toBeTruthy()
     expect(screen.getByText(/another version of the plugin/u)).toBeTruthy()
   })
 
   it('draws what it knows and says what it skipped', () => {
-    const { Tail } = loadClient()
+    const { CardNode } = loadClient()
     const program = { ...CURRENT_META.program, nodes: [...CURRENT_META.program.nodes, { id: 'x', type: 'hologram', parent: 'root', props: {} }] }
-    const turn = { turn: 1, end: { data: { reason: { kind: 'completed' } } }, data: { get: () => ({ cards: [{ seq: 1, callId: 'mixed', meta: { ...CURRENT_META, program } }] }) } }
-    const view = render(<Tail turn={turn} seq={9} {...kit()} />)
+    const view = render(<CardNode node={settledNode('mixed', { ...CURRENT_META, program })} {...kit()} />)
     expect(screen.getByText('1 component(s) could not be shown.')).toBeTruthy()
     expect(view.container.querySelector('hologram')).toBeNull()
   })
 
   it('degrades a card that fails to render to its text version', () => {
-    const { Tail } = loadClient()
+    const { CardNode } = loadClient()
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     // React's development build re-dispatches a caught render error as a window error; that report is expected here.
     const quiet = (event: ErrorEvent): void => { event.preventDefault() }
@@ -528,8 +669,7 @@ describe('persisted programs from other builds', () => {
     try {
       const hostile = new Proxy({}, { getOwnPropertyDescriptor: () => { throw new Error('boom') } })
       const program = { ...CURRENT_META.program, constants: hostile, fallback: 'safe text version' }
-      const turn = { turn: 1, end: { data: { reason: { kind: 'completed' } } }, data: { get: () => ({ cards: [{ seq: 1, callId: 'broken', meta: { ...CURRENT_META, program } }] }) } }
-      const view = render(<div data-testid="transcript"><Tail turn={turn} seq={9} {...kit()} /><p>the rest of the transcript</p></div>)
+      const view = render(<div data-testid="transcript"><CardNode node={settledNode('broken', { ...CURRENT_META, program })} {...kit()} /><p>the rest of the transcript</p></div>)
       expect(within(view.getByTestId('transcript')).getByText('safe text version')).toBeTruthy()
       expect(screen.getByText('the rest of the transcript')).toBeTruthy()
     } finally {
@@ -824,8 +964,7 @@ describe('pages, checklists, sorting, and diagrams', () => {
     expect(screen.getByRole('tabpanel').textContent).toBe('A rate.')
     act(() => { fireEvent.keyDown(screen.getByRole('tablist'), { key: 'End' }) })
     cleanup()
-    const turn = { turn: 1, end: { data: { reason: { kind: 'completed' } } }, data: { get: () => ({ cards: [{ seq: 3, callId: 'tabs-1', meta }] }) } }
-    render(<client.Tail turn={turn} seq={9} {...kit()} />)
+    render(<client.CardNode node={settledNode('tabs-1', meta)} {...kit()} />)
     expect(screen.getByRole('tabpanel').textContent).toBe('Try 3x^2.')
   })
 
@@ -1132,9 +1271,54 @@ describe('revising a card', () => {
     // The plan carries over as it was; 30 seats is past the new maximum, so it is held at 20.
     expect(screen.getByText('20 seats on Team cost 440 USD a month.')).toBeTruthy()
     cleanup()
+    // The earlier card folds to one line; the reader can open it again, and it kept its values.
     render(<client.ToolView phase="result" block={resultBlock(before)} callId="rev-1" useDisclosure={useHostDisclosure} {...kit()} />)
-    expect(screen.getByText('A newer version of this card follows.')).toBeTruthy()
+    expect(screen.getByText('A newer version below replaced this card.')).toBeTruthy()
+    expect(screen.getByText('Replaced by a newer version')).toBeTruthy()
+    expect(screen.queryByText('30 seats on Team cost 660 USD a month.')).toBeNull()
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Show the old version' })) })
     expect(screen.getByText('30 seats on Team cost 660 USD a month.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Hide the old version' }).getAttribute('aria-expanded')).toBe('true')
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Hide the old version' })) })
+    expect(screen.queryByRole('slider')).toBeNull()
+  })
+
+  it('leaves out of a reply the card a later card of the same turn redrew', async () => {
+    const { CardNode } = loadClient()
+    const first = await settleAs('rev-5', { source: ESTIMATE_EXAMPLE })
+    const second = await settleAs('rev-6', { source: REVISED, revises: 'rev-5' })
+    let published = { cards: [{ seq: 2, callId: 'rev-5', meta: first }] }
+    const listeners = new Set<() => void>()
+    const source = { getSnapshot: () => published, subscribe: (listener: () => void) => { listeners.add(listener); return () => listeners.delete(listener) } }
+    const location = { kind: 'step', turn: { turn: 1, data: { source: () => source } } }
+    const view = render(
+      <>
+        <CardNode node={settledNode('rev-5', first, location)} {...kit()} />
+        <CardNode node={settledNode('rev-6', second, location)} {...kit()} />
+      </>,
+    )
+    // Until the redraw has published in the turn, both stand where they were called.
+    expect(view.container.querySelectorAll('[data-dsh-intelligent-ui="reply"]')).toHaveLength(2)
+    act(() => {
+      published = { cards: [...published.cards, { seq: 4, callId: 'rev-6', meta: second }] }
+      for (const listener of listeners) listener()
+    })
+    expect(screen.getByText('Team plan, revised')).toBeTruthy()
+    expect(screen.queryByText('Team plan')).toBeNull()
+    expect(screen.queryByText('A newer version below replaced this card.')).toBeNull()
+    expect(view.container.querySelectorAll('[data-dsh-intelligent-ui="reply"]')).toHaveLength(1)
+  })
+
+  it('folds a card that a later turn revised', async () => {
+    const { CardNode } = loadClient()
+    const first = await settleAs('rev-7', { source: ESTIMATE_EXAMPLE })
+    const second = await settleAs('rev-8', { source: REVISED, revises: 'rev-7' })
+    render(<CardNode node={settledNode('rev-7', first, inTurn([{ seq: 2, callId: 'rev-7', meta: first }], 1))} {...kit()} />)
+    expect(screen.getByText('Team plan')).toBeTruthy()
+    render(<CardNode node={settledNode('rev-8', second, inTurn([{ seq: 6, callId: 'rev-8', meta: second }], 2))} {...kit()} />)
+    expect(screen.queryByText('Team plan')).toBeNull()
+    expect(screen.getByText('Team plan, revised')).toBeTruthy()
+    expect(screen.getByText('A newer version below replaced this card.')).toBeTruthy()
   })
 
   it('carries values into the streaming preview, but marks nothing until the result lands', async () => {
@@ -1148,7 +1332,7 @@ describe('revising a card', () => {
     expect(screen.getByText('9 seats on Pro cost 261 USD a month.')).toBeTruthy()
     cleanup()
     render(<client.ToolView phase="result" block={resultBlock(before)} callId="rev-3" useDisclosure={useHostDisclosure} {...kit()} />)
-    expect(screen.queryByText('A newer version of this card follows.')).toBeNull()
+    expect(screen.queryByText('A newer version below replaced this card.')).toBeNull()
   })
 })
 
@@ -1534,12 +1718,12 @@ describe('drawings', () => {
     const source = 'card\n  canvas svg="""\n    <svg viewBox="0 0 9 9"><clipPath id="c"><rect width="1"/></clipPath><rect id="r" fill="url(#c)" clip-path="url(#c)"/><use href="#r"/></svg>\n    """'
     const client = loadClient()
     const meta = await settle(source)
-    const { ToolView, Tail } = client
-    const turn = { turn: 1, end: { data: { reason: { kind: 'completed' } } }, data: { get: () => ({ cards: [{ seq: 3, callId: 'ids-1', meta }] }) } }
+    const { ToolView, CardNode } = client
+    // Two copies of one card: its row in a view without Chat nodes, and its reply copy in another.
     const view = render(
       <>
         <ToolView phase="result" block={resultBlock(meta)} callId="ids-1" useDisclosure={useHostDisclosure} {...kit()} />
-        <Tail turn={turn} seq={9} {...kit()} />
+        <CardNode node={settledNode('ids-1b', meta)} {...kit()} />
       </>,
     )
     const ids = [...view.container.querySelectorAll('.dsh-iui-canvas-drawing clipPath')].map(entry => entry.id)
@@ -1702,5 +1886,66 @@ describe('drawings', () => {
     } finally {
       vi.unstubAllGlobals()
     }
+  })
+})
+
+describe('fill-in sentences', () => {
+  const SOURCE = 'card "Chemistry"\n  blanks "Water is ___, and a mole of it weighs ______ g."'
+
+  it('sends the filled sentence once every blank is filled, then locks', async () => {
+    const session = kit()
+    const { ToolView } = loadClient()
+    render(<ToolView phase="result" block={resultBlock(await settle(SOURCE))} callId="blank-1" useDisclosure={useHostDisclosure} {...session} />)
+    const first = screen.getByRole('textbox', { name: 'Blank 1' }) as HTMLInputElement
+    const second = screen.getByRole('textbox', { name: 'Blank 2' }) as HTMLInputElement
+    expect(screen.getByText(/Water is/u).textContent).toBe('Water is , and a mole of it weighs  g.')
+    expect((screen.getByRole('button', { name: 'Submit' }) as HTMLButtonElement).disabled).toBe(true)
+    act(() => { fireEvent.change(first, { target: { value: 'H2O' } }) })
+    // Enter moves on; from the last blank it goes back to an empty one instead of sending.
+    act(() => { fireEvent.keyDown(first, { key: 'Enter' }) })
+    expect(document.activeElement).toBe(second)
+    act(() => { fireEvent.keyDown(second, { key: 'Enter' }) })
+    expect(session.inputActions.submit).not.toHaveBeenCalled()
+    act(() => { fireEvent.change(second, { target: { value: ' 18 ' } }) })
+    // An input method still composing a word keeps its Enter.
+    act(() => { fireEvent.keyDown(second, { key: 'Enter', keyCode: 229 }) })
+    expect(session.inputActions.submit).not.toHaveBeenCalled()
+    expect((screen.getByRole('button', { name: 'Submit' }) as HTMLButtonElement).disabled).toBe(false)
+    act(() => { fireEvent.keyDown(second, { key: 'Enter' }) })
+    expect(session.inputActions.setDraft).toHaveBeenCalledWith('Water is [H2O], and a mole of it weighs [18] g.')
+    expect(session.inputActions.submit).toHaveBeenCalledTimes(1)
+    expect(first.readOnly && second.readOnly).toBe(true)
+    expect(screen.getByRole('button', { name: /Submit/u }).textContent).toBe('SubmitSent')
+    act(() => { fireEvent.click(screen.getByRole('button', { name: /Submit/u })) })
+    expect(session.inputActions.submit).toHaveBeenCalledTimes(1)
+  })
+
+  it('widens a blank for its answer, a wide character taking two columns', async () => {
+    const { ToolView } = loadClient()
+    render(<ToolView phase="result" block={resultBlock(await settle(SOURCE))} callId="blank-2" useDisclosure={useHostDisclosure} {...kit()} />)
+    const first = screen.getByRole('textbox', { name: 'Blank 1' }) as HTMLInputElement
+    expect(first.style.width).toBe('5ch')
+    expect((screen.getByRole('textbox', { name: 'Blank 2' }) as HTMLInputElement).style.width).toBe('8ch')
+    act(() => { fireEvent.change(first, { target: { value: '一氧化二氢' } }) })
+    expect(first.style.width).toBe('12ch')
+  })
+
+  it('keeps the answers and the lock across a reload', async () => {
+    const meta = await settle(SOURCE)
+    const before = loadClient()
+    const session = kit()
+    render(<before.ToolView phase="result" block={resultBlock(meta)} callId="blank-3" useDisclosure={useHostDisclosure} {...session} />)
+    act(() => { fireEvent.change(screen.getByRole('textbox', { name: 'Blank 1' }), { target: { value: 'H2O' } }) })
+    cleanup()
+    const after = loadClient()
+    render(<after.ToolView phase="result" block={resultBlock(meta)} callId="blank-3" useDisclosure={useHostDisclosure} {...kit()} />)
+    expect((screen.getByRole('textbox', { name: 'Blank 1' }) as HTMLInputElement).value).toBe('H2O')
+    act(() => { fireEvent.change(screen.getByRole('textbox', { name: 'Blank 2' }), { target: { value: '18' } }) })
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Submit' })) })
+    cleanup()
+    const again = loadClient()
+    render(<again.ToolView phase="result" block={resultBlock(meta)} callId="blank-3" useDisclosure={useHostDisclosure} {...kit()} />)
+    expect((screen.getByRole('textbox', { name: 'Blank 2' }) as HTMLInputElement).readOnly).toBe(true)
+    expect(screen.getByText('Sent')).toBeTruthy()
   })
 })

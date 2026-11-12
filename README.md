@@ -13,9 +13,9 @@ Interactive cards in DeepSeek Harness chats. The model writes a small interface 
 
 ## How it works
 
-- The plugin registers one tool, `ui_render`, and one skill, `dsh-intelligent-ui`, which teaches the model when a card beats prose. The skill is its own part of the plugin: the Plugin Manager lists it with its own switch, and installing the plugin installs it. The model never writes HTML or JavaScript: its program is checked against the 35-component catalog and stored with the tool result. SVG it writes for a drawing is read into a checked tree with no scripts, styles, links, or images.
-- A card draws in the tool row while the reply streams, and under the reply once it finishes. Moving a control recomputes every figure locally, and this browser keeps what you set, so a reload shows the card as you left it.
-- Asked to change a card, the model draws a revised one that starts from your settings; the earlier card says a newer version follows.
+- The plugin registers one tool, `ui_render`, and one skill, `dsh-intelligent-ui`, which teaches the model when a card beats prose. The skill is its own part of the plugin: the Plugin Manager lists it with its own switch, and installing the plugin installs it. The model never writes HTML or JavaScript: its program is checked against the 36-component catalog and stored with the tool result. SVG it writes for a drawing is read into a checked tree with no scripts, styles, links, or images.
+- A card stands in the reply where the model drew it, between the text before it and the text after it, and builds up there while the model writes it; folding a finished turn's work leaves it in place. Moving a control recomputes every figure locally, and this browser keeps what you set, so a reload shows the card as you left it.
+- Asked to change a card, or when a card came out wrong, the model draws a revised one that starts from your settings; a card redrawn in the same turn never reaches the reply, and an earlier one folds to a line you can open.
 - A `player` animates a card: code traced line by line, an algorithm's passes, a point moving along a curve. With `loop=true autoplay=true` a drawing plays by itself while it is on screen, like a GIF: a rolling wheel, a travelling wave, an orbit. Playback runs in the browser and sends nothing to the model, and nothing starts by itself if your system asks for less motion.
 - A `canvas` draws what the model sketches, from shape lines or SVG. You can drag its points and click its parts, and everything recomputes locally; a button can tell the model what you chose.
 - Cards compute integrals (including infinite bounds), derivatives, limits, sums and products, roots, and Taylor polynomials. A value that cannot be computed reliably shows "—", never a guess.
@@ -31,7 +31,7 @@ node node_modules/vitest/vitest.mjs run
 
 `AGENTS.md` holds the rules of the tree; `docs/VERIFY.md` is the live checklist.
 
-## The 35 components
+## The 36 components
 
 One card per component, drawn by this plugin in the host's light theme. The program behind each card is in [`docs/SAMPLES.md`](docs/SAMPLES.md).
 
@@ -232,6 +232,12 @@ An on/off switch.
 <img src="assets/catalog/checklist.png" alt="checklist" width="720">
 
 Items to tick off with a done count; `bind=` hands the count — or the sum of the ticked items' `values=` — to the rest of the card, and `names=` the ticked names.
+
+### `blanks` — Action
+
+<img src="assets/catalog/blanks.png" alt="blanks" width="720">
+
+A sentence you complete: each `___` becomes a blank in the line. Submit sends the sentence with your answers in brackets as your next message, and the blanks lock; the model grades it.
 
 ### `button` — Action
 

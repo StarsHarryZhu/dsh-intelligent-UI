@@ -60,8 +60,9 @@ test or consumer needs. The browser entry exports the same three names.
   provider.
 - `host/` — the harness-process half: the tool definition, the model-facing
   contract, and the skill provider. See `host/AGENTS.md`.
-- `client/` — the browser half: the tool row, the turn tail, the turn data
-  Definition, and the card. See `client/AGENTS.md`.
+- `client/` — the browser half: the card in the reply and the Definition that
+  places it, the tool row, the turn data Definition, and the card. See
+  `client/AGENTS.md`.
 - `lang/` — the shared language layer: catalog, grammar, expressions, the math
   engine, compiler, limits, and identity. See `lang/AGENTS.md`.
 

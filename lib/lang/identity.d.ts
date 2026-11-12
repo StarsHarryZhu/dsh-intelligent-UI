@@ -13,8 +13,14 @@ export declare const PLUGIN_ID = "dsh-intelligent-ui";
 export declare const UI_TOOL_NAME = "ui_render";
 /** Keyed slot that dispatches one atomic tool call to its registered view. */
 export declare const TOOL_VIEW_SLOT = "tool.call.toolview";
-/** List slot rendered under a finished turn's reply, before its action row. */
-export declare const TURN_TAIL_SLOT = "conversation.chat.turnTail";
+/** Keyed slot that draws one Chat node by its kind. */
+export declare const CHAT_NODE_SLOT = "conversation.chat.node";
+/**
+ * Chat node kind of a card in the reply: the Conversation Definition that
+ * places one card where its call stands, and the `conversation.chat.node` key
+ * that draws it.
+ */
+export declare const CARD_NODE_KIND = "dsh-intelligent-ui.card";
 /** Conversation Definition kind and the Turn data key it publishes. */
 export declare const TURN_DATA_KEY = "dsh-intelligent-ui";
 /** Locale namespace of the card chrome. */

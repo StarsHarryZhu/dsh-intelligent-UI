@@ -14,7 +14,7 @@
  * @module dsh-intelligent-ui/lang/compile
  */
 
-import { CATALOG_BY_TYPE, catalogHash, MAX_CHART_SERIES, MAX_PIE_SLICES, SHAPE_NEEDS, SIZES, TONES, type ComponentDescriptor, type PropSpec } from './catalog.ts'
+import { BLANK_RUN, CATALOG_BY_TYPE, catalogHash, MAX_BLANKS, MAX_CHART_SERIES, MAX_PIE_SLICES, SHAPE_NEEDS, SIZES, TONES, type ComponentDescriptor, type PropSpec } from './catalog.ts'
 import { parseDil, type Envelope, type RawCalc, type RawNode, type RawState } from './dil.ts'
 import { checkExpr, evalExpr, type ExprType } from './expr.ts'
 import { API_VERSION } from './identity.ts'
@@ -475,6 +475,27 @@ function readNode(raw: RawNode, context: NodeContext, diagnostics: Diagnostic[])
       repair: 'Write the text in a block (code lang=python """ … """), or name a text state or calc with value=.',
     })
     return undefined
+  }
+  if (type === 'blanks') {
+    // Blanks are counted in the sentence as written, so a value filled in by {…} never adds one.
+    const runs = String(rawProps.text ?? '').match(BLANK_RUN)?.length ?? 0
+    if (runs === 0) {
+      diagnostics.push({
+        code: 'invalid_literal',
+        ...where(`nodes.${id}.text`),
+        message: '<blanks> has no ___ for the reader to fill in; the component was left out',
+        repair: 'Write ___ where each answer goes, for example blanks "Water is ___ at 100 °C."',
+      })
+      return undefined
+    }
+    if (runs > MAX_BLANKS) {
+      diagnostics.push({
+        code: 'invalid_literal',
+        ...where(`nodes.${id}.text`),
+        message: `<blanks> has ${runs} blanks; only the first ${MAX_BLANKS} take answers`,
+        repair: `Split it into sentences of at most ${MAX_BLANKS} blanks each.`,
+      })
+    }
   }
   if (type === 'checklist' && Array.isArray(props.values) && Array.isArray(props.items) && props.values.length !== props.items.length) {
     const count = props.items.length
@@ -1485,6 +1506,7 @@ export function fallbackLines(program: Pick<UIProgram, 'nodes' | 'constants' | '
       case 'select': return `${text(node, 'label')}: ${String(values.get(bound) ?? '')}`
       case 'checkbox': return `${text(node, 'label')}: ${values.get(bound) === true ? 'yes' : 'no'}`
       case 'button': return `[${text(node, 'text')}]`
+      case 'blanks': return `${text(node, 'text')} [Submit]`
       case 'link': return `${text(node, 'text')} — ${String(node.props.url ?? '')}`
       case 'image': return `[image: ${String(node.props.alt ?? '')}]`
       case 'keys': return list(node.props.items).join(' · ')

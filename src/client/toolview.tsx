@@ -1,19 +1,24 @@
 /**
- * The `ui_render` tool row: the card while its turn is still running.
+ * The `ui_render` tool row: one status line in the process.
  *
- * Tool rows are process rows, and a finished turn folds them away, so this view
- * is the live surface: it previews the interface while the arguments stream,
- * shows the compiled card the moment the result lands, and leaves the settled
- * card to the turn tail under the reply. A result that arrives while the reader
- * watches opens the row; the host's own reset closes it when the turn folds.
+ * The card itself stands in the reply, as its own Chat node, while this row
+ * sits among the process rows a finished turn folds. While that reply copy is
+ * on the page the row says how the call went — building, how many components
+ * and controls, replaced, failed — and opens only to show why a program did not
+ * compile. Where no reply copy exists, in a view without Chat nodes or for a
+ * card whose reply copy is not drawn, the row draws the card itself: it
+ * previews the interface while the arguments stream, and a result that arrives
+ * while the reader watches opens the row.
  * @module dsh-intelligent-ui/client/toolview
  */
 
-import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
+import { SENDERS } from '../lang/catalog.ts'
 import { Card, Contained, revisionOf } from './card.tsx'
 import type { EditsStore } from './edits.ts'
 import type { DisclosureLike, ToolBlockLike, ToolViewProps } from './host.ts'
 import { translator } from './locales.ts'
+import type { Presence } from './presence.ts'
 import { previewProgram, readCardId, readMeta, type Program } from './program.ts'
 
 /** A result newer than this opens its row on arrival. */
@@ -21,21 +26,23 @@ const FRESH_MS = 30_000
 
 /**
  * Build the row component over the plugin's edit store.
- * @param store - the reader's edits, shared with the turn tail.
+ * @param store - the reader's edits, shared with the card in the reply.
+ * @param presence - the record of cards drawn in the reply.
  * @returns the component registered under the `ui_render` key.
  */
-export function createToolView(store: EditsStore): (props: ToolViewProps) => ReactNode {
+export function createToolView(store: EditsStore, presence: Presence): (props: ToolViewProps) => ReactNode {
   return function DshIntelligentUiToolView(props: ToolViewProps): ReactNode {
     return (
       <Contained label="tool row">
-        <ToolViewBody {...props} edits={store} />
+        <ToolViewBody {...props} edits={store} presence={presence} />
       </Contained>
     )
   }
 }
 
-/** The row's header and, while open, its card. */
-function ToolViewBody(props: ToolViewProps & { edits: EditsStore }): ReactNode {
+/** The row's header and, while open, its card or its problems. */
+function ToolViewBody(props: ToolViewProps & { edits: EditsStore; presence: Presence }): ReactNode {
+  const { presence } = props
   const store = props.edits
   const tr = translator(props.t)
   const phase = props.phase ?? 'result'
@@ -51,12 +58,20 @@ function ToolViewBody(props: ToolViewProps & { edits: EditsStore }): ReactNode {
   const metaValue = live ? undefined : block.meta
   const meta = useMemo(() => (metaValue === undefined ? undefined : readMeta(metaValue)), [metaValue])
   const disclosure = (props.useDisclosure ?? useLocalDisclosure)()
+  const callId = props.callId ?? block.callId
+  const memoryKey = `${props.sessionId ?? ''}:${callId ?? ''}`
+  const subscribe = useCallback((listener: () => void) => store.subscribe(memoryKey, listener), [store, memoryKey])
+  // A later card that revises this one renames the row's status.
+  const replaced = useSyncExternalStore(subscribe, () => store.get(memoryKey)?.revisedBy !== undefined)
+  const subscribeReply = useCallback((listener: () => void) => presence.subscribe(memoryKey, listener), [presence, memoryKey])
+  // While the card stands in the reply, the row does not draw it a second time.
+  const inReply = useSyncExternalStore(subscribeReply, () => presence.has(memoryKey))
   const resultTime = !live && typeof block.time === 'number' ? block.time : undefined
   useEffect(() => {
-    if (resultTime !== undefined && Date.now() - resultTime < FRESH_MS) disclosure.setExpanded(true)
+    if (!inReply && resultTime !== undefined && Date.now() - resultTime < FRESH_MS) disclosure.setExpanded(true)
     // Only a result's arrival opens the row; the reset that closes it belongs to the host.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resultTime])
+  }, [resultTime, inReply])
 
   const title = (meta?.title ?? readArgument(block, 'title') ?? '').trim()
   const program: Program | undefined = live ? preview : meta?.ok === true ? meta.program : undefined
@@ -70,19 +85,18 @@ function ToolViewBody(props: ToolViewProps & { edits: EditsStore }): ReactNode {
     : block.isError === true
       ? block.error?.code === 'interrupted' ? tr('row.stopped') : tr('row.error')
       : program !== undefined
-        ? tr('row.ready', { components: program.nodes.length, controls: program.nodes.filter(node => node.bind !== undefined || node.type === 'button').length })
+        ? replaced ? tr('row.replaced') : tr('row.ready', { components: program.nodes.length, controls: program.nodes.filter(node => node.bind !== undefined || SENDERS.has(node.type)).length })
         : tr('row.failed')
   const detail = errorText ?? diagnostics
-  const expandable = !live && (program !== undefined || (detail !== undefined && detail !== ''))
-  const open = live || disclosure.expanded
+  const drawsCard = program !== undefined && !inReply
+  const expandable = !live && (drawsCard || (program === undefined && detail !== undefined && detail !== ''))
+  const open = (live && drawsCard) || (expandable && disclosure.expanded)
   const toggle = (): void => { if (expandable) disclosure.toggle() }
   const onKey = (event: KeyboardEvent<HTMLDivElement>): void => {
     if (!expandable || (event.key !== 'Enter' && event.key !== ' ')) return
     event.preventDefault()
     disclosure.toggle()
   }
-  const callId = props.callId ?? block.callId
-  const memoryKey = `${props.sessionId ?? ''}:${callId ?? ''}`
   // A preview already starts from the revised card's values; only a settled
   // result marks the earlier card as revised.
   const revises = live ? readCardId(readArgument(block, 'revises')) : meta?.ok === true ? meta.revises : undefined
@@ -113,7 +127,7 @@ function ToolViewBody(props: ToolViewProps & { edits: EditsStore }): ReactNode {
           </button>
         )}
       </div>
-      {open && program !== undefined ? (
+      {open && drawsCard && program !== undefined ? (
         <div className="dsh-iui-row-body">
           <Card program={program} memoryKey={memoryKey} store={store} kit={props} revision={revision} />
         </div>

@@ -1,8 +1,8 @@
 /**
  * The reader's edits, kept in this browser.
  *
- * One card can be drawn twice — in the tool row while its turn runs and under the
- * reply once it ends — and a chat list may unmount a row that scrolls away. Keeping
+ * One card can be drawn twice — in the reply and, where no reply copy is drawn, in
+ * its tool row — and a chat list may unmount a row that scrolls away. Keeping
  * edits here, keyed by session and call, makes both copies and every remount show
  * the same state. Each card's memory is also written to the browser's own storage,
  * so a reload or a restart shows the card as the reader left it. The storage is

@@ -47,8 +47,8 @@ them on every platform.
 ## 3. Contents
 
 - `AGENTS.md` — this file: what the skill is for and the rules it keeps.
-- `SKILL.md` — the skill: when to draw a card, how to shape one, what to say
-  around it, code blocks, quiz rules, revising a card, the repair loop, and the
+- `SKILL.md` — the skill: when to draw a card, how to shape one, where it
+  stands in the reply and what to say around it, code blocks, quiz rules, revising a card, the repair loop, and the
   reference list.
 - `math.md` — the math vocabulary, the calculus operators and their accuracy,
   `plot` and `formula`, and six calculus recipes.
@@ -57,7 +57,7 @@ them on every platform.
   parts), and five recipes.
 - `recipes.md` — complete cards for a subscription estimate, a loan, a unit
   conversion, binomial and normal probabilities, projectile motion, a quiz
-  series, priced add-ons on a checklist with `values=` and `names=`, revenue
+  series, a fill-in question, priced add-ons on a checklist with `values=` and `names=`, revenue
   by source as stacked series with a pie, and code played line by line.
 
 ## 4. Progress
@@ -84,6 +84,17 @@ them on every platform.
 - Moving drawings (2026-11-05): a "Moving pictures" section and two recipes in
   `drawing.md`, and one bullet under "Animate" in `SKILL.md`; room was made by
   shortening the player's intro and the reference list.
+- Replaced cards (2026-11-07): "Revising a card" also covers redrawing a card
+  that came out wrong, and says the earlier card folds away.
+- Fill-in questions (2026-11-08): "Practice questions" (was "Questions answered
+  by clicking") adds `blanks`, and `recipes.md` a fill-in recipe with how to
+  grade it. Room was made by dropping the code block's `value=` bullet, which the
+  tool description already carries, and shortening the description line.
+- Where a card stands (2026-11-11): "What to say around it" became "Where it
+  stands and what to say": the card stands in the reply where `ui_render` is
+  called, so the lead-in is written before the call in the same message and the
+  rest after the result. Room was made by dropping the code block's `caption=`,
+  `numbers=`, and `current=` sentence, which the tool description carries.
 
 **Not done.**
 

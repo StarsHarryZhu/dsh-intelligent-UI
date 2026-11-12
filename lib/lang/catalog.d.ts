@@ -22,6 +22,12 @@ export declare const CHART_SHAPES: readonly ["bar", "line", "area", "pie"];
 export declare const MAX_CHART_SERIES = 4;
 /** Slices a pie keeps; a pie with more is drawn as bars. */
 export declare const MAX_PIE_SLICES = 8;
+/** Blanks one fill-in sentence takes answers for; any further ___ stays plain text. */
+export declare const MAX_BLANKS = 12;
+/** A run of three or more underscores: one blank of a fill-in sentence. */
+export declare const BLANK_RUN: RegExp;
+/** Components that send the reader's next message, so they count as controls. */
+export declare const SENDERS: ReadonlySet<string>;
 /** What a shape can be. */
 export declare const SHAPE_KINDS: readonly ["line", "rect", "circle", "polygon", "polyline", "path", "curve", "text", "point", "hotspot", "use"];
 /** The props each kind of shape cannot be drawn without. */

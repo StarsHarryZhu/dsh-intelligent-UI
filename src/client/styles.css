@@ -33,7 +33,8 @@
 .dsh-iui-row-inspect { flex: none; border: 0; padding: 0 4px; background: transparent; color: var(--dsw-alias-link); font: inherit; cursor: pointer; }
 .dsh-iui-row-body { margin: 4px 0 8px; min-width: 0; }
 
-.dsh-iui-tail { display: flex; flex-direction: column; gap: 12px; min-width: 0; margin-top: 4px; }
+/* A card in the reply: the flow's own gap, plus a little air around a framed card. */
+.dsh-iui-reply { display: flex; flex-direction: column; min-width: 0; margin: 4px 0; }
 
 .dsh-iui-surface { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 
@@ -162,7 +163,7 @@
 }
 .dsh-iui-input:focus-visible, .dsh-iui-select:focus-visible, .dsh-iui-range:focus-visible, .dsh-iui-button:focus-visible, .dsh-iui-check input:focus-visible,
 .dsh-iui-player-button:focus-visible, .dsh-iui-player-speed:focus-visible, .dsh-iui-tabs-tab:focus-visible, .dsh-iui-table-sort:focus-visible,
-.dsh-iui-table-copy:focus-visible, .dsh-iui-table-page:focus-visible, .dsh-iui-code-copy:focus-visible, .dsh-iui-chart-key:focus-visible,
+.dsh-iui-table-copy:focus-visible, .dsh-iui-table-page:focus-visible, .dsh-iui-code-copy:focus-visible, .dsh-iui-chart-key:focus-visible, .dsh-iui-replaced-toggle:focus-visible,
 .dsh-iui-chart-plot:focus-visible, .dsh-iui-shape[data-tap]:focus-visible, .dsh-iui-shape[data-drag]:focus-visible, .dsh-iui-shape-part[data-tap]:focus-visible {
   outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 1px;
@@ -187,7 +188,7 @@
 .dsh-iui-table-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; }
 .dsh-iui-table-head > .dsh-iui-caption { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dsh-iui-table-tools { display: inline-flex; flex: none; gap: 2px; }
-.dsh-iui-table-copy, .dsh-iui-table-page {
+.dsh-iui-table-copy, .dsh-iui-table-page, .dsh-iui-replaced-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -201,7 +202,7 @@
   cursor: pointer;
   transition: background-color 120ms ease;
 }
-.dsh-iui-table-copy:hover, .dsh-iui-table-page:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
+.dsh-iui-table-copy:hover, .dsh-iui-table-page:hover:not(:disabled), .dsh-iui-replaced-toggle:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
 .dsh-iui-table-page { width: 24px; padding: 0; }
 .dsh-iui-table-page:disabled { cursor: default; opacity: 0.4; }
 .dsh-iui-table-filter-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -438,8 +439,32 @@
 .dsh-iui-button:disabled { cursor: default; opacity: 0.5; }
 .dsh-iui-button[data-sent] { opacity: 1; border-color: var(--dsw-alias-brand-primary); color: var(--dsw-alias-brand-primary); }
 .dsh-iui-button-mark { flex: none; font: var(--dsw-font-xxs-12); }
+/* A fill-in sentence: entries sit in the line like the blanks they replace, then one send button. */
+.dsh-iui-blanks { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
+.dsh-iui-blanks-text { line-height: 32px; overflow-wrap: anywhere; }
+.dsh-iui-blank {
+  box-sizing: content-box;
+  max-width: calc(100% - 16px);
+  height: 22px;
+  margin: 0 4px;
+  padding: 0 4px;
+  border: 0;
+  border-bottom: 1px solid var(--dsw-alias-label-tertiary);
+  border-radius: var(--dsw-radius-xs) var(--dsw-radius-xs) 0 0;
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  line-height: 22px;
+  text-align: center;
+  vertical-align: baseline;
+}
+.dsh-iui-blank:focus { outline: none; border-bottom-color: var(--dsw-alias-brand-primary); }
+.dsh-iui-blank:focus-visible { box-shadow: 0 1px 0 0 var(--dsw-alias-brand-primary); }
+.dsh-iui-blank[readonly] { background: transparent; border-bottom-color: var(--dsw-alias-border-l3); }
 
 .dsh-iui-note { font: var(--dsw-font-xxs-12); color: var(--dsw-alias-label-tertiary); }
+/* A card a newer version replaced: one quiet line, with a toggle for the old card. */
+.dsh-iui-replaced { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-height: 24px; }
 .dsh-iui-copy-text { display: block; margin-top: 4px; padding: 4px 8px; border-radius: var(--dsw-radius-sm); background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); font-family: var(--ds-font-family-code); white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
 .dsh-iui-foot { font: var(--dsw-font-xxxs-11); color: var(--dsw-alias-label-tertiary); }
 .dsh-iui-fallback { margin: 0; font: var(--dsw-font-xs-13); color: var(--dsw-alias-label-primary); white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -489,7 +514,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .dsh-iui-row-head, .dsh-iui-button, .dsh-iui-player-button, .dsh-iui-player-speed, .dsh-iui-progress-fill, .dsh-iui-chart-bar,
-  .dsh-iui-tabs-tab, .dsh-iui-diagram-node rect, .dsh-iui-code-copy, .dsh-iui-table-copy, .dsh-iui-table-page, .dsh-iui-chart-key, .dsh-iui-shape { transition: none; }
+  .dsh-iui-tabs-tab, .dsh-iui-diagram-node rect, .dsh-iui-code-copy, .dsh-iui-table-copy, .dsh-iui-table-page, .dsh-iui-chart-key, .dsh-iui-shape,
+  .dsh-iui-replaced-toggle { transition: none; }
   .dsh-iui-code-scroll { scroll-behavior: auto; }
   .dsh-iui-row-head[data-state='running'] .dsh-iui-row-status { animation: none; }
 }

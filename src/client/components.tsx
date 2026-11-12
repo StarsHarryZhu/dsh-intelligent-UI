@@ -17,6 +17,7 @@ import { evalExpr, formatNumber } from '../lang/expr.ts'
 import { MAX_SPACE } from '../lang/limits.ts'
 import { formatSignificant } from '../lang/math.ts'
 import type { JsonValue } from '../lang/types.ts'
+import { Blanks } from './blanks.tsx'
 import { CanvasFigure } from './canvas.tsx'
 import { ChartFigure } from './chart.tsx'
 import { CodeFigure } from './code.tsx'
@@ -391,6 +392,7 @@ export const REGISTRY: Readonly<Record<string, Renderer>> = {
     if (url === undefined || !/^https?:\/\//iu.test(url)) return <span className="dsh-iui-text">{text}</span>
     return <a className="dsh-iui-link" href={url} target="_blank" rel="noopener noreferrer">{text}</a>
   },
+  blanks: (node, _children, scope) => <Blanks node={node} scope={scope} />,
   button: (node, _children, scope) => {
     const prompt = scope.text(node.props.prompt)
     const sent = scope.sent === node.id

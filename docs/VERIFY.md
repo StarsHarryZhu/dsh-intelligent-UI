@@ -38,13 +38,13 @@ window.__DSH_BOOT__.entries.some(entry => entry.id === 'dsh-intelligent-ui')
 document.querySelectorAll('style[data-plugin="dsh-intelligent-ui"]').length
 ```
 
-Pass: `true`, then `1`. The console shows no `client-modules` error, no `web boot: … did not activate`, and no `slot entry crashed` naming `tool.call.toolview` or `conversation.chat.turnTail`.
+Pass: `true`, then `1`. The console shows no `client-modules` error, no `web boot: … did not activate`, and no `slot entry crashed` naming `tool.call.toolview` or `conversation.chat.node`, and no raw-data block labelled with the kind `dsh-intelligent-ui.card`.
 
 ## 3. A persisted card renders (no model call)
 
 Open any session that holds a settled `ui_render` call made by a build that writes `version: 1` (every build from the program-version reset on). If the turn is above the loaded window, click "load earlier".
 
-Pass: the cards appear under that turn's reply. Moving a slider changes its figures at once, with no request in the network panel and no new turn.
+Pass: each card appears in that turn's reply, where the model called the tool. Moving a slider changes its figures at once, with no request in the network panel and no new turn.
 
 A card persisted before the version fields existed (on the development machine: the `deepseek-harness` workspace session `9cecadfb…`, turn 11) shows its text version with the note that it comes from another version of the plugin, and the transcript around it is unaffected.
 
@@ -56,8 +56,8 @@ Start a new session in the standard mode and send:
 
 Pass:
 
-- While the model writes the call, the `Interactive` row shows a growing preview.
-- When the turn finishes, it folds and the card stays under the reply.
+- While the model writes the call, a growing preview appears in the reply, below the call's row; the `Interactive` row itself shows only its status.
+- When the turn finishes, its process folds and the card stays where it was drawn, between the text before the call and any text after it.
 - The card shows the typeset integral, its value, and a plot with a shaded area, a marked point, and a dashed tangent.
 - At the initial a, the figures read area = a³/3 and slope = 2a.
 - The reply quotes the same figures the card shows.
@@ -104,7 +104,7 @@ Pass: the row shows `The interface did not compile`; the model reports the diagn
 
 Reload the page and reopen the session from step 4.
 
-Pass: every card is still under its reply, back at the model's initial values. Switch the theme between light and dark: plots, formulas, and controls follow, with no unreadable text. With the interface language set to Chinese, the row label reads `交互界面` and the footer note is Chinese.
+Pass: every card is still where it was drawn in its reply, back at the model's initial values. Switch the theme between light and dark: plots, formulas, and controls follow, with no unreadable text. With the interface language set to Chinese, the row label reads `交互界面` and the footer note is Chinese.
 
 ## 11. Nothing else moved
 
@@ -136,7 +136,7 @@ Send:
 
 > 用一张卡片讲 HTTP 请求重试：分成“流程”“清单”“对比”三页。流程页画出发送请求、判断是否收到响应、成功解析或等待后重试的流程图，并能用滑块高亮当前步骤；清单页列出上线前要检查的 4 项，勾选后显示完成进度；对比页用表格比较三种重试策略的等待时间和适用场景，读者可以按列排序。
 
-Pass: the program compiles with no repair and uses `tabs`, `checklist`, `table … sortable=true`, and `diagram`. Clicking a tab and the left and right arrow keys switch pages, and the open page is the same in the tool row and under the reply. Ticking items updates the done count and anything bound to it. A column header sorts ascending, then descending, then back to the written order. The flowchart's loop returns along the side without crossing a box, and the slider moves the highlight. No request appears in the network panel while doing any of this.
+Pass: the program compiles with no repair and uses `tabs`, `checklist`, `table … sortable=true`, and `diagram`. Clicking a tab and the left and right arrow keys switch pages, and the open page is still open after a reload. Ticking items updates the done count and anything bound to it. A column header sorts ascending, then descending, then back to the written order. The flowchart's loop returns along the side without crossing a box, and the slider moves the highlight. No request appears in the network panel while doing any of this.
 
 ## 15. A code block
 
@@ -165,7 +165,7 @@ The prompts are in English because the composer drops CJK text typed by automati
 
 Pass, before any reload: the program compiles with no repair and uses `chart … shape=area stacked=true` with three indented `series` lines, a `chart shape=pie`, and a 30-row `table`. The legend hides and shows each series, always keeping one; hovering or focusing the chart and pressing ← and → moves the readout from month to month. The pie's legend shows each slice's share, and hiding a slice recomputes them. The table shows a filter box, a row count, and pages of 20; filtering narrows the rows and resets to the first page; Copy CSV and Copy Markdown paste as a spreadsheet range and as a Markdown table. No request appears in the network panel.
 
-Then move the slider, hide a series, sort and filter the table, and turn to its second page. Reload the page. Pass: the card shows every one of those settings as it was left, in the tool row and under the reply alike.
+Then move the slider, hide a series, sort and filter the table, and turn to its second page. Reload the page. Pass: the card shows every one of those settings as it was left.
 
 Then send:
 
@@ -203,6 +203,34 @@ Pass: the program compiles with no repair and uses `shape kind=use ref=…` with
 
 Pass: the card uses `shape kind=curve fn="…"`; the wave moves smoothly, and the slider changes the wavelength while it plays. With the system set to reduce motion, a newly drawn card waits on its play button.
 
+## 20. A card redrawn in its turn, and a card replaced in a later one
+
+Send, in a new session:
+
+> Draw a card with a slider for x from 0 to 10 and a metric of x squared. Once it is drawn, redraw it in the same turn with a second metric for the square root of x, as a revision of that card. Reply in Chinese.
+
+Pass: the second call carries `revises=` with the card id the first result reported. Once the second result lands, the first card leaves the reply and its row's status reads 已被新版本替换; only the second card stays, where it was called. Move the slider, then send:
+
+> Change the slider's maximum to 20. Reply in Chinese.
+
+Pass: the new card starts from the slider value you set; the card of the first turn shows only 这张卡片已被后文的新版本替换。 and 显示旧版本, which opens it with its values and 收起旧版本 folds it again. A reload keeps it folded.
+
+## 21. A fill-in question
+
+Send, in a new session:
+
+> Give me one fill-in-the-blank question about the chemistry of water, with two blanks, as a card. Reply in Chinese.
+
+Pass: the program compiles with no repair and uses `blanks "…___…"` with no `@state` for the answers. Each blank sits inside the sentence and widens as you type Chinese into it; Submit stays disabled until both are filled. Enter in the first blank moves to the second, and Enter in the second sends. While a Chinese input method is composing, Enter picks the word and sends nothing. The message that arrives reads as the sentence with each answer in brackets, the model grades it in its reply, and the blanks and Submit lock. A reload keeps the answers and the lock.
+
+## 22. A card inside the answer
+
+Send, in a new session:
+
+> Explain compound interest in three short parts, reply in Chinese: first one paragraph on the idea; then a card with sliders for principal, rate, and years and the final amount as a metric; then a paragraph on what to try with it and a closing tip.
+
+Pass: the model writes the first paragraph and calls `ui_render` in the same message, and the result's second line says the card stands there. The card builds up in the reply under that paragraph while the arguments stream, in the `standard` view as well; the process shows the `Interactive` row as a status line. After the result the model goes on writing below the card. When the turn completes, its process folds and the card stays between the two paragraphs. Expanding the process shows the row as one line that does not open, and a reload keeps the card in place. With Settings → General → Replies after collapse set to Final answer only, the first paragraph folds with the process and the card stays.
+
 # Part 2 — Desktop apps (macOS and Windows)
 
 **Passed on 0.2.1-rc.2, on both apps.** D1 to D4 passed on the macOS app and on the Windows app of DeepSeek Harness 0.2.1-rc.2, installed on macOS from the working checkout as a `link:` dependency and on Windows through W1. The failure of 2026-10-16 on 0.2.0-rc.2 — no card drawn, and past conversations that would not open with the plugin loaded — did not recur on this build. Run this part again on any new desktop version, in a throwaway session first, before claiming that version.
@@ -231,7 +259,7 @@ Pass: `true`, then `1`, and Settings → Plugins lists 渐进式交互 / Intelli
 
 The desktop apps default to the `standard` transcript view, which keeps a running turn's tool rows collapsed. Run step 4.
 
-Pass: while the turn runs, the step group is collapsed (expand it to see the row's live preview); when the turn finishes, the card appears under the reply. Switching the transcript view to `detailed` in Settings shows the preview in place, as on the web.
+Pass: while the turn runs, the step group is collapsed, and the card's preview still grows in the reply, outside it; when the turn finishes, the card stays where it was drawn. Switching the transcript view to `detailed` in Settings changes the process rows only, not where the card stands.
 
 ## D4. The rest
 
@@ -293,14 +321,25 @@ Pass: the linker creates directory junctions without asking for administrator ri
   - Found and fixed in this run: the running host defines no `--shiki-background`, so the block fell back to a lighter layer than the host's code blocks; it now falls back to `--dsw-alias-markdown-code-block`. And on its first desktop call the model opened the block with `"""` on a line of its own under `code`, which dropped the block until the model retried; such a block now attaches to the component above it, with a repair note.
 
 - 2026-10-26, web UI and the macOS desktop app, DeepSeek Harness 0.2.1-rc.2, DeepSeek-V4.1-Flash, both profiles linked to the working checkout, run by Claude Code as on 2026-10-22: step 17 passed on both hosts, with notes.
-- 2026-11-05, web UI, DeepSeek Harness 0.2.2-alpha.2 (the working checkout), DeepSeek-V4.1-Flash at Max, the profile linked to the working checkout: step 18 passed. The triangle compiled with no repair; a real mouse drag moved a vertex onto its 0.5 steps with the area following (C to (6.5, 5.5), area 14), the arrow keys moved another, no request of the plugin's appeared while dragging, a reload kept the vertices, and the button sent `A(3.5, 3)、B(9.5, 3)、C(6.5, 5.5)`. An SVG lamp of 135 elements with gradients compiled with no repair and read well in both themes; clicking a hotspot changed the sentence and marked the area, and a reload kept it. The first lamp prompt told the model to read no file but the skill, so it missed `drawing.md` and drew with shapes, wrote `tone=<calc>`, was told of the repair, and revised its own card with `revises=`; `drawing.md` now says that a tone is a fixed word. The parabola compiled with no repair: the dragged point stayed on the curve at (2.4, 1.44) and the tangent followed; asked for a lower limit, the revision started at 2 and the earlier card kept 2.4 and said a newer version follows. In Chrome with touch emulation, a touch on a point moved the point and left the page still, and a touch elsewhere on the canvas scrolled the page. Two defects were found and fixed in this run: a pointer left the keyboard focus ring on a shape, and at a phone's width the canvas shrank its text and points with it, so its viewBox now takes the canvas's width on the page. The macOS desktop app was **not** run: the app was open, did not exit when asked to quit, and the command line refuses to change its profile, so D1 to D4 have no record for drawings.
-- 2026-11-05, the built bundle in headless Chrome, on a static page with the host's built stylesheets (no running harness and no model): step 19 is **not** run live yet. The two moving recipes of `drawing.md` and an orbit compiled with no repair. The wheel started by itself, its part changed 61 times in two seconds and had turned 181° after two of its four seconds, and its trail was drawn; nothing was written to storage while it played, and pausing kept that frame (`a = 3.45`). A card below the fold showed its play button and frame 1 until scrolled to, then played. With reduced motion emulated, the wheel waited on its play button.
   - Both programs of each host compiled with zero repairs: one card with a slider, a stacked area chart of three `series`, a pie, and a 30-row table, and its revision. Each result named its card id, and each revision carried `revises` with that id.
   - The legend hid a series and the area chart redrew without it; ← and Home moved the readout to March and January; hiding a pie slice recomputed the other shares (41.6% and 58.4%). The table showed its filter, "30 / 30 行", and two pages; filtering for one customer left one row with no pages, a filter matching nothing said so, and the next-page button turned to rows 21 to 30. No `/api` request left the page while doing any of this. Copy said it could not copy in the in-app browser, which refuses the clipboard, as step 15 allows.
   - After a page reload (web UI) and after quitting and reopening the app (desktop), the slider, the hidden series and slice, the filter, and the second table page were all as left, in the dark and the light theme.
   - Asked to lower the slider's maximum and add a fourth series, the model revised the card: the new card started from the slider value the reader had set, held at the new maximum (30000 → 25000 on the web UI, 36000 → 30000 on the desktop app), drew four series, and the earlier card said a newer version follows. A quiz button locked across a reload was not tried live; `tests/client.test.tsx` covers it.
   - Found and fixed in this run: the chart's keyboard focus ring used the brand colour, near black in the light theme; it now takes the host's focus ring like every other control.
+- 2026-11-05, web UI, DeepSeek Harness 0.2.2-alpha.2 (the working checkout), DeepSeek-V4.1-Flash at Max, the profile linked to the working checkout: step 18 passed. The triangle compiled with no repair; a real mouse drag moved a vertex onto its 0.5 steps with the area following (C to (6.5, 5.5), area 14), the arrow keys moved another, no request of the plugin's appeared while dragging, a reload kept the vertices, and the button sent `A(3.5, 3)、B(9.5, 3)、C(6.5, 5.5)`. An SVG lamp of 135 elements with gradients compiled with no repair and read well in both themes; clicking a hotspot changed the sentence and marked the area, and a reload kept it. The first lamp prompt told the model to read no file but the skill, so it missed `drawing.md` and drew with shapes, wrote `tone=<calc>`, was told of the repair, and revised its own card with `revises=`; `drawing.md` now says that a tone is a fixed word. The parabola compiled with no repair: the dragged point stayed on the curve at (2.4, 1.44) and the tangent followed; asked for a lower limit, the revision started at 2 and the earlier card kept 2.4 and said a newer version follows. In Chrome with touch emulation, a touch on a point moved the point and left the page still, and a touch elsewhere on the canvas scrolled the page. Two defects were found and fixed in this run: a pointer left the keyboard focus ring on a shape, and at a phone's width the canvas shrank its text and points with it, so its viewBox now takes the canvas's width on the page. The macOS desktop app was **not** run: the app was open, did not exit when asked to quit, and the command line refuses to change its profile, so D1 to D4 have no record for drawings.
+- 2026-11-05, the built bundle in headless Chrome, on a static page with the host's built stylesheets (no running harness and no model): step 19 is **not** run live yet. The two moving recipes of `drawing.md` and an orbit compiled with no repair. The wheel started by itself, its part changed 61 times in two seconds and had turned 181° after two of its four seconds, and its trail was drawn; nothing was written to storage while it played, and pausing kept that frame (`a = 3.45`). A card below the fold showed its play button and frame 1 until scrolled to, then played. With reduced motion emulated, the wheel waited on its play button.
+- 2026-11-07, the built bundle in headless Chrome, on the same kind of static page: step 20 is **not** run live yet. A card in one turn and its revision in a later turn: the earlier card showed only 这张卡片已被后文的新版本替换。 with 显示旧版本, its tool row's status read 已被新版本替换, and the toggle opened the old card with its values and folded it again. A card and its redraw in one turn: the reply drew only the redraw. No page error.
+- 2026-11-08, the built bundle in headless Chrome, on the same kind of static page: step 21 is **not** run live yet. Sample 36 compiled with no repair; with H2O and 18 typed in, Submit sent `水的化学式是 [H2O]，1 mol 水的质量约为 [18] g。`, the button said 已发送, and the blanks locked. No page error. Input-method composition was checked only in jsdom (`keyCode` 229).
+- 2026-11-11, DeepSeek Harness 0.2.2-alpha.2 (the working checkout) served by a separate `pnpm dsh web --port 3097` with `DSH_HOME` set to a throwaway directory whose web profile held only this plugin, linked to the working checkout; no model, driven by headless Chrome: step 22 is **not** run live yet. The session of the 2026-11-05 drawing run was copied in, with a lead-in sentence added before each of its two `ui_render` calls. The host's own conversation engine placed each card's node after its row and outside the process (no `data-turn-process-member`), so each turn read lead-in, card, closing reply with the process folded; the turn-1 card, revised in turn 2, showed only its fold line between the two texts. Expanding turn 2's process showed the `ui_render` row as `交互界面 · … 16 个组件 · 3 个控件`, with no card and no disclosure, and the card right below it. No page errors. The throwaway instance created an empty `default-workspace` folder beside the harness checkout, removed afterwards; `~/.dsh` was not touched. The streaming preview and a model placing its own card need a live run.
+- 2026-11-11, macOS desktop app, DeepSeek Harness 0.2.2-rc.1, desktop profile linked to the working checkout, run by the app's own agent: the placement half of step 22, step 21, and the same-turn half of step 20 passed live, with notes.
+  - Step 22: the model wrote its lead-in, called `ui_render` in the same message, and went on writing after the result. In the finished turn the card stood between the two paragraphs, the process folded around it, and its row read as a status line that did not open. The preview building up while the arguments streamed was not watched, and "Final answer only" was not tried.
+  - Step 21: a `blanks` card asked for the mass of 1 mol of water and water's formula. The submitted message arrived as `1 mol 水的质量约为 [18] g，它的化学式是 [h2o]。`, the model graded both answers, and the blanks locked. The reader typed into both blanks; Enter, an input method, and a reload were not tried.
+  - Step 20, same turn: a second call carrying `revises=` with the first result's card id replaced the card, and its result said the earlier card folds away and states with the same names keep the reader's values. The later-turn fold was not tried.
+  - A drawing card's vertices were dragged and the card followed with no request, as the reader reported.
+  - Found in this run: a bare expression item in a list prop, `points=[ax, ay, -3, -2.5, 3, -2.5]`, is split at its commas and the repair drops the prop (`"ay," is not attached to a prop`, `must be a list of numbers or expressions`); quoting each item compiled with zero repairs. Recorded as a known defect, with sample 35 as the pattern to copy.
 
 # Not verified
 
-The desktop apps are verified on 0.2.1-rc.2 only. Part 2 and W1, W2, and W3 passed on both apps of that version, cards drawn and history opening. Nothing here proves an older or a newer desktop release, and W4 (link the toolchain, build, run the suite on Windows) has no recorded pass: the 2026-10-16 attempt failed with its output lost, and no later attempt is recorded. The one earlier desktop run, on 0.2.0-rc.2, failed both visually and on history; that build is below the plugin's engine range and the plugin now refuses it.
+Part 2 as a checklist is passed on 0.2.1-rc.2 only: D1 to D4 and W1, W2, and W3 passed on both apps of that version, cards drawn and history opening. On 0.2.2-rc.1 the macOS app loaded the linked checkout and passed steps 21 and 22 (placement) and the same-turn half of step 20, but Part 2 was not rerun as a checklist and Windows was not run. Nothing here proves an older or a newer desktop release, and W4 (link the toolchain, build, run the suite on Windows) has no recorded pass: the 2026-10-16 attempt failed with its output lost, and no later attempt is recorded. The one earlier desktop run, on 0.2.0-rc.2, failed both visually and on history; that build is below the plugin's engine range and the plugin now refuses it.
+
+Steps 19 and 20 have no complete live run: step 19 has run only in headless Chrome on the built bundle, and step 20's later-turn fold only there, while its same-turn half passed live on 2026-11-11. Step 22's placement and the model's lead-in passed live the same day, but the preview building up in the reply while a model streams its arguments has not been seen in a live DSH. Step 21's live pass typed into both blanks but did not try Enter, an input method, or a reload.

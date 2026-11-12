@@ -32,6 +32,15 @@ export const MAX_CHART_SERIES = 4
 /** Slices a pie keeps; a pie with more is drawn as bars. */
 export const MAX_PIE_SLICES = 8
 
+/** Blanks one fill-in sentence takes answers for; any further ___ stays plain text. */
+export const MAX_BLANKS = 12
+
+/** A run of three or more underscores: one blank of a fill-in sentence. */
+export const BLANK_RUN = /_{3,}/gu
+
+/** Components that send the reader's next message, so they count as controls. */
+export const SENDERS: ReadonlySet<string> = new Set(['button', 'blanks'])
+
 /** What a shape can be. */
 export const SHAPE_KINDS = ['line', 'rect', 'circle', 'polygon', 'polyline', 'path', 'curve', 'text', 'point', 'hotspot', 'use'] as const
 
@@ -231,7 +240,7 @@ export const CATALOG: readonly ComponentDescriptor[] = [
   },
   {
     type: 'textInput',
-    description: 'Short text entry for a text state.',
+    description: 'Short text entry.',
     container: false,
     primary: 'label',
     props: {
@@ -249,7 +258,7 @@ export const CATALOG: readonly ComponentDescriptor[] = [
   },
   {
     type: 'checkbox',
-    description: 'On/off choice for a true/false state.',
+    description: 'On/off choice.',
     container: false,
     primary: 'label',
     props: { label: { kind: 'text', required: true }, bind: { kind: 'bind', required: true, state: 'boolean' } },
@@ -478,10 +487,17 @@ export const CATALOG: readonly ComponentDescriptor[] = [
   },
   {
     type: 'link',
-    description: 'Citation link, opened only when the reader clicks it.',
+    description: 'Citation link.',
     container: false,
     primary: 'text',
     props: { text: { kind: 'text', required: true }, url: { kind: 'string', required: true, format: 'url' } },
+  },
+  {
+    type: 'blanks',
+    description: 'A sentence whose ___ runs the reader fills in; its button sends the filled sentence as their message, once.',
+    container: false,
+    primary: 'text',
+    props: { text: { kind: 'text', required: true } },
   },
   {
     type: 'button',

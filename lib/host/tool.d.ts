@@ -55,6 +55,8 @@ export type UIRenderValue = UIRenderSuccess | UIRenderFailure;
  * @returns the `ui_render` tool definition.
  */
 export declare function createUIRenderTool(): ToolDefinition;
+/** Where the card stands, told with every card so the model goes on writing after it. */
+export declare const PLACEMENT_NOTE = "It stands in your reply here, where you called ui_render; continue your answer below it.";
 /** Render the tool result for the model: the summary, or the repair list when it failed. */
 export declare function renderForModel(value: unknown): string;
 /**

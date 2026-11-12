@@ -29,9 +29,10 @@ tool, `ui_render`, which compiles the model's source and persists the compiled
 program as the tool result's presentation metadata; the skill row registers one
 skill, `dsh-intelligent-ui`, which teaches the model when and how to use the
 tool, the way the host's own skill packages register theirs. The browser half draws the
-program in two places — in the tool row while the turn runs (with a live preview
-while the arguments stream), and under the reply once the turn has finished,
-because a finished turn folds its tool rows away. It supports DeepSeek Harness
+program in the reply, where the model called the tool: a Chat node of its own,
+outside the process a finished turn folds, so the card sits between the text
+written before the call and the text written after it, with a live preview while
+the arguments stream. The call's tool row stays a one-line status beside it. It supports DeepSeek Harness
 0.2.1-rc.1 and later within 0.2.x on all three hosts it serves — the web UI,
 the macOS desktop app, and the Windows desktop app — through one `dsh.client`
 declaration, because the desktop apps wrap the same web client.
@@ -57,12 +58,14 @@ opens" true.
 bundle rows, `dsh-intelligent-ui` with one tool, `ui_render`, and
 `dsh-intelligent-ui-skill` with one skill provider listing one skill,
 `dsh-intelligent-ui`. Browser: one keyed `tool.call.toolview` cell under
-`ui_render`, one `conversation.chat.turnTail` list entry with id
-`dsh-intelligent-ui`, one data-only Conversation Definition of kind
-`dsh-intelligent-ui` (it publishes Turn data and builds no view node), one
-dictionary namespace, and one `<style data-plugin="dsh-intelligent-ui">`. No
-store, no settings namespace, no replacement of a shipped cell, no agent-loop
-change, no assistant renderer.
+`ui_render`; one keyed `conversation.chat.node` cell under
+`dsh-intelligent-ui.card` with the Conversation Definition of that kind that
+builds its nodes, one per `ui_render` call, registered and removed together; one
+data-only Conversation Definition of kind `dsh-intelligent-ui` (it publishes Turn
+data and builds no view node); one dictionary namespace; and one
+`<style data-plugin="dsh-intelligent-ui">`. A Chat node kind is a view of events
+the host already records, not session data. No store, no settings namespace, no
+replacement of a shipped cell, no agent-loop change, no assistant renderer.
 
 **The browser half imports nothing from the harness.** Only `react` and
 `react/jsx-runtime` leave the bundle, and the build fails on any other request.
@@ -247,6 +250,35 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
   (`tests/compile.test.ts`, `tests/client.test.tsx`). Checked in headless Chrome
   on the built bundle; not yet run live (`docs/VERIFY.md` step 19). The tool
   description no longer carries the comparison example, to stay under 9800.
+- Fill-in questions (2026-11-08): `blanks "… ___ …"` puts a blank in the line for
+  each run of underscores; Submit, or Enter in the last blank, sends the
+  sentence with the answers in brackets as the reader's next message, once, and
+  the blanks lock. Answers are kept like ticks, so the model declares no state,
+  and the card never checks them. The description made room by naming the
+  general containers once (9794 of 9800); the skill gained a fill-in bullet and
+  recipe (`tests/compile.test.ts`, `tests/client.test.tsx`, `tests/tool.test.ts`).
+  Live on 2026-11-11, macOS desktop app 0.2.2-rc.1 (`docs/VERIFY.md` step 21):
+  a submitted sentence arrived with both answers in brackets.
+- Cards in the reply (2026-11-11): a card stands where the model called
+  `ui_render`, as its own Chat node at the `turn` group-tree position, so a
+  finished turn folds its process around it and the card stays between the text
+  before the call and the text after it; it previews there while the arguments
+  stream, in every transcript view. The tool row stays a status line while the
+  reply copy is on the page; the turn-tail entry is gone. The description, each
+  result, and the skill tell the model to write the lead-in before calling and to
+  continue after the result (9787 of 9800). Unit-tested, and replayed with the
+  host's real engine: a session copied into a throwaway `DSH_HOME`, served by a
+  separate DSH web, drew text, card, text in both turns, the earlier card folded
+  and the rows a status line (`docs/VERIFY.md` step 22). Live on 2026-11-11,
+  macOS desktop app 0.2.2-rc.1: a model wrote its lead-in before the call, and
+  the card stood between that text and the follow-up written after the result.
+- Replaced cards (2026-11-07): a card that `revises=` replaces no longer shows in
+  full. Redrawn in the same turn, it is left out of the reply; revised in a later
+  turn, it folds to one line that can open it again, and its row says it was
+  replaced. Each result tells the model to pass `revises=` with its card id to
+  redraw it (`tests/client.test.tsx`, `tests/tool.test.ts`). A same-turn redraw
+  replaced its card live on 2026-11-11 (macOS desktop app 0.2.2-rc.1); a
+  later-turn fold has been checked only in headless Chrome.
 - **Live run of 2026-10-26, web UI and macOS desktop app** (`docs/VERIFY.md`
   step 17): a model-written card with three series, a pie, and a 30-row table
   drew with zero repairs; its settings survived a page reload and an app
@@ -300,7 +332,8 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
   with the entry config, so the tool row threw inside its slot registration and
   never rendered. Guarded by the build self-check and `tests/client.test.tsx`.
 - A card drawn only in the tool row vanished when a finished turn folded its tool
-  rows. The turn tail now carries settled cards.
+  rows. The turn tail carried settled cards until 2026-11-11; a Chat node of the
+  plugin's own now keeps each card in the reply where it was called.
 - Models confused the old `mode` and `source` parameters, and wrote comments with
   `#`, which the old grammar read as nodes. One argument and `//` comments remain.
 - A copy fallback announced "copied" even when the page refused the clipboard.
@@ -315,16 +348,18 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
 
 **Known defects.**
 
-- In the `verbose` transcript mode, and when a reader expands a folded turn, a
-  card can appear both in its tool row and under the reply. Both copies share one
-  state, so they never disagree.
-- In the `standard` transcript view, a running turn's tool rows are collapsed, so
-  the streaming preview is hidden until the reader expands the step group; the
-  card appears under the reply when the turn finishes.
-- A tail needs the turn's `turn/start` event in the loaded history window; a turn
-  that starts above the window keeps its card in the tool row only.
+- A card stands where the model called the tool. With the host's "Final answer
+  only" setting, text written before the call folds with the process while the
+  card stays.
+- A card called after a turn's last text, with nothing written after it, stands
+  after the closing reply, and the host then offers no branch from that reply.
+- The live streaming path (argument deltas building the node) is unit-tested
+  against the host's chunk shapes but has not run in a live DSH yet.
 - An item in `keys.items` or a cell in `table.rows` is read as text, so
   `"Monthly: {monthly}"` interpolates while a bare expression there does not.
+- A bare expression item in a list prop, as in `points=[ax, ay, -3, -2.5, 3,
+  -2.5]`, is split at its commas and the repair drops the prop; quote each item
+  (`points=["ax", "ay", -3, -2.5, 3, -2.5]`), as sample 35 writes it.
 - `{fmt(x, 4)}` rounds a tiny value to `0.0000`; `{x}` shows it in exponent form.
   The skill says so, but a model may still choose `fmt`.
 - Developing on Windows (Part 3, W4 of `docs/VERIFY.md`: link the toolchain,
@@ -335,7 +370,7 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
 **Desktop apps: verified on 0.2.1-rc.2.** The web UI, the macOS app, and the
 Windows app draw the same cards from one bundle. On 0.2.1-rc.2, Part 2 of
 `docs/VERIFY.md` passed on both apps — the card drew in the row while the turn ran
-and under the reply when it finished, controls recomputed with no request, and
+and under the reply when it finished (the placement of that release), controls recomputed with no request, and
 past conversations opened with the plugin loaded — and W1, W2, and W3 passed, W3
 at 100% and 150% display scaling, the macOS app loading the plugin from the
 working checkout as a `link:` and the Windows app installing it from the GitHub

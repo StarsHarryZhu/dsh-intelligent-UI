@@ -73,20 +73,23 @@ needs the build first: run `node build.js` before the suite.
   sources, content safety, streaming compiles, the API version, the
   animation props, and the newest components: tabs and their repairs,
   checklists with their values and names, sortable tables, diagram arrows, code blocks with their
-  limits and text view, charts of several series with their repairs, and canvases and shapes with theirs.
+  limits and text view, charts of several series with their repairs, canvases and shapes with theirs, and fill-in sentences.
 - `limits.test.ts` — each bound at its limit and one past it, and bounded JSON
   recovery.
 - `catalog.test.ts` — the catalog and the render registry in both directions,
   and each descriptor's internal consistency, including what a narrow
   container holds.
 - `tool.test.ts` — the tool definition's wire shape, its result schema, what the
-  model is told, the card id and `revises`, and the persisted metadata.
+  model is told, the card id and how `revises` replaces a card, the persisted metadata,
+  the description's container line and fill-in entry, and where a card stands.
 - `client.test.tsx` — the browser half through its real registration: the row's
-  stages, buttons, the turn data Definition, the tail, shared edits, the player,
+  stages, buttons, the turn data Definition, cards in the reply (the Definition
+  over streamed, recorded, and settled calls, the argument reader on every
+  prefix, the reply copy, and the row deferring to it), shared edits, the player,
   tabs, checklists (counts, sums, and names), sorting, diagrams and their layout, code blocks (colours,
   the moving highlight that scrolls only the block, copying, `value=`), edits
-  kept across a reload and the store's storage rules, revised cards, long
-  tables (filter, pages, copies), charts of several series and pies, drawings (geometry, drags, clicks, turns, curves, placed parts, forged programs), a player that loops and plays by itself (on screen, reduced motion, one copy, frames not stored), and every
+  kept across a reload and the store's storage rules, revised cards (folded, or gone from a reply that redrew them), long
+  tables (filter, pages, copies), charts of several series and pies, drawings (geometry, drags, clicks, turns, curves, placed parts, forged programs), a player that loops and plays by itself (on screen, reduced motion, one copy, frames not stored), fill-in sentences (Enter, input methods, one send, the lock, widths, a reload), and every
   degradation path. `localStorage` is cleared after each spec.
 - `math.test.ts` — the quadrature rule's constants, integrals, derivatives,
   limits, sums, products, roots, Taylor polynomials, special functions,
@@ -111,9 +114,12 @@ needs the build first: run `node build.js` before the suite.
   the host tool and skill, the browser half, the pluggability and packaging invariants, and the
   documentation rules; `node build.js && node node_modules/vitest/vitest.mjs run`
   runs them all.
-- The browser spec found two defects before any live run: a turn-tail snapshot
+- The browser spec found two defects before any live run: a turn-data snapshot
   that looped when the host offered no observable source, and a card whose own
   render error escaped its boundary. Both are fixed and pinned.
+- The card Definition is driven by a small stand-in for the engine (one Context
+  per id, opened by its first start match); the host's real engine ran it in a
+  replay recorded in `docs/VERIFY.md` step 22, which the suite does not repeat.
 
 **Not done.**
 
@@ -127,4 +133,4 @@ needs the build first: run `node build.js` before the suite.
   than compiling the browser half itself.
 
 **Next goal.** Add a replay spec that feeds a recorded session's events through
-the turn data Definition and renders the resulting tail.
+both Definitions and renders the resulting cards in the reply.

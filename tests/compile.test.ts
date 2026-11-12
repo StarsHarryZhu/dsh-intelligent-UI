@@ -968,7 +968,7 @@ describe('canvases and shapes', () => {
     expect(messages(program)).toContain('holds only shape lines')
   })
 
-  it.each([34, 35])('compiles sample %i without a repair, to the text the samples file records', (number) => {
+  it.each([34, 35, 36])('compiles sample %i without a repair, to the text the samples file records', (number) => {
     const samples = readFileSync(join(import.meta.dirname, '..', 'docs', 'SAMPLES.md'), 'utf8')
     const fence = '`'.repeat(3)
     const match = new RegExp(`^## ${number}\\. [\\s\\S]*?${fence}dil\\n([\\s\\S]*?)${fence}\\n\\nResult:\\n\\n${fence}\\n[\\s\\S]*?What a text-only reader sees:\\n([\\s\\S]*?)\\n${fence}`, 'mu').exec(samples)
@@ -976,5 +976,27 @@ describe('canvases and shapes', () => {
     const program = ok((match?.[1] ?? '').replace(/\n$/u, ''))
     expect(program.diagnostics).toEqual([])
     expect(program.fallback).toBe(match?.[2])
+  })
+})
+
+describe('fill-in sentences', () => {
+  it('takes a sentence with blanks, with no repair, and shows it as written', () => {
+    const program = ok('card "Chemistry"\n  blanks "Water is ___, and a mole of it weighs ______ g."')
+    expect(program.diagnostics).toEqual([])
+    expect(first(program, 'blanks').bind).toBeUndefined()
+    expect(program.fallback).toBe('## Chemistry\n  Water is ___, and a mole of it weighs ______ g. [Submit]')
+  })
+
+  it('leaves out a sentence with nothing to fill in, and says where blanks go', () => {
+    const program = ok('card\n  blanks "Water is wet; a value {1 + 1} is not a blank."\n  text "kept"')
+    expect(program.nodes.some(node => node.type === 'blanks')).toBe(false)
+    expect(program.diagnostics.map(entry => entry.message)).toEqual(['<blanks> has no ___ for the reader to fill in; the component was left out'])
+    expect(program.diagnostics[0]?.repair).toContain('Write ___ where each answer goes')
+  })
+
+  it('keeps a sentence with too many blanks and says only the first twelve take answers', () => {
+    const program = ok(`card\n  blanks "${Array.from({ length: 13 }, () => '___').join(' ')}"`)
+    expect(first(program, 'blanks')).toBeDefined()
+    expect(program.diagnostics.map(entry => entry.message)).toEqual(['<blanks> has 13 blanks; only the first 12 take answers'])
   })
 })

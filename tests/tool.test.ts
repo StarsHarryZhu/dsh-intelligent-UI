@@ -2,7 +2,7 @@ import { assertSupportedJsonSchema, validateJsonSchemaValue } from '@deepseek-ai
 import type { JsonSchemaNode } from '@deepseek-ai/dsh-tools'
 import { describe, expect, it } from 'vitest'
 import { ANIMATION_EXAMPLE, CALCULUS_EXAMPLE, COMPARISON_EXAMPLE, ESTIMATE_EXAMPLE, QUIZ_EXAMPLE, UI_TOOL_DESCRIPTION } from '../src/host/model-brief.ts'
-import { buildPresentationMeta, createUIRenderTool, renderForModel, UI_TOOL_NAME } from '../src/host/tool.ts'
+import { buildPresentationMeta, createUIRenderTool, PLACEMENT_NOTE, renderForModel, UI_TOOL_NAME } from '../src/host/tool.ts'
 import { CATALOG } from '../src/lang/catalog.ts'
 import { compileSource } from '../src/lang/compile.ts'
 import { LIMITS } from '../src/lang/limits.ts'
@@ -146,16 +146,17 @@ describe('what is persisted for the card', () => {
 })
 
 describe('revising a card', () => {
-  it('tells the model the card id a later call can revise', async () => {
+  it('tells the model the card id a later call can revise, and how a redraw replaces it', async () => {
     const value = await tool.execute({ source: ESTIMATE_EXAMPLE }, { callId: 'call_01' } as never) as Record<string, unknown>
     expect(value.card).toBe('call_01')
-    expect(renderForModel(value)).toContain('Card id: call_01')
+    expect(renderForModel(value)).toContain('Card id: call_01 (to redraw or change this card, call ui_render with revises=call_01; the reader then sees only the new card)')
+    expect(UI_TOOL_DESCRIPTION).toContain('To redraw or change a card, pass revises=<its card id>: the old one folds away')
   })
 
   it('records a valid revises in the meta and says what carries over', async () => {
     const value = await tool.execute({ source: ESTIMATE_EXAMPLE, revises: ' call_01 ' }, { callId: 'call_02' } as never) as Record<string, unknown>
     expect(value.revises).toBe('call_01')
-    expect(renderForModel(value)).toContain('It replaces card call_01')
+    expect(renderForModel(value)).toContain('It replaces card call_01, which now folds away')
     const meta = buildPresentationMeta({}, value) as Record<string, unknown>
     expect(meta.revises).toBe('call_01')
   })
@@ -167,5 +168,30 @@ describe('revising a card', () => {
       expect(value.notes).toEqual(expect.arrayContaining([expect.stringContaining('revises was ignored')]))
       expect(buildPresentationMeta({}, value)).not.toHaveProperty('revises')
     }
+  })
+})
+
+describe('fill-in sentences', () => {
+  it('counts a sentence with blanks as a control and tells the model what it sends', async () => {
+    const value = await tool.execute({ source: 'card\n  blanks "Water is ___."' }, {} as never) as Record<string, unknown>
+    expect(value.controls).toBe(1)
+    expect(UI_TOOL_DESCRIPTION).toContain('  blanks "text…" — A sentence whose ___ runs the reader fills in; its button sends the filled sentence as their message, once.')
+  })
+
+  it('names the general containers once instead of on every line', () => {
+    expect(UI_TOOL_DESCRIPTION).toContain('inside the container above it (card, col, row, grid, tabs, tab).')
+    expect(UI_TOOL_DESCRIPTION).not.toContain('Holds indented components.')
+    expect(UI_TOOL_DESCRIPTION).toContain('Holds indented shape lines.')
+  })
+})
+
+describe('cards in the reply', () => {
+  it('tells the model the card stands where it calls, before and after the call', async () => {
+    expect(UI_TOOL_DESCRIPTION).toContain('The card stands in your reply where you call ui_render: write the text that leads up to it in the same message, then continue after the result.')
+    expect(UI_TOOL_DESCRIPTION).not.toContain('the card is shown with your reply')
+    const text = renderForModel(await tool.execute({ source: ESTIMATE_EXAMPLE }, {} as never))
+    expect(text.split('\n').slice(0, 2)).toEqual(['The card is shown: 5 component(s), 2 control(s).', PLACEMENT_NOTE])
+    // A failed program stands nowhere, so its result says nothing about a place.
+    expect(renderForModel(await tool.execute({ source: 'hologram' }, {} as never))).not.toContain(PLACEMENT_NOTE)
   })
 })

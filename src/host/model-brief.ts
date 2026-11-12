@@ -81,13 +81,16 @@ const MATH_LINES = [
   'Results carry about ten significant digits; a value that cannot be computed reliably shows "—", never a guess. The result you receive lists the computed values; quote those in your reply.',
 ]
 
+/** The containers that hold any component, in catalog order. */
+const CONTAINERS = CATALOG.filter(descriptor => descriptor.container && descriptor.holds === undefined).map(descriptor => descriptor.type)
+
 /** What the model must know before writing a program. */
 export const UI_TOOL_DESCRIPTION = [
-  'Show an interactive card in the chat instead of describing data in prose: an estimate the reader adjusts with sliders or inputs, a comparison table, a small chart, a proportion, a short form, a question with answer buttons, or a process the reader plays step by step. Use plain text for a short factual answer or a single number.',
+  'Show an interactive card in the chat instead of describing data in prose: an estimate the reader adjusts with sliders or inputs, a comparison table, a small chart, a proportion, a short form, a question with answer buttons or blanks, or a process the reader plays step by step. Use plain text for a short factual answer or a single number.',
   '',
-  'Put the program in `source` (DIL, below); `title` optionally labels the card. Controls recompute the card in the browser and send you nothing. A button sends its `prompt` as the reader\'s next message. Reply in prose as usual; the card is shown with your reply. If the result lists problems, fix them and call ui_render again in the same turn. To change a card you drew, call ui_render with revises=<its card id>; states with the same names keep the reader\'s values.',
+  'Put the program in `source` (DIL, below); `title` labels the card. Controls recompute the card in the browser and send you nothing. A button sends its `prompt` as the reader\'s next message. The card stands in your reply where you call ui_render: write the text that leads up to it in the same message, then continue after the result. If the result lists problems, fix them and call ui_render again in the same turn. To redraw or change a card, pass revises=<its card id>: the old one folds away; same-named states keep the reader\'s values.',
   '',
-  'DIL: one statement per line. Indent a component two spaces to put it inside the container above it. Comments start with //.',
+  `DIL: one statement per line. Indent a component two spaces to put it inside the container above it (${CONTAINERS.join(', ')}). Comments start with //.`,
   '  @state <name> = <initial> [min=] [max=] [step=] [options=a|b|c]    a number, "text", true/false, or a choice when options= is given',
   '  @calc <name> = <expression>    + - * / ^ % ( ), < <= > >= == !=, && || !, c ? a : b, min max abs floor ceil round(x, digits), pick(i, a, b, …) (the i-th option, counting from 1), and the math below; text compares as plan == "Pro"',
   '  <component> ["text"] [prop=value …]    the quoted text fills the component\'s main text (marked "…" below)',
@@ -108,7 +111,7 @@ export const UI_TOOL_DESCRIPTION = [
   'Example — an adjustable estimate:',
   indent(ESTIMATE_EXAMPLE),
   '',
-  'Example — a question answered by clicking (never show the answer in the card):',
+  'Example — a question answered by clicking (no answer in the card):',
   indent(QUIZ_EXAMPLE),
   '',
   'Example — calculus the reader explores:',
@@ -126,7 +129,8 @@ function describeComponent(descriptor: ComponentDescriptor): string {
   const props = Object.entries(descriptor.props)
     .filter(([name]) => name !== descriptor.primary && descriptor.explained?.includes(name) !== true)
     .map(([name, spec]) => `${name}${spec.required === true ? '' : '?'}=${hint(spec)}`)
-  const children = !descriptor.container ? '' : descriptor.holds === undefined ? ' Holds indented components.' : ` Holds indented ${descriptor.holds.join(', ')} lines.`
+  // The general containers are named once, in the DIL line; a narrow one says what it holds.
+  const children = descriptor.holds === undefined ? '' : ` Holds indented ${descriptor.holds.join(', ')} lines.`
   return `  ${descriptor.type}${primary}${props.length === 0 ? '' : ` ${props.join(' ')}`} — ${descriptor.description}${children}`
 }
 

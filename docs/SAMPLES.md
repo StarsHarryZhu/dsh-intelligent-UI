@@ -1,6 +1,6 @@
 # The catalog, one sample per component
 
-A live tour of the catalog: one card per component, drawn in a real chat. Samples 1 to 24 were drawn on 2026-10-15 in the order the catalog had then; samples 25 and 26, the math components, and sample 27, the animation player, were written by the model itself on 2026-10-16. Samples 28 to 31, the newest components, were written by hand on 2026-10-18 and compiled by the built tool; their results are that tool's output. Samples 32 (`code`, 2026-10-22), 33 (`series`, 2026-10-26), and 34 and 35 (`canvas` and `shape`, 2026-11-05) were written the same way. On 2026-10-19 one card using all four — tabs, a checklist, a sortable table, and a diagram — drew in the web UI.
+A live tour of the catalog: one card per component, drawn in a real chat. Samples 1 to 24 were drawn on 2026-10-15 in the order the catalog had then; samples 25 and 26, the math components, and sample 27, the animation player, were written by the model itself on 2026-10-16. Samples 28 to 31, the newest components, were written by hand on 2026-10-18 and compiled by the built tool; their results are that tool's output. Samples 32 (`code`, 2026-10-22), 33 (`series`, 2026-10-26), 34 and 35 (`canvas` and `shape`, 2026-11-05), and 36 (`blanks`, 2026-11-08) were written the same way. On 2026-10-19 one card using all four — tabs, a checklist, a sortable table, and a diagram — drew in the web UI.
 
 Every block below is the exact `source` that was passed to `ui_render` and the exact result it reported, so this file doubles as a regression corpus — `tests/compile.test.ts` can compile any of them.
 
@@ -442,6 +442,7 @@ Result:
 
 ```
 The card is shown: 10 component(s), 0 control(s).
+It stands in your reply here, where you called ui_render; continue your answer below it.
 What a text-only reader sees:
 ## tabs · 分页
   ### 概念
@@ -476,6 +477,7 @@ Result:
 
 ```
 The card is shown: 8 component(s), 1 control(s).
+It stands in your reply here, where you called ui_render; continue your answer below it.
 What a text-only reader sees:
 ## tab · 单页
   ### 图像
@@ -505,6 +507,7 @@ Result:
 
 ```
 The card is shown: 4 component(s), 1 control(s).
+It stands in your reply here, where you called ui_render; continue your answer below it.
 What a text-only reader sees:
 ## checklist · 勾选清单
   出发前 (0/4 done)
@@ -534,6 +537,7 @@ Result:
 
 ```
 The card is shown: 4 component(s), 1 control(s).
+It stands in your reply here, where you called ui_render; continue your answer below it.
 What a text-only reader sees:
 ## diagram · 流程图
   Diagram: 发送请求 → 收到响应？; 收到响应？ → 解析数据 (是); 收到响应？ → 等待重试 (否); 等待重试 → 发送请求; 解析数据 → 完成; current: 收到响应？
@@ -567,6 +571,7 @@ Result:
 
 ````
 The card is shown: 5 component(s), 1 control(s).
+It stands in your reply here, where you called ui_render; continue your answer below it.
 What a text-only reader sees:
 ## code · 代码块
   fib.py:
@@ -604,6 +609,7 @@ Result:
 
 ```
 The card is shown: 8 component(s), 1 control(s).
+It stands in your reply here, where you called ui_render; continue your answer below it.
 What a text-only reader sees:
 ## series · 多序列图表
   收入构成（堆叠面积）
@@ -651,6 +657,7 @@ Result:
 
 ```
 The card is shown: 6 component(s), 3 control(s).
+It stands in your reply here, where you called ui_render; continue your answer below it.
 What a text-only reader sees:
 ## canvas · 画布
   Drawing: 一盏台灯：SVG 底图，上面是可点的区域 (an SVG drawing, 3 shape(s))
@@ -687,6 +694,7 @@ Result:
 
 ```
 The card is shown: 11 component(s), 2 control(s).
+It stands in your reply here, where you called ui_render; continue your answer below it.
 What a text-only reader sees:
 ## shape · 形状
   Drawing: 拖动顶点 A；P 只能沿曲线走 (7 shape(s))
@@ -698,6 +706,29 @@ What a text-only reader sees:
 
 12 components, 2 controls, zero repairs.
 
+## 36. `blanks`
+
+A sentence the reader completes. Each run of three or more underscores becomes an entry in the line, as wide as the run promises and growing with the answer. Submit, or Enter in the last blank, sends the sentence with each answer in brackets as the reader's next message, once; then the entries lock. The answers are kept like ticks, with no state to declare, and the card never checks them: the model grades what arrives.
+
+```dil
+card "blanks · 填空"
+  text "两个空都填好后点“提交”，模型收到填好的整句。"
+  blanks "水的化学式是 ___，1 mol 水的质量约为 ______ g。"
+```
+
+Result:
+
+```
+The card is shown: 3 component(s), 1 control(s).
+It stands in your reply here, where you called ui_render; continue your answer below it.
+What a text-only reader sees:
+## blanks · 填空
+  两个空都填好后点“提交”，模型收到填好的整句。
+  水的化学式是 ___，1 mol 水的质量约为 ______ g。 [Submit]
+```
+
+3 components, 1 control, zero repairs. Pictured with both blanks filled in, before Submit; the reader's message would read `水的化学式是 [H2O]，1 mol 水的质量约为 [18] g。`
+
 ## What this tour found
 
 **A bare `expr` value ended at the first space (fixed).** Sample 9 first read `metric "折合小时" value=mins / 60 unit="h"`, and the compiler kept `value=mins` while reporting the `/` and the `60` as stray tokens; the card showed `24 h` instead of `0.75 h`. Bare values now keep spaces inside brackets and rejoin pieces that start or follow an operator, so that line reads as written; `tests/dil.test.ts` pins it. Quoting an expression with spaces remains the documented form.
@@ -706,4 +737,4 @@ What a text-only reader sees:
 
 ## Status
 
-Samples 1 to 24 were drawn in one live session on 2026-10-15, in the `ui_render` tool row, with the compiler reporting zero repairs except the first attempt at sample 9. Samples 25 and 26 were drawn on 2026-10-16 in the tool row and then under the reply, and survived a page reload; that run is recorded in `VERIFY.md`. Sample 27 was drawn on 2026-10-16 after the program-version reset, and played as described above. Samples 28 to 31 are compiled, tested, and drawn in the static gallery, and one card using all four drew in the web UI on 2026-10-19. Sample 32 (2026-10-22) is compiled, tested, and drawn in the static gallery; a code card a live model wrote for the same kind of request drew in the web UI and the macOS desktop app on 2026-10-22, as recorded in `VERIFY.md`. Sample 33 (2026-10-26) is compiled, tested, and drawn in the static gallery; a card a live model wrote for the same kind of request drew on the web UI and the macOS desktop app the same day (step 17 of `VERIFY.md`).
+Samples 1 to 24 were drawn in one live session on 2026-10-15, in the `ui_render` tool row, with the compiler reporting zero repairs except the first attempt at sample 9. Samples 25 and 26 were drawn on 2026-10-16 in the tool row and then under the reply, and survived a page reload; that run is recorded in `VERIFY.md`. Sample 27 was drawn on 2026-10-16 after the program-version reset, and played as described above. Samples 28 to 31 are compiled, tested, and drawn in the static gallery, and one card using all four drew in the web UI on 2026-10-19. Sample 32 (2026-10-22) is compiled, tested, and drawn in the static gallery; a code card a live model wrote for the same kind of request drew in the web UI and the macOS desktop app on 2026-10-22, as recorded in `VERIFY.md`. Sample 33 (2026-10-26) is compiled, tested, and drawn in the static gallery; a card a live model wrote for the same kind of request drew on the web UI and the macOS desktop app the same day (step 17 of `VERIFY.md`). Sample 36 (2026-11-08) is compiled, tested, and drawn in the static gallery; no live model has drawn one yet (step 21 of `VERIFY.md`).

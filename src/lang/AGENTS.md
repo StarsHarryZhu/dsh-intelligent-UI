@@ -157,15 +157,15 @@ https, images must be inline `data:image/…` rasters.
   hoisting, tree repair, tabs, chart series, and diagram arrows, code text and
   its limits, fallback text, and bounded JSON recovery.
 - `limits.ts` — the vocabulary bounds and the spacing grid maximum.
-- `identity.ts` — the plugin id, the tool name, the slot names, the API
-  version, and the shape of a card id. Imports nothing.
+- `identity.ts` — the plugin id, the tool name, the slot names, the card node
+  kind, the API version, and the shape of a card id. Imports nothing.
 
 ## 4. Progress
 
 **Done.**
 
-- Thirty-five components, `player`, `tabs`, `tab`, `checklist`, `diagram`,
-  `code`, `series`, `canvas`, and `shape` among them; the catalog drives validation, the description, and the registry
+- Thirty-six components, `player`, `tabs`, `tab`, `checklist`, `diagram`,
+  `code`, `series`, `canvas`, `shape`, and `blanks` among them; the catalog drives validation, the description, and the registry
   check (`tests/catalog.test.ts`).
 - DIL nests by indentation, fills primary text from a bare quoted string, infers
   state kinds, keeps a spaced bare expression whole, reads `"""` text blocks,
@@ -180,6 +180,13 @@ https, images must be inline `data:image/…` rasters.
 - A canvas draws shape lines over a checked SVG tree; hostile SVG in any spelling
   is left out and reported, and each repair of a shape is reported
   (`tests/svg.test.ts`, `tests/compile.test.ts`).
+- A fill-in sentence (`blanks`, 2026-11-08) is its text alone: the compiler
+  counts the `___` runs as written, leaves out a sentence with none, and reports
+  any past `MAX_BLANKS`; `SENDERS` makes it count as a control like a button
+  (`tests/compile.test.ts`).
+- Three catalog descriptions were cut to what the model needs (`textInput`,
+  `checkbox`, `link`, 2026-11-11), making room in the tool description for where
+  a card stands; `CARD_NODE_KIND` and `CHAT_NODE_SLOT` name the card node.
 - A checklist binds up to two states: `bind=` the ticked count, or the sum of
   plain-number `values=` evened out to one per item, and `names=` the ticked
   names; any `bind` prop other than `bind` itself is kept as the state's key

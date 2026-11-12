@@ -2,11 +2,13 @@
 
 ## 1. Role
 
-The browser half. `index.ts` registers the plugin's contributions; `toolview.tsx`
-draws the `ui_render` row while its turn runs; `tail.tsx` draws a finished turn's
-cards under its reply; `turn-data.ts` collects those cards from events the host
-already records; `card.tsx` draws one program with its local state, and
-`components.tsx` with `canvas.tsx`, `table.tsx`, `chart.tsx`, `plot.tsx`, `formula.tsx`, and
+The browser half. `index.ts` registers the plugin's contributions;
+`card-node.ts` places each card in the reply, as its own Chat node where the
+model called the tool, and `node-view.tsx` draws it there; `toolview.tsx` draws
+the `ui_render` row among the process rows; `turn-data.ts` collects a turn's
+cards from events the host already records; `card.tsx` draws one program with
+its local state, and
+`components.tsx` with `canvas.tsx`, `table.tsx`, `chart.tsx`, `plot.tsx`, `formula.tsx`, `blanks.tsx`, and
 the other figure files maps each catalog type to exactly one renderer.
 
 Everything a card draws comes from `tool/result.meta`, or, while the call streams,
@@ -27,9 +29,29 @@ required services are `slots` and `locale`; `uiConversation` is waited for with
 slot's declaration and removes the contribution when the slot collapses.
 
 **The keys are this plugin's.** The row registers under the wire tool name
-`ui_render`; the tail entry, the Definition, the Turn data key, and the dictionary
-namespace are all `dsh-intelligent-ui`. A mismatch between the tool name and the
-row key is silent — the row simply never renders.
+`ui_render`; the turn-data Definition, the Turn data key, and the dictionary
+namespace are all `dsh-intelligent-ui`; the card node kind is
+`dsh-intelligent-ui.card`, both the Definition that builds the nodes and the
+`conversation.chat.node` key that draws them. A mismatch between the tool name
+and the row key is silent — the row simply never renders.
+
+**A card stands where it was called, outside the fold.** `card-node.ts` builds
+one `chat` node per `ui_render` call, from the call's streamed argument deltas,
+its `tool/call`, and its `tool/result`, anchored `AFTER_CALL` (1e-9) past the
+call's first event, so it follows its own tool row and precedes anything later,
+at the `turn` group-tree position, which keeps it out of the process a finished
+turn folds. A failed compile, an errored call, and a preview whose turn stopped
+build a hidden node, or none. The node renderer and the Definition are
+registered in the same `slots.inject` callback and removed together, because a
+node of a kind nobody draws shows as the host's raw-data fallback. The
+Definition matches every tool-call delta, because only the first names its tool,
+and keeps argument text for `ui_render` calls only, bounded by the source limit.
+
+**One copy at a time.** A reply copy enters `presence.ts` while it is mounted;
+the call's row then stays a status line, opens only to show a failure, and does
+not open itself. Where no reply copy is on the page — a view that draws no Chat
+nodes, or a call whose reply copy is hidden — the row previews and draws the
+card itself as before.
 
 **The registry is the allowlist.** `renderNode` looks up `REGISTRY[type]` with an
 own-property check and draws nothing when there is no entry. Never create an
@@ -45,22 +67,25 @@ program of an API version this build does not know.
 open tab, the ticked items of a checklist, and a table's sort live in the edits
 store under the node's id (`CardMemory.ui`), so both copies of a card agree; they
 are kept like every edit. A table keeps its filter and page under the node's id
-with `:q` and `:p` appended, and a chart the series or slices the reader hid. A checklist writes ordinary states: `bind=` gets the
+with `:q` and `:p` appended, a chart the series or slices the reader hid, and a
+fill-in sentence its answers, one string per blank. A checklist writes ordinary states: `bind=` gets the
 ticked count, or the sum of the items' `values=`, and `names=` a text state the
 ticked names joined by "、" when any is CJK and ", " otherwise, so the
 program's state kinds stay as they were.
 
 **The boundary sits above the renderer.** `Card` wraps `CardBody` in its failure
 boundary because a component's own render error is caught only by an ancestor;
-the row and the tail sit inside `Contained` for the same reason.
+the row and the reply copy sit inside `Contained` for the same reason.
 
 **The preview reads the growing arguments during render.** The preparing block
 grows in place, so the source is read on every render and the preview is
-memoized by the text itself, never by the block's identity.
+memoized by the text itself, never by the block's identity. The reply copy reads
+its string arguments from the streamed JSON prefix with `readArguments`, which
+decodes each complete string and the one still growing, and never invents text.
 
 **State is local and shared by call.** Edits live in one store created by `apply`,
-keyed by session and call, so the row and the tail show the same values and a
-remount loses nothing. `edits.ts` writes each card's memory through to local
+keyed by session and call, so the row and the reply copy show the same values
+and a remount loses nothing. `edits.ts` writes each card's memory through to local
 storage — one key per card plus an index of at most 200 cards, oldest dropped
 first — and is the only file of this half that touches storage; the isolation
 test holds it to that. A memory over 16 KB, a damaged entry, or a storage that
@@ -71,8 +96,12 @@ refuses leaves the edit for the page only. Values read back are checked again by
 `revises` starts from the earlier card's values for the states it still declares,
 without writing anything until the reader edits; open tabs, ticks, sorts, and a
 sent button stay with the earlier card, because node ids do not carry over. Once
-the revision's result has settled, the earlier card is marked `revisedBy` and says
-that a newer version follows; a streaming preview carries values but marks nothing.
+the revision's result has settled, the earlier card is marked `revisedBy`, folds
+to one line with a toggle that opens it for that view, and its row's status says
+it was replaced; a streaming preview carries values but marks nothing. A reply
+copy disappears once a later card of the same turn revises it, read from the
+turn's own data, so a card the model redrew in the same answer never stays in
+the reply.
 
 **Buttons go through the composer.** A press calls `inputActions.setDraft` and
 `submit` only when the composer is empty and idle; otherwise the prompt is copied
@@ -154,11 +183,15 @@ accepts no other non-theme colour. Copying writes the block's exact text.
 
 - `AGENTS.md` — this file: what the browser half may do and what it must not.
 - `index.ts` — the browser entry: `name`, `inject`, `apply`, and the stylesheet mount.
-- `toolview.tsx` — the `ui_render` row: header, streaming preview, settled card,
-  failure details, and the fresh-result disclosure.
-- `tail.tsx` — the turn-tail entry that draws a completed turn's cards.
+- `card-node.ts` — the Conversation Definition that places each card in the
+  reply, and the reader of streamed string arguments.
+- `node-view.tsx` — the renderer of a card in the reply: preview, settled card,
+  and leaving out a card its own turn redrew.
+- `presence.ts` — the record of reply copies on the page that tool rows defer to.
+- `toolview.tsx` — the `ui_render` row: its status, failure details, and, where
+  no reply copy is drawn, the preview, the card, and the fresh-result disclosure.
 - `turn-data.ts` — the data-only Conversation Definition that collects cards per turn.
-- `card.tsx` — the card: values, edits, revisions, button sends, notices, and the boundaries.
+- `card.tsx` — the card: values, edits, revisions and the replaced fold, button sends, notices, and the boundaries.
 - `clipboard.ts` — the page clipboard, shared by the button fallback and the
   code block's copy button.
 - `components.tsx` — the type-to-renderer registry, the number field, the
@@ -167,6 +200,7 @@ accepts no other non-theme colour. Copying writes the block's exact text.
 - `canvas.tsx` — drawings: shapes, the checked SVG layer, dragged points, and
   clicked shapes.
 - `table.tsx` — tables: sorting, filtering, pages, and CSV and Markdown copies.
+- `blanks.tsx` — fill-in sentences: blanks in the line, Enter to move on, and one send that locks them.
 - `diagram.tsx` — flowcharts: the layered layout and its SVG drawing.
 - `code.tsx` — code blocks: coloured lines, line numbers, the current line kept
   in view, and copying.
@@ -187,12 +221,19 @@ accepts no other non-theme colour. Copying writes the block's exact text.
 
 **Done.**
 
-- `apply(ctx)` registers the row, the tail, the Definition, the dictionaries, and
-  the stylesheet, and unloading removes all of them (`tests/client.test.tsx`).
-- The row previews a streaming source, recomputes on control changes without a
-  request, keeps old results collapsed, and shows failures with their reasons.
-- The tail draws only completed turns, follows the observable Turn data source,
-  and shares edits with the row.
+- `apply(ctx)` registers the row, the card node renderer and its Definition, the
+  turn-data Definition, the dictionaries, and the stylesheet, and unloading
+  removes all of them (`tests/client.test.tsx`).
+- Cards in the reply (2026-11-11): each card stands where its call stands,
+  after its row and outside the folded process, previewing while the arguments
+  stream and drawing the settled card after; failures build nothing; a card its
+  own turn redrew leaves the reply; the row stays a status line while the reply
+  copy is on the page and draws the card itself where there is none
+  (`tests/client.test.tsx`, and headless Chrome on the built bundle). Not yet
+  run live in DSH.
+- The row, where it draws the card, previews a streaming source, recomputes on
+  control changes without a request, keeps old results collapsed, and shows
+  failures with their reasons.
 - Buttons send once through the composer and never overwrite a draft.
 - API version 1 renders; any other version, and programs from before the
   version fields, show their text; a renderer failure degrades the card to its
@@ -219,6 +260,16 @@ accepts no other non-theme colour. Copying writes the block's exact text.
   oversized entries and a refusing storage fall back to the page; a revision
   starts from the earlier card's values, clamped by its own declarations, and
   marks the earlier card (`tests/client.test.tsx`).
+- Fill-in sentences (2026-11-08): each `___` is a blank in the line, as wide as
+  its run and growing with the answer; Enter moves to the next blank and sends
+  from the last once all are filled, but never while an input method composes;
+  Submit sends the sentence with the answers in brackets, once, and the blanks
+  lock; answers and the lock survive a reload (`tests/client.test.tsx`, and
+  headless Chrome on the built bundle). Not yet run live in DSH.
+- Replaced cards (2026-11-07): a card revised in a later turn folds to one line
+  that opens it again and its row says it was replaced; a card redrawn in its own
+  turn is left out of the reply (`tests/client.test.tsx`, and headless Chrome on
+  the built bundle). Not yet run live in DSH.
 - Long tables filter, page, follow `current=` across pages, and copy CSV and
   Markdown; charts group, stack, and fill several series, toggle them from the
   legend, read a column out by keyboard, and draw pies with their shares
@@ -237,12 +288,13 @@ accepts no other non-theme colour. Copying writes the block's exact text.
 
 **Known defects.**
 
-- In `verbose` mode, or with a finished turn expanded, a card can show in both
-  its row and the tail; both copies share one state.
-- A turn whose `turn/start` lies above the loaded history window gets no tail.
-- The `standard` transcript view collapses a running turn's tool rows; the
-  streaming preview is then out of sight until the reader expands the step group,
-  and the card appears when the turn finishes.
+- A card's place is where the model called the tool. A model that writes all its
+  text after the call puts the card first; the skill and the tool description
+  teach it to write the lead-in before calling. With the host's "Final answer
+  only" choice, text written before the call folds with the process while the
+  card stays.
+- A card called after the last text of a turn, with no reply after it, stands
+  after the closing reply; the host then offers no branch from that reply.
 - On the macOS desktop app 0.2.0-rc.2, a build below the engine range, no card was
   drawn and past conversations would not open. On 0.2.1-rc.2 both apps draw every
   card and open history, so the earlier failure did not survive the version bump;

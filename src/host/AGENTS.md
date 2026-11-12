@@ -31,12 +31,19 @@ are optional. Models confused a separate grammar switch with the grammar itself,
 so the compiler detects the grammar from the source instead.
 
 **A card's id is its call id.** A successful result tells the model `Card id:`
-with the call id from `exec.callId`; a later call passes it as `revises` to
-replace that card, and the reader's values for states with the same names carry
-over in the browser. A `revises` without a card id's shape (`CARD_ID_PATTERN`),
+with the call id from `exec.callId`, and that passing it as `revises` redraws or
+changes that card; the earlier card folds away in the browser, and the reader's
+values for states with the same names carry over. A `revises` without a card id's shape (`CARD_ID_PATTERN`),
 or naming the call itself, is ignored with a note; a valid one is persisted as
 `meta.revises`. The host checks only the shape: whether that card exists is the
 browser's to find out, and a missing one carries nothing.
+
+**A card stands where it is called, and the model is told so.** The browser
+draws each card in the reply at its call, so the description asks the model to
+write the text that leads up to a card in the same message as the call and to
+continue after the result, and every successful result repeats it on its second
+line (`PLACEMENT_NOTE`), right where the model goes on writing. A failed program
+stands nowhere and its result says nothing about a place.
 
 **The model sees the summary, never the program.** `output.render` projects the
 result into model-visible text — counts, repairs, and the text-only view, which
@@ -87,8 +94,8 @@ through the registry's own `assertSupportedJsonSchema` in the tests.
 
 - Parameters are `source` (required), `title`, and `revises`; arguments without
   `source` are rejected before compiling (`tests/tool.test.ts`).
-- A result names its card id, and a valid `revises` reaches the metadata while
-  an invalid one is reported (`tests/tool.test.ts`).
+- A result names its card id and how a redraw replaces it, and a valid `revises`
+  reaches the metadata while an invalid one is reported (`tests/tool.test.ts`).
 - Success reports counts, the repairs made, and the text-only view with computed
   figures; failure reports capped diagnostics and the repair hint.
 - Metadata is `{ version: 1, ok: true, program, title?, revises? }` on success and
@@ -98,7 +105,15 @@ through the registry's own `assertSupportedJsonSchema` in the tests.
   four examples that compile cleanly, at under 9800 characters. The comparison
   example stays exported for the tests but out of the description, because the
   table's line already shows its form; a catalog entry's `explained` props are
-  left to their own paragraph (the shapes).
+  left to their own paragraph (the shapes). The general containers are named
+  once, in the DIL line, rather than on each of their catalog lines, which made
+  room for `blanks` (2026-11-08) without raising the limit.
+- A result counts a component of `SENDERS` (a button, a fill-in sentence) as a
+  control, as the row does (`tests/tool.test.ts`).
+- Where a card stands (2026-11-11): the description replaced "the card is shown
+  with your reply" with the placement sentence, paid for by shortening three
+  catalog lines and an example heading (9787 of 9800), and each successful
+  result carries `PLACEMENT_NOTE` (`tests/tool.test.ts`).
 - The skill lists under `dsh-intelligent-ui` from its own row, as a bundled
   provider whose base directory holds its three reference files
   (`tests/skill.test.ts`, `tests/isolation.test.ts`); the move from the runtime

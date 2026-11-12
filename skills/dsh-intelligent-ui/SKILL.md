@@ -1,6 +1,6 @@
 ---
 name: dsh-intelligent-ui
-description: Use when the ui_render tool is available and an answer would be clearer as an interactive card - an estimate the reader adjusts, a comparison, a chart or function plot, a drawing, a formula with live values, a short form, a multiple-choice question answered by clicking, or a process the reader plays step by step. Covers choosing a card over prose, designing one, math cards, drawings, code blocks, animation, and repairing a failed call.
+description: Use when the ui_render tool is available and an answer would be clearer as an interactive card - an estimate the reader adjusts, a comparison, a chart or function plot, a drawing, a formula with live values, a short form, a question to click or fill in, or a process the reader plays step by step. Covers choosing a card over prose, designing one, math cards, drawings, code blocks, animation, and repairing a failed call.
 ---
 
 # Answering with interactive cards
@@ -25,7 +25,7 @@ side, or answer with a click:
   `formula`. Read `math.md` first.
 - A drawing to reshape or watch move: a triangle, a force diagram, a labelled
   picture. `canvas`, with draggable points and areas to click; read `drawing.md`.
-- A practice question: the stem in `text` and one `button` per option.
+- A practice question: one `button` per option, or `blanks` to fill in.
 - A process that unfolds: code running line by line, an algorithm's passes, a
   point moving along a curve. Drive it with a `player`; see "Animate" below.
 
@@ -47,29 +47,32 @@ explores.
   only read calcs declared above it.
 - Put live values into sentences: `text "{seats} seats cost {monthly} USD a month."`
 
-## What to say around it
+## Where it stands and what to say
 
-The tool result contains the card's text view, with every figure computed at the
-initial values. In your reply:
+The card stands in your reply where you call `ui_render`. Write the text that
+leads up to it first, in the same message as the call; after the result,
+continue below the card:
 
-- say in one or two sentences what the card shows and what to try with it;
-- quote the key figure from that text view, never a number you worked out a
-  different way, so the reply and the card always agree;
+- say in a sentence or two what the card shows and what to try with it;
+- quote the key figure from the text view the result carries, computed at the
+  initial values, never a number you worked out a different way;
 - do not restate the whole card in prose.
 
 A figure shown as "—" could not be computed reliably. Fix the program, or tell
 the reader why there is no value.
 
-## Questions answered by clicking
+## Practice questions
 
 - One question per card: the stem in `text`, then a `col` with one `button` per
   option. Set each `prompt` to what the reader would type, usually the letter.
+- To have the answer typed, write the sentence in `blanks` with `___` for each
+  answer; you receive it filled in, each answer in brackets.
 - Never put the answer, a hint that gives it away, or a "check" control in the
-  card. The answer belongs in your next reply, after the reader has chosen.
-- When the reader's choice arrives as their message, say whether it is right,
+  card. The answer belongs in your next reply, after the reader has answered.
+- When the answer arrives as their message, say whether it is right,
   explain briefly, and send the next question as a new card if the set goes on.
-- A card sends at most once; after a click its buttons lock. `recipes.md` has a
-  quiz series.
+- A card sends at most once; then its buttons and blanks lock. `recipes.md` has
+  a quiz series and a fill-in question.
 
 ## Animate
 
@@ -114,18 +117,14 @@ frame, in the browser, without calling you.
   with a line of only `"""`. The text is kept exactly as written: no `{…}`, no
   escapes, indentation measured from the block's left edge.
 - Set `lang=` for syntax colours; leave it out for prose-like text, which wraps.
-  `caption=` names the file, `numbers=true` adds line numbers, and `current=`
-  highlights one line.
-- For text that changes, such as what the reader typed into a `textInput`,
-  write `value=name` with a text state or calc instead of a literal.
 
 ## Revising a card
 
-When the reader asks to change a card you drew, call `ui_render` with
-`revises=` set to the card id its result reported, and write the whole program
-again with the change. Keep the names of states you are not changing: the new
-card starts from the reader's values for them, and the earlier card says a newer
-version follows. A different question gets a new card, without `revises=`.
+When the reader asks to change a card you drew, or one you just drew came out
+wrong, call `ui_render` with `revises=` set to the card id its result reported,
+and write the whole program again. Keep the names of states you are not
+changing: the new card starts from the reader's values for them, and the earlier
+card folds away. A different question gets a new card, without `revises=`.
 
 ## When the call fails
 

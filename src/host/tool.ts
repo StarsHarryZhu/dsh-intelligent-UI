@@ -16,7 +16,7 @@
  */
 
 import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'
-import { catalogHash } from '../lang/catalog.ts'
+import { catalogHash, SENDERS } from '../lang/catalog.ts'
 import { compileSource } from '../lang/compile.ts'
 import { API_VERSION, CARD_ID_PATTERN, UI_TOOL_NAME } from '../lang/identity.ts'
 import { LIMITS } from '../lang/limits.ts'
@@ -81,7 +81,7 @@ export function createUIRenderTool(): ToolDefinition {
       },
       revises: {
         type: 'string',
-        description: 'Card id of an earlier ui_render result that this card replaces; the reader\'s settings carry over to states with the same name.',
+        description: 'Card id of an earlier ui_render result that this card replaces: the earlier card folds away, and the reader\'s settings carry over to states with the same name.',
       },
     },
     output: {
@@ -143,7 +143,7 @@ export function createUIRenderTool(): ToolDefinition {
       return {
         ok: true,
         components: program.nodes.length,
-        controls: program.nodes.filter(node => node.bind !== undefined || node.type === 'button').length,
+        controls: program.nodes.filter(node => node.bind !== undefined || SENDERS.has(node.type)).length,
         truncated: program.truncated !== undefined,
         summary: program.fallback,
         notes,
@@ -172,6 +172,9 @@ function readCallId(exec: unknown): string | undefined {
   return typeof callId === 'string' && CARD_ID_PATTERN.test(callId) ? callId : undefined
 }
 
+/** Where the card stands, told with every card so the model goes on writing after it. */
+export const PLACEMENT_NOTE = 'It stands in your reply here, where you called ui_render; continue your answer below it.'
+
 /** Render the tool result for the model: the summary, or the repair list when it failed. */
 export function renderForModel(value: unknown): string {
   const record = (typeof value === 'object' && value !== null ? value : {}) as Partial<UIRenderSuccess> & Partial<UIRenderFailure>
@@ -182,8 +185,9 @@ export function renderForModel(value: unknown): string {
   const notes = record.notes ?? []
   return [
     `The card is shown: ${String(record.components ?? 0)} component(s), ${String(record.controls ?? 0)} control(s).`,
-    typeof record.card === 'string' ? `Card id: ${record.card}` : '',
-    typeof record.revises === 'string' ? `It replaces card ${record.revises}: states with the same names keep the reader's values.` : '',
+    PLACEMENT_NOTE,
+    typeof record.card === 'string' ? `Card id: ${record.card} (to redraw or change this card, call ui_render with revises=${record.card}; the reader then sees only the new card)` : '',
+    typeof record.revises === 'string' ? `It replaces card ${record.revises}, which now folds away; states with the same names keep the reader's values.` : '',
     record.truncated === true ? 'A size limit was reached, so part of the source was left out.' : '',
     notes.length > 0 ? `Repaired or ignored (fix these next time):\n${notes.join('\n')}` : '',
     `What a text-only reader sees:\n${record.summary ?? ''}`,

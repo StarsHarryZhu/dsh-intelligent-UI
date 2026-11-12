@@ -80,18 +80,23 @@ export interface SourceLike<T> {
   subscribe(listener: () => void): () => void
 }
 
-/** Props of one `conversation.chat.turnTail` entry. */
-export interface TurnTailProps extends SessionKit {
-  turn?: {
-    turn?: number
-    end?: { data?: { reason?: { kind?: string } } }
-    data?: {
-      get?(key: string): unknown
-      source?(key: string): SourceLike<unknown>
-    }
+/** The Turn a Chat node belongs to, reduced to its published data. */
+export interface TurnLike {
+  turn?: number
+  data?: {
+    get?(key: string): unknown
+    source?(key: string): SourceLike<unknown>
   }
-  /** Sequence of the closing reply; cards recorded before it belong to this tail. */
-  seq?: number
+}
+
+/** Props of one keyed `conversation.chat.node` entry. */
+export interface ChatNodeProps extends SessionKit {
+  node?: {
+    key?: string
+    kind?: string
+    data?: unknown
+    location?: { kind?: string; turn?: TurnLike }
+  }
 }
 
 /** The context services the browser half uses. */
