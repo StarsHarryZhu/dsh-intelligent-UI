@@ -1,6 +1,7 @@
 /**
- * The plugin stays a plugin: every invariant in the root AGENTS.md "Constraints"
- * that can be checked without a running harness is checked here.
+ * The plugin stays a plugin, and a widget stays in its frame: every invariant in
+ * the root AGENTS.md "Constraints" that can be checked without a running harness
+ * or a real browser is checked here.
  */
 
 import { readFileSync, readdirSync } from 'node:fs'
@@ -9,9 +10,9 @@ import { describe, expect, it } from 'vitest'
 import { apply as applyHost, inject as hostInject, name as hostName } from '../src/index.ts'
 import type { SkillCandidateLike, SkillProviderLike } from '../src/host/skill.ts'
 import { apply as applySkill, inject as skillInject, name as skillName } from '../src/skill.ts'
-import { LOCALE_NS, PLUGIN_ID, TURN_DATA_KEY, UI_TOOL_NAME } from '../src/lang/identity.ts'
-
-const ROOT = join(import.meta.dirname, '..')
+import { LOCALE_NS, PLUGIN_ID, TURN_DATA_KEY, UI_TOOL_NAME } from '../src/widget/identity.ts'
+import { FRAME_SANDBOX } from '../src/widget/policy.ts'
+import { bundledText, clientBundle, ROOT } from './helpers.ts'
 
 /** Every file below a directory. */
 function files(directory: string): string[] {
@@ -24,11 +25,16 @@ function files(directory: string): string[] {
   return found
 }
 
-/** Source files of one half, as text. */
+/** Source files below some directories, as text. */
 function sources(directories: string[]): Array<{ path: string; text: string }> {
   return directories.flatMap(directory => files(directory))
     .filter(path => /\.(?:ts|tsx)$/u.test(path) && !path.endsWith('.d.ts'))
     .map(path => ({ path, text: readFileSync(join(ROOT, path), 'utf8') }))
+}
+
+/** A source without its comments, so a rule is not tripped by prose about it. */
+function code(text: string): string {
+  return text.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/^\s*\/\/.*$/gmu, '')
 }
 
 /** Import specifiers of one file, with whether the import is type-only. */
@@ -41,6 +47,11 @@ function imports(text: string): Array<{ specifier: string; typeOnly: boolean }> 
   return found
 }
 
+/** Paths of the files whose code matches a pattern. */
+function users(list: Array<{ path: string; text: string }>, pattern: RegExp): string[] {
+  return list.filter(file => pattern.test(code(file.text))).map(file => relative(ROOT, join(ROOT, file.path)))
+}
+
 describe('only the published plugin contract is used', () => {
   it('keeps every name the plugin registers under its own id', () => {
     expect(PLUGIN_ID).toBe(JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).name)
@@ -48,30 +59,47 @@ describe('only the published plugin contract is used', () => {
     expect(hostName).toBe(PLUGIN_ID)
   })
 
-  it('imports no harness package at runtime except the tool definition helper', () => {
-    // The host half may also read its own bundled skill file with Node built-ins.
-    const hostAllowed = ['@deepseek-ai/dsh-tools', 'node:fs', 'node:fs/promises', 'node:url']
+  it('imports nothing at runtime beyond what each layer is allowed', () => {
+    // The host half uses the tool helper; it reads its own skill file and compiles
+    // (never runs) a widget's scripts with Node built-ins, each in one file.
+    const builtins: Record<string, string[]> = {
+      [join('src', 'host', 'skill.ts')]: ['node:fs', 'node:fs/promises', 'node:url'],
+      [join('src', 'host', 'check.ts')]: ['node:vm'],
+    }
     for (const file of sources(['src'])) {
       for (const { specifier, typeOnly } of imports(file.text)) {
-        if (specifier.startsWith('.') || typeOnly) continue
-        if (file.path.startsWith(join('src', 'client'))) {
-          expect(['react', 'react/jsx-runtime'], `${file.path} imports ${specifier}`).toContain(specifier)
-        } else if (file.path.startsWith(join('src', 'lang'))) {
-          throw new Error(`${file.path} imports ${specifier}; the language layer imports nothing outside itself`)
-        } else {
-          expect(hostAllowed, `${file.path} imports ${specifier}`).toContain(specifier)
-          if (specifier.startsWith('node:')) expect(file.path, specifier).toBe(join('src', 'host', 'skill.ts'))
+        if (typeOnly) continue
+        const layer = file.path.split(sep)[1]
+        if (specifier.startsWith('.')) {
+          const target = join(file.path, '..', specifier).split(sep)[1]
+          // The shared layer imports only itself; the frame only itself and the shared layer;
+          // the browser half never the host half or the frame's code, and the reverse.
+          if (layer === 'widget') expect(target, `${file.path} imports ${specifier}`).toBe('widget')
+          if (layer === 'frame') expect(['frame', 'widget'], `${file.path} imports ${specifier}`).toContain(target)
+          if (layer === 'host') expect(['host', 'widget'], `${file.path} imports ${specifier}`).toContain(target)
+          if (layer === 'client' && target !== 'client' && target !== 'widget') {
+            // The two texts the build inlines for a frame's document.
+            expect(['../frame/base.css', '../frame/main.runtime'], `${file.path} imports ${specifier}`).toContain(specifier)
+          }
+          continue
         }
+        if (layer === 'client') expect(['react', 'react/jsx-runtime'], `${file.path} imports ${specifier}`).toContain(specifier)
+        else if (layer === 'widget' || layer === 'frame') throw new Error(`${file.path} imports ${specifier}; this layer imports nothing from outside the plugin`)
+        else if (specifier.startsWith('node:')) expect(builtins[file.path] ?? [], `${file.path} imports ${specifier}`).toContain(specifier)
+        else expect(['@deepseek-ai/dsh-tools'], `${file.path} imports ${specifier}`).toContain(specifier)
       }
     }
   })
 
-  it('ships a browser bundle that requests nothing beyond React', () => {
-    const bundle = readFileSync(join(ROOT, 'lib', 'client.js'), 'utf8')
+  it('ships a browser bundle that requests nothing beyond React and its own lazy library files', () => {
+    const bundle = clientBundle()
     const requests = new Set([...bundle.matchAll(/\brequire\("([^"]+)"\)/gu)].map(match => match[1] as string))
     expect([...requests].filter(request => !request.startsWith('.')).sort()).toEqual(['react', 'react/jsx-runtime'])
     expect(bundle.startsWith(`/* ${PLUGIN_ID} `)).toBe(true)
     expect(bundle).toContain(`id: "${PLUGIN_ID}"`)
+    // The one lazy request the wrapper passes on names a library file of this plugin.
+    expect(bundle).toContain('const chunk = /^\\.\\/client\\.lib-[a-z0-9-]+\\.js$/u;')
+    expect(bundle.match(/require\.async\(/gu)).toHaveLength(1)
   })
 
   /** A host context with the tool registry and the skill registry. */
@@ -128,32 +156,119 @@ describe('only the published plugin contract is used', () => {
   })
 })
 
-describe('the browser half cannot reach outside its card', () => {
-  const browser = sources(['src/client', 'src/lang'])
+describe('the host half never runs a widget', () => {
+  const host = sources(['src/host', 'src/widget']).concat(sources(['src']).filter(file => !file.path.includes(sep, 4)))
 
-  it('uses no network, no timers, and no code evaluation', () => {
-    const banned = [/\bfetch\s*\(/u, /XMLHttpRequest/u, /WebSocket/u, /EventSource/u, /\beval\s*\(/u, /new\s+Function/u, /dangerouslySetInnerHTML/u, /\bsetTimeout\s*\(/u, /\bsetInterval\s*\(/u, /\bsessionStorage\b/u, /\bindexedDB\b/u]
-    for (const file of browser) {
-      for (const pattern of banned) expect(pattern.test(file.text), `${file.path} matches ${String(pattern)}`).toBe(false)
+  it('compiles scripts for their syntax and executes nothing', () => {
+    const check = readFileSync(join(ROOT, 'src', 'host', 'check.ts'), 'utf8')
+    expect(imports(check).filter(entry => entry.specifier === 'node:vm')).toHaveLength(1)
+    expect(check).toMatch(/import \{ Script \} from 'node:vm'/u)
+    for (const file of host) {
+      const text = code(file.text)
+      for (const pattern of [/\.runIn(?:This|New)?Context\s*\(/u, /\brunInContext\b/u, /\bcreateContext\b/u, /\bcompileFunction\b/u, /\beval\s*\(/u, /new\s+Function\b/u, /\bimport\s*\(/u, /child_process|worker_threads/u]) {
+        expect(pattern.test(text), `${file.path} matches ${String(pattern)}`).toBe(false)
+      }
     }
   })
 
-  it('keeps reader edits in local storage from one file only', () => {
-    const users = browser.filter(file => /\blocalStorage\b/u.test(file.text)).map(file => relative(ROOT, join(ROOT, file.path)))
-    expect(users).toEqual([join('src', 'client', 'edits.ts')])
-  })
-
-  it('creates elements only from fixed tag names', () => {
-    for (const file of browser) expect(/createElement\(\s*[^'"\s]/u.test(file.text), file.path).toBe(false)
-  })
-
-  it('writes to the document only to mount its own stylesheet', () => {
-    const writers = browser.filter(file => /document\.(?:head|body|createElement|write)/u.test(file.text)).map(file => relative(ROOT, join(ROOT, file.path)))
-    expect(writers).toEqual([join('src', 'client', 'index.ts')])
+  it('reaches no network and writes no file', () => {
+    for (const file of host) {
+      const text = code(file.text)
+      for (const pattern of [/\bfetch\s*\(/u, /node:https?|node:net|node:dgram/u, /writeFile|appendFile|createWriteStream|\bmkdir|\brm(?:Sync)?\s*\(/u]) {
+        expect(pattern.test(text), `${file.path} matches ${String(pattern)}`).toBe(false)
+      }
+    }
   })
 })
 
-describe('the stylesheet stays inside the card', () => {
+describe('the page never holds a widget\'s markup or code', () => {
+  const page = sources(['src/client', 'src/widget'])
+
+  it('uses no network, no timers, no code evaluation, and no way to write markup', () => {
+    const banned = [
+      /\bfetch\s*\(/u, /XMLHttpRequest/u, /WebSocket/u, /EventSource/u, /sendBeacon/u,
+      /\beval\s*\(/u, /new\s+Function\b/u,
+      /dangerouslySetInnerHTML/u, /\.innerHTML\b/u, /\.outerHTML\b/u, /insertAdjacentHTML/u, /document\.write/u, /createContextualFragment/u, /DOMParser/u,
+      /\bsetTimeout\s*\(/u, /\bsetInterval\s*\(/u,
+      /\bsessionStorage\b/u, /\bindexedDB\b/u, /document\.cookie/u,
+    ]
+    for (const file of page) {
+      const text = code(file.text)
+      for (const pattern of banned) expect(pattern.test(text), `${file.path} matches ${String(pattern)}`).toBe(false)
+    }
+  })
+
+  it('keeps what widgets store in local storage from one file only', () => {
+    expect(users(page, /\blocalStorage\b/u)).toEqual([join('src', 'client', 'edits.ts')])
+  })
+
+  it('creates elements only from fixed tag names, and writes to the document only to mount its stylesheet', () => {
+    for (const file of page) expect(/createElement\(\s*[^'"\s]/u.test(code(file.text)), file.path).toBe(false)
+    expect(users(page, /document\.(?:head|createElement)\b|\.append(?:Child)?\s*\(/u)).toEqual([join('src', 'client', 'index.ts')])
+  })
+
+  it('draws exactly one kind of frame, sandboxed, with no address and no extra powers', () => {
+    expect(FRAME_SANDBOX).toBe('allow-scripts allow-forms')
+    expect(users(page, /<iframe\b/u)).toEqual([join('src', 'client', 'widget.tsx')])
+    const widget = code(readFileSync(join(ROOT, 'src', 'client', 'widget.tsx'), 'utf8'))
+    const frames = [...widget.matchAll(/<iframe\b[\s\S]*?\/>/gu)].map(match => match[0])
+    expect(frames).toHaveLength(1)
+    const frame = frames[0] as string
+    expect(frame).toContain('sandbox={FRAME_SANDBOX}')
+    expect(frame).toContain('allow=""')
+    expect(frame).toContain('referrerPolicy="no-referrer"')
+    expect(frame).toContain('srcDoc={srcdoc}')
+    expect(frame).not.toMatch(/\bsrc=/u)
+    // No other spelling of a sandbox token, anywhere in the page's code.
+    for (const file of page) {
+      const text = code(file.text).replace("export const FRAME_SANDBOX = 'allow-scripts allow-forms'", '')
+      expect(/allow-(?:same-origin|top-navigation|popups|modals|downloads|pointer-lock|presentation|scripts|forms)/u.test(text), file.path).toBe(false)
+    }
+  })
+
+  it('talks to a frame only through the checked bridge', () => {
+    expect(users(page, /\.postMessage\s*\(/u)).toEqual([join('src', 'client', 'widget.tsx')])
+    expect(users(page, /addEventListener\(\s*'message'/u)).toEqual([join('src', 'client', 'widget.tsx')])
+    const widget = code(readFileSync(join(ROOT, 'src', 'client', 'widget.tsx'), 'utf8'))
+    // Every message is dropped unless it comes from this widget's own frame, then read by the bridge.
+    expect(widget).toMatch(/event\.source !== frame\.current\.contentWindow\) return\s+const action = readFrameMessage\(event\.data\)/u)
+    expect(widget.match(/event\.data/gu)).toHaveLength(1)
+    // Speaking for the reader and opening pages both wait for a click inside the frame.
+    expect(widget).toMatch(/case 'send':\s+case 'open': \{\s+if \(!clickedInside\(frame\.current\)\)/u)
+    expect(widget.match(/window\.open\(/gu)).toHaveLength(1)
+    expect(widget).toContain("window.open(action.url, '_blank', 'noopener,noreferrer')")
+    expect(users(page, /window\.open\(/u)).toEqual([join('src', 'client', 'widget.tsx')])
+  })
+})
+
+describe('the frame runtime stays inside its frame', () => {
+  const frame = sources(['src/frame'])
+  const runtime = bundledText('frame/main.runtime')
+
+  it('is one self-contained script', () => {
+    expect(runtime.startsWith('(() => {')).toBe(true)
+    expect([...runtime.matchAll(/\brequire\(\s*["']([^"']+)["']\s*\)/gu)].every(match => (match[1] as string).startsWith('.'))).toBe(true)
+    expect(runtime).not.toMatch(/\bimport\s*\(|\bimportScripts\b/u)
+  })
+
+  it('reaches the page only by posting messages, and nothing above its own window', () => {
+    for (const file of frame) {
+      const text = code(file.text)
+      expect(text.match(/\bparent\.(?!postMessage\b)\w+/gu) ?? [], file.path).toEqual([])
+      for (const pattern of [/\b(?:window|win|self|globalThis)\.top\b/u, /\bwindow\.opener\b/u, /\.frameElement\b/u, /\bfetch\s*\(/u, /XMLHttpRequest/u, /WebSocket/u, /sendBeacon/u, /\blocalStorage\b/u, /document\.cookie/u, /\beval\s*\(/u, /new\s+Function\b/u]) {
+        expect(pattern.test(text), `${file.path} matches ${String(pattern)}`).toBe(false)
+      }
+    }
+  })
+
+  it('takes messages only from the page that holds it', () => {
+    const text = code(readFileSync(join(ROOT, 'src', 'frame', 'runtime.ts'), 'utf8'))
+    expect(text).toMatch(/win\.addEventListener\('message', \(event\) => \{\s+if \(event\.source !== parent\) return/u)
+    expect(text.match(/addEventListener\('message'/gu)).toHaveLength(1)
+  })
+})
+
+describe('the stylesheet stays inside the plugin\'s own elements', () => {
   const css = readFileSync(join(ROOT, 'src', 'client', 'styles.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//gu, '')
 
   /** Every selector list of every plain rule, ignoring at-rule preludes and keyframe steps. */
@@ -169,7 +284,7 @@ describe('the stylesheet stays inside the card', () => {
 
   it('scopes every selector under a dsh-iui class', () => {
     const list = selectors()
-    expect(list.length).toBeGreaterThan(50)
+    expect(list.length).toBeGreaterThan(15)
     for (const selector of list) expect(selector, selector).toMatch(/\.dsh-iui-/u)
   })
 
@@ -182,9 +297,7 @@ describe('the stylesheet stays inside the card', () => {
     expect(css).not.toMatch(/\b(?:rgb|rgba|hsl|hsla|oklch|color-mix)\(/iu)
     for (const match of css.matchAll(/(?:^|[;{\s])(color|background|border-color|fill|stroke|accent-color)\s*:\s*([^;}]+)/gmu)) {
       const value = (match[2] as string).trim()
-      // The host's syntax tokens colour code like its own code blocks; each falls back to a theme token.
-      const syntax = /^var\(--shiki-[\w-]+, var\(--dsw-[\w-]+\)\)$/u.test(value)
-      expect(['transparent', 'inherit', 'none'].includes(value) || value.startsWith('var(--dsw-') || syntax, `${match[1]}: ${value}`).toBe(true)
+      expect(['transparent', 'inherit', 'none'].includes(value) || value.startsWith('var(--dsw-'), `${match[1]}: ${value}`).toBe(true)
     }
   })
 
@@ -192,5 +305,13 @@ describe('the stylesheet stays inside the card', () => {
     for (const match of css.matchAll(/border-radius\s*:\s*([^;}]+)/gu)) {
       expect(['inherit'].includes((match[1] as string).trim()) || (match[1] as string).trim().startsWith('var(--dsw-radius-'), match[1]).toBe(true)
     }
+  })
+
+  it('loads nothing from anywhere, in the page\'s stylesheet and in the frame\'s', () => {
+    const frameCss = bundledText('frame/base.css')
+    for (const text of [css, frameCss]) {
+      expect(text).not.toMatch(/@import|url\(\s*['"]?(?:https?:)?\/\//iu)
+    }
+    expect(frameCss).toBe(readFileSync(join(ROOT, 'src', 'frame', 'base.css'), 'utf8'))
   })
 })

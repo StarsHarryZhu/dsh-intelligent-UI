@@ -14,9 +14,9 @@
  * @module dsh-intelligent-ui/client/card-node
  */
 
-import { CARD_NODE_KIND, UI_TOOL_NAME } from '../lang/identity.ts'
-import { LIMITS } from '../lang/limits.ts'
-import { asRecord } from './program.ts'
+import { CARD_NODE_KIND, UI_TOOL_NAME } from '../widget/identity.ts'
+import { LIMITS } from '../widget/policy.ts'
+import { asRecord, isOwnMeta } from './read.ts'
 
 /**
  * How far after its call a card stands. Streamed rows take fractions of the
@@ -31,7 +31,7 @@ export const AFTER_CALL = 1e-9
  * accepts, every byte escaped, plus room for the title. A longer stream stops
  * growing the preview; the recorded call carries the rest.
  */
-const MAX_STREAMED_ARGS = LIMITS.maxSourceBytes * 2 + 4096
+const MAX_STREAMED_ARGS = LIMITS.maxSourceChars * 2 + 4096
 
 /** Where a call is: its arguments streaming, recorded, or answered. */
 export type CardPhase = 'preparing' | 'start' | 'result'
@@ -96,13 +96,6 @@ function idOf(value: unknown): string | undefined {
 function resultCallId(data: unknown): string | undefined {
   const message = asRecord(asRecord(data).message)
   return idOf(asRecord(message.source).callId) ?? idOf(message.toolCallId)
-}
-
-/** Whether persisted meta is this plugin's: a compiled card or a failed compile. */
-function isOwnMeta(meta: unknown): boolean {
-  const record = asRecord(meta)
-  return (record.ok === true && typeof record.program === 'object' && record.program !== null)
-    || (record.ok === false && Array.isArray(record.diagnostics))
 }
 
 /** Arguments recorded as text or, from some providers, as an object. */

@@ -1,70 +1,61 @@
 /**
  * The `ui_render` tool row: one status line in the process.
  *
- * The card itself stands in the reply, as its own Chat node, while this row
+ * The widget itself stands in the reply, as its own Chat node, while this row
  * sits among the process rows a finished turn folds. While that reply copy is
- * on the page the row says how the call went — building, how many components
- * and controls, replaced, failed — and opens only to show why a program did not
- * compile. Where no reply copy exists, in a view without Chat nodes or for a
- * card whose reply copy is not drawn, the row draws the card itself: it
- * previews the interface while the arguments stream, and a result that arrives
- * while the reader watches opens the row.
+ * on the page the row says how the call went — building, shown, replaced,
+ * failed — and opens only to show why a widget did not pass the check. Where no
+ * reply copy exists, in a view without Chat nodes or for a widget whose reply
+ * copy is not drawn, the row draws the widget itself: it shows the source while
+ * the arguments stream, and a result that arrives while the reader watches
+ * opens the row.
  * @module dsh-intelligent-ui/client/toolview
  */
 
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
-import { SENDERS } from '../lang/catalog.ts'
-import { Card, Contained, revisionOf } from './card.tsx'
-import type { EditsStore } from './edits.ts'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
 import type { DisclosureLike, ToolBlockLike, ToolViewProps } from './host.ts'
 import { translator } from './locales.ts'
-import type { Presence } from './presence.ts'
-import { previewProgram, readCardId, readMeta, type Program } from './program.ts'
+import { readCardId, readMeta } from './read.ts'
+import { Contained, LegacyCard, revisionOf, Widget, type WidgetEnv } from './widget.tsx'
 
 /** A result newer than this opens its row on arrival. */
 const FRESH_MS = 30_000
 
 /**
- * Build the row component over the plugin's edit store.
- * @param store - the reader's edits, shared with the card in the reply.
- * @param presence - the record of cards drawn in the reply.
+ * Build the row component.
+ * @param env - what every widget on the page shares.
  * @returns the component registered under the `ui_render` key.
  */
-export function createToolView(store: EditsStore, presence: Presence): (props: ToolViewProps) => ReactNode {
+export function createToolView(env: WidgetEnv): (props: ToolViewProps) => ReactNode {
   return function DshIntelligentUiToolView(props: ToolViewProps): ReactNode {
     return (
       <Contained label="tool row">
-        <ToolViewBody {...props} edits={store} presence={presence} />
+        <ToolViewBody {...props} env={env} />
       </Contained>
     )
   }
 }
 
-/** The row's header and, while open, its card or its problems. */
-function ToolViewBody(props: ToolViewProps & { edits: EditsStore; presence: Presence }): ReactNode {
-  const { presence } = props
-  const store = props.edits
+/** The row's header and, while open, its widget or its problems. */
+function ToolViewBody(props: ToolViewProps & { env: WidgetEnv }): ReactNode {
+  const { env } = props
+  const { presence, store } = env
   const tr = translator(props.t)
   const phase = props.phase ?? 'result'
   const block: ToolBlockLike = props.block ?? {}
   const live = phase !== 'result'
-  // The preparing view grows in place, so the source is read during render and
-  // the preview is memoized by the text itself, never by the block's identity.
-  const source = live ? readArgument(block, 'source') : undefined
-  const preview = useMemo(
-    () => (source === undefined || source.trim() === '' ? undefined : previewProgram(source, phase === 'preparing')),
-    [source, phase],
-  )
+  const streamed = live ? readArgument(block, 'source') : undefined
   const metaValue = live ? undefined : block.meta
   const meta = useMemo(() => (metaValue === undefined ? undefined : readMeta(metaValue)), [metaValue])
   const disclosure = (props.useDisclosure ?? useLocalDisclosure)()
+  const [, forceRender] = useState(0)
   const callId = props.callId ?? block.callId
   const memoryKey = `${props.sessionId ?? ''}:${callId ?? ''}`
   const subscribe = useCallback((listener: () => void) => store.subscribe(memoryKey, listener), [store, memoryKey])
   // A later card that revises this one renames the row's status.
   const replaced = useSyncExternalStore(subscribe, () => store.get(memoryKey)?.revisedBy !== undefined)
   const subscribeReply = useCallback((listener: () => void) => presence.subscribe(memoryKey, listener), [presence, memoryKey])
-  // While the card stands in the reply, the row does not draw it a second time.
+  // While the widget stands in the reply, the row does not draw it a second time.
   const inReply = useSyncExternalStore(subscribeReply, () => presence.has(memoryKey))
   const resultTime = !live && typeof block.time === 'number' ? block.time : undefined
   useEffect(() => {
@@ -74,33 +65,49 @@ function ToolViewBody(props: ToolViewProps & { edits: EditsStore; presence: Pres
   }, [resultTime, inReply])
 
   const title = (meta?.title ?? readArgument(block, 'title') ?? '').trim()
-  const program: Program | undefined = live ? preview : meta?.ok === true ? meta.program : undefined
+  const source = live ? streamed : meta?.kind === 'widget' ? meta.source : undefined
+  const legacy = !live && meta?.kind === 'legacy' ? meta.text : undefined
+  const drawable = legacy !== undefined || (source !== undefined && source.trim() !== '')
   const errorText = !live && block.isError === true ? contentText(block) : undefined
-  const diagnostics = meta?.ok === false
-    ? meta.diagnostics.map(entry => `${entry.line === undefined ? '' : `line ${entry.line}: `}${entry.message}. ${entry.repair}`).join('\n')
+  const problems = meta?.kind === 'failed'
+    ? meta.problems.map(entry => `${entry.line === undefined ? '' : `line ${entry.line}: `}${entry.message}. ${entry.repair}`).join('\n')
     : !live && meta === undefined && errorText === undefined ? contentText(block) : undefined
-  const state = live ? 'running' : program !== undefined ? 'ready' : 'failed'
+  const state = live ? 'running' : drawable ? 'ready' : 'failed'
   const status = live
     ? tr('row.preparing')
     : block.isError === true
       ? block.error?.code === 'interrupted' ? tr('row.stopped') : tr('row.error')
-      : program !== undefined
-        ? replaced ? tr('row.replaced') : tr('row.ready', { components: program.nodes.length, controls: program.nodes.filter(node => node.bind !== undefined || SENDERS.has(node.type)).length })
-        : tr('row.failed')
-  const detail = errorText ?? diagnostics
-  const drawsCard = program !== undefined && !inReply
-  const expandable = !live && (drawsCard || (program === undefined && detail !== undefined && detail !== ''))
-  const open = (live && drawsCard) || (expandable && disclosure.expanded)
-  const toggle = (): void => { if (expandable) disclosure.toggle() }
+      : legacy !== undefined
+        ? tr('row.legacy')
+        : drawable
+          ? replaced ? tr('row.replaced') : tr('row.ready', { lines: (source ?? '').split('\n').length })
+          : tr('row.failed')
+  const detail = errorText ?? problems
+  const drawsCard = drawable && !inReply
+  const expandable = !live && (drawsCard || (!drawable && detail !== undefined && detail !== ''))
+  // A row that drew its widget while it streamed keeps it open when the result
+  // lands, until the host's disclosure catches up: closing it for one render
+  // would throw the frame away and load it again.
+  const heldOpen = useRef(false)
+  if (live && drawsCard) heldOpen.current = true
+  const open = (live && drawsCard) || (expandable && (disclosure.expanded || heldOpen.current))
+  const toggle = (): void => {
+    if (!expandable) return
+    if (heldOpen.current && !disclosure.expanded) {
+      // The reader closes a row the hold alone kept open.
+      heldOpen.current = false
+      forceRender(count => count + 1)
+      return
+    }
+    heldOpen.current = false
+    disclosure.toggle()
+  }
   const onKey = (event: KeyboardEvent<HTMLDivElement>): void => {
     if (!expandable || (event.key !== 'Enter' && event.key !== ' ')) return
     event.preventDefault()
-    disclosure.toggle()
+    toggle()
   }
-  // A preview already starts from the revised card's values; only a settled
-  // result marks the earlier card as revised.
-  const revises = live ? readCardId(readArgument(block, 'revises')) : meta?.ok === true ? meta.revises : undefined
-  const revision = revisionOf(props.sessionId, revises, live ? undefined : callId)
+  const revises = live ? readCardId(readArgument(block, 'revises')) : meta?.kind === 'widget' ? meta.revises : undefined
   return (
     <div className="dsh-iui-tool" data-dsh-intelligent-ui="tool" data-state={state}>
       <div
@@ -127,12 +134,22 @@ function ToolViewBody(props: ToolViewProps & { edits: EditsStore; presence: Pres
           </button>
         )}
       </div>
-      {open && drawsCard && program !== undefined ? (
+      {open && drawsCard ? (
         <div className="dsh-iui-row-body">
-          <Card program={program} memoryKey={memoryKey} store={store} kit={props} revision={revision} />
+          {legacy !== undefined ? <LegacyCard text={legacy} tr={tr} /> : (
+            <Widget
+              env={env}
+              source={source ?? ''}
+              stage={live ? (phase === 'preparing' ? 'streaming' : 'complete') : 'ready'}
+              memoryKey={memoryKey}
+              cardId={callId}
+              kit={props}
+              revision={revisionOf(props.sessionId, revises, live ? undefined : callId)}
+            />
+          )}
         </div>
       ) : null}
-      {open && !live && program === undefined && detail !== undefined && detail !== '' ? (
+      {open && !live && !drawable && detail !== undefined && detail !== '' ? (
         <pre className="dsh-iui-diag">{detail}</pre>
       ) : null}
     </div>

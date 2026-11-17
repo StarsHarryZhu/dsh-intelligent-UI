@@ -1,0 +1,426 @@
+{
+  "$comment": "Libraries this plugin ships. Each file is downloaded from https://cdn.jsdelivr.net/npm/<package>@<version>/<path> by scripts/vendor.mjs into vendor/cache/ (not committed) and must match its sha256; build.js then writes lib/client.lib-<id>.js. A file marked font is written into the stylesheets that name it as a data address (fontFace: every @font-face of that family becomes one rule with that font); a file marked license is copied to lib/licenses/. The address rules that pick these files live in src/widget/libs.ts.",
+  "libraries": [
+    {
+      "id": "chartjs",
+      "title": "Chart.js 4",
+      "package": "chart.js",
+      "version": "4.6.1",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "dist/chart.umd.min.js",
+          "sha256": "87364cc2b2a76a6684929e7d6b80b18a897794db38400caff1fcf1791c6925d2"
+        },
+        {
+          "path": "LICENSE.md",
+          "license": true,
+          "sha256": "41a84aa2caba645f966a18d9c2056b73e6d3a81d80bc0046bc0011a2634d4cce"
+        }
+      ]
+    },
+    {
+      "id": "echarts",
+      "title": "ECharts 5",
+      "package": "echarts",
+      "version": "5.6.0",
+      "license": "Apache-2.0",
+      "files": [
+        {
+          "path": "dist/echarts.min.js",
+          "sha256": "bf4a223524e40b77c304bec67e1222cf551f14880cf42c69dc046558e11c07b1"
+        },
+        {
+          "path": "LICENSE",
+          "license": true,
+          "sha256": "634293835b43a6dd2094fa39182a3d9a6b9ca43b7fdb9ac354e8037af2a3093a"
+        },
+        {
+          "path": "NOTICE",
+          "license": true,
+          "sha256": "fa99ac3af859d0e13166906dc53a73ad34a08898da7e8ae83407275496e9e30c"
+        }
+      ]
+    },
+    {
+      "id": "d3",
+      "title": "D3 7",
+      "package": "d3",
+      "version": "7.9.2",
+      "license": "ISC",
+      "files": [
+        {
+          "path": "dist/d3.min.js",
+          "sha256": "912111098ea99503a6f4967361d2bbdc9dbf58cf9c678c8e27e5b02d1a07f0c1"
+        },
+        {
+          "path": "LICENSE",
+          "license": true,
+          "sha256": "2a6d2d5f32ba0b755ddbc1c833f766e30cdbe6ebe9a6d4e3e24427721f0b63d3"
+        }
+      ]
+    },
+    {
+      "id": "topojson",
+      "title": "topojson-client 3",
+      "package": "topojson-client",
+      "version": "3.1.0",
+      "license": "ISC",
+      "files": [
+        {
+          "path": "dist/topojson-client.min.js",
+          "sha256": "25cd02ae486cc5063e0215a4e4cfb15de83700c87ac48bac4d57dc6aaf3ebb89"
+        },
+        {
+          "path": "LICENSE",
+          "license": true,
+          "sha256": "4c4d15b635e04e691825a76db7d33f7f2033b55669a7430011694f31e6c65999"
+        }
+      ]
+    },
+    {
+      "id": "katex",
+      "title": "KaTeX 0.16",
+      "package": "katex",
+      "version": "0.16.47",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "dist/katex.min.js",
+          "sha256": "a29d2961d3146de5949d78ac7c1a9d93ae54955bad22a6db4fbe836e88e8bf48"
+        },
+        {
+          "path": "dist/katex.min.css",
+          "sha256": "0289a02cf451a44dd73add683a09644252363871ac11713a647b732cee8b1ee3"
+        },
+        {
+          "path": "dist/contrib/auto-render.min.js",
+          "sha256": "e5372d199bcdae8b4de71d0f7ceba72a4ba12774a27c60a6f1f77d03b3228ee4"
+        },
+        {
+          "path": "LICENSE",
+          "license": true,
+          "sha256": "766ccc1f306c885aa45542a9846bbd0a505b27a0374f146778171c2254ce18e3"
+        },
+        {
+          "path": "dist/fonts/KaTeX_AMS-Regular.woff2",
+          "font": true,
+          "sha256": "0cdd387c9590a1a9f9794560022dbb59654a7d86f187aa0c81495ad42d3a7308"
+        },
+        {
+          "path": "dist/fonts/KaTeX_Caligraphic-Bold.woff2",
+          "font": true,
+          "sha256": "de7701e42cf1f4cf0b766c03fb27977207eee2f4fd5d76fa82188406da43ea4c"
+        },
+        {
+          "path": "dist/fonts/KaTeX_Caligraphic-Regular.woff2",
+          "font": true,
+          "sha256": "5d53e70ad607c2352162dec9e0923fb54ecdafaccbf604cd8dcf7d00facb989b"
+        },
+        {
+          "path": "dist/fonts/KaTeX_Fraktur-Bold.woff2",
+          "font": true,
+          "sha256": "74444efd593c005e3f4573b44524704c0af0a937fe911cca9e94068d0d140d3f"
+        },
+        {
+          "path": "dist/fonts/KaTeX_Fraktur-Regular.woff2",
+          "font": true,
+          "sha256": "51814d270d06ff0255dba0799994fa4d8c84d11f09951d47595f4abb1f3602dc"
+        },
+        {
+          "path": "dist/fonts/KaTeX_Main-Bold.woff2",
+          "font": true,
+          "sha256": "0f60d1b897938ec918c8ce073092411baf9438f6739465693ff18b0f9d20b021"
+        },
+        {
+          "path": "dist/fonts/KaTeX_Main-BoldItalic.woff2",
+          "font": true,
+          "sha256": "99cd42a3c072d918f2f44984a807cf7aa16e13545fd0875fc07c6c65f99e715b"
+        },
+        {
+          "path": "dist/fonts/KaTeX_Main-Italic.woff2",
+          "font": true,
+          "sha256": "97479ca6cce906abc961ecac96faa5f9ca2e61b8e7670d475826bcdee9a7c267"
+        },
+        {
+          "path": "dist/fonts/KaTeX_Main-Regular.woff2",
+          "font": true,
+          "sha256": "c2342cd8b869e01752a9321dc17213fc40d4d04c79688c1d43f2cf316abd7866"
+        },
+        {
+          "path": "dist/fonts/KaTeX_Math-BoldItalic.woff2",
+          "font": true,
+          "sha256": "dc47344dbb6cb5b655c8460d561f4df5f501b90c804ad3c6cec65fe322351ab1"
+        },
+        {
+          "path": "dist/fonts/KaTeX_Math-Italic.woff2",
+          "font": true,
+          "sha256": "7af58c5ec8f132a2ddde9027c6d7814decce4d3b822a11192a42a20e2e973264"
+        },
+        {
+          "path": "dist/fonts/KaTeX_SansSerif-Bold.woff2",
+          "font": true,
+          "sha256": "e99ae51144bf1232efcc1bfe5add36262c6866b0faab24fa75740e1b98577a62"
+        },
+        {
+          "path": "dist/fonts/KaTeX_SansSerif-Italic.woff2",
+          "font": true,
+          "sha256": "00b26ac825e2095056396e0553b8ac26d3f8ad158c3826e28b4c45b385c4714a"
+        },
+        {
+          "path": "dist/fonts/KaTeX_SansSerif-Regular.woff2",
+          "font": true,
+          "sha256": "68e8c73ef42afd3ccec58bf0fba302cce448938e7fc020a5e31f8a952eee1342"
+        },
+        {
+          "path": "dist/fonts/KaTeX_Script-Regular.woff2",
+          "font": true,
+          "sha256": "036d4e95149b69ff9bcc0cd55771efeb25ffa3947293e69acd78d5ac328c684b"
+        },
+        {
+          "path": "dist/fonts/KaTeX_Size1-Regular.woff2",
+          "font": true,
+          "sha256": "6b47c40166b6dbe21a5dfca7718413f2147fd2399be1ba605d8ad39cedf25dfe"
+        },
+        {
+          "path": "dist/fonts/KaTeX_Size2-Regular.woff2",
+          "font": true,
+          "sha256": "d04c54219f9eaec6d4d4fd42dfb28785975a4794d6b2fc71e566b9cd6db842dd"
+        },
+        {
+          "path": "dist/fonts/KaTeX_Size3-Regular.woff2",
+          "font": true,
+          "sha256": "73d591271b1604960cb10bb90fee021670af7297017e0e98480b332d11f51995"
+        },
+        {
+          "path": "dist/fonts/KaTeX_Size4-Regular.woff2",
+          "font": true,
+          "sha256": "a4af7d414440a1c1790825cfb700cf9cf43b0f2c4b04f0ebc523011ad9853ec0"
+        },
+        {
+          "path": "dist/fonts/KaTeX_Typewriter-Regular.woff2",
+          "font": true,
+          "sha256": "71d517d67827787cfabdf186914cc3358eda539e37931941f2b2fd4a21f68c0b"
+        }
+      ]
+    },
+    {
+      "id": "three-r128",
+      "title": "Three.js r128",
+      "package": "three",
+      "version": "0.128.0",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "build/three.min.js",
+          "sha256": "9274bbcec8d96168626c732b5d31c775aa8cfb7eaa0599bec0c175908a2c1ce2"
+        },
+        {
+          "path": "examples/js/controls/OrbitControls.js",
+          "sha256": "02bb4ade710f3e607329e37a21f098bc3ac70eb6e33daf8a65e79f4db785e7b2"
+        },
+        {
+          "path": "LICENSE",
+          "license": true,
+          "sha256": "7dddf7c5b8fd10ee654db8857d75d104b5557889aa5a91fc4ca545ea7c07062f"
+        }
+      ]
+    },
+    {
+      "id": "three-160",
+      "title": "Three.js 0.160",
+      "package": "three",
+      "version": "0.160.1",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "build/three.module.min.js",
+          "sha256": "3e690ac7d180b0aadf0891bea39eec643e29e2d3e75c99b18689518665f69ba6"
+        },
+        {
+          "path": "examples/jsm/controls/OrbitControls.js",
+          "sha256": "7aa4372a5ec60b49988edde81014c7361740a57962d032003ca33301c1f4edd5"
+        },
+        {
+          "path": "LICENSE",
+          "license": true,
+          "sha256": "852e0e8699169bf9f6fdc6bda3e682d078dcbc738b5d33e74df594721bff271d"
+        }
+      ]
+    },
+    {
+      "id": "highlight",
+      "title": "highlight.js 11",
+      "package": "@highlightjs/cdn-assets",
+      "version": "11.12.0",
+      "license": "BSD-3-Clause",
+      "files": [
+        {
+          "path": "highlight.min.js",
+          "sha256": "8ab71eb09c51f501e5e25157d9cff100e46cc29bcbfc744d0b746d451fca7f53"
+        },
+        {
+          "path": "styles/github.min.css",
+          "sha256": "3a9a5def8b9c311e5ae43abde85c63133185eed4f0d9f67fea4b00a8308cf066"
+        },
+        {
+          "path": "styles/github-dark.min.css",
+          "sha256": "9f208d022102b1d0c7aebfecd8e42ca7997d5de636649d2b31ea63093d809019"
+        },
+        {
+          "path": "styles/atom-one-dark.min.css",
+          "sha256": "4237ffca7ce6aadb438c457e0a675b125c534bbdda5b87f41f3a1495603bcc9b"
+        },
+        {
+          "path": "styles/default.min.css",
+          "sha256": "fbde0ac0921d86c356c41532e7319c887a23bd1b8ff00060cab447249f03c7cf"
+        },
+        {
+          "path": "LICENSE",
+          "license": true,
+          "sha256": "6c081431591d9df696c82dc598fe1423765b8a299b200ed00b281afd0f64c490"
+        }
+      ]
+    },
+    {
+      "id": "marked",
+      "title": "marked 12",
+      "package": "marked",
+      "version": "12.0.2",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "marked.min.js",
+          "sha256": "15fabce5b65898b32b03f5ed25e9f891a729ad4c0d6d877110a7744aa847a894"
+        },
+        {
+          "path": "LICENSE.md",
+          "license": true,
+          "sha256": "8e3a3f82f59a60958f56ca08f445647c32a4733dc7ca6c2c46f6eb898471ab9c"
+        }
+      ]
+    },
+    {
+      "id": "mermaid",
+      "title": "Mermaid 11",
+      "package": "mermaid",
+      "version": "11.17.2",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "dist/mermaid.min.js",
+          "sha256": "581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8"
+        },
+        {
+          "path": "LICENSE",
+          "license": true,
+          "sha256": "ec9fb67dcb25eccc416ed56e1aab819222c805a2a4bfe4cb19e7556bf2ffde80"
+        }
+      ]
+    },
+    {
+      "id": "mathjs",
+      "title": "math.js 14",
+      "package": "mathjs",
+      "version": "14.9.1",
+      "license": "Apache-2.0",
+      "files": [
+        {
+          "path": "lib/browser/math.js",
+          "sha256": "eb2977cb81d52fcbbf7892f805b9821583faa9ac0ccfd7d5a2e782ffe5dc9493"
+        },
+        {
+          "path": "LICENSE",
+          "license": true,
+          "sha256": "3b0f65a9308588e12b619b2f05c788b4a5f41220006ce563b826b0feb489fd26"
+        },
+        {
+          "path": "NOTICE",
+          "license": true,
+          "sha256": "4ffe61bf0e3474513ef782fc9678d83325120eab1ddfa0dc375f89dfa38f1b68"
+        }
+      ]
+    },
+    {
+      "id": "tabler-icons",
+      "title": "Tabler Icons 3",
+      "package": "@tabler/icons-webfont",
+      "version": "3.52.0",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "dist/tabler-icons.min.css",
+          "sha256": "a0fd1e808c70840f73badd85423b9b609b761439ef7b7f0f85765c2a316ba3ff",
+          "fontFace": {
+            "family": "tabler-icons",
+            "font": "dist/fonts/tabler-icons.woff2"
+          }
+        },
+        {
+          "path": "LICENSE",
+          "license": true,
+          "sha256": "b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db"
+        },
+        {
+          "path": "dist/fonts/tabler-icons.woff2",
+          "font": true,
+          "sha256": "4209a7e22ad2ee662f5f8f68a059ef2e2ba247bc2e853dbb5e231e074b07bca2"
+        }
+      ]
+    },
+    {
+      "id": "matter",
+      "title": "Matter.js 0.20",
+      "package": "matter-js",
+      "version": "0.20.0",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "build/matter.min.js",
+          "sha256": "72d30be0f579eb02ce1e0b6f9d359a4f392e6837e5a26ba8be5dbee7f88e24ae"
+        },
+        {
+          "path": "LICENSE",
+          "license": true,
+          "sha256": "ed182087be5b26734aa6d4789743de3a97417950e8c1e3ff2e3d19c6462720d3"
+        }
+      ]
+    },
+    {
+      "id": "tone",
+      "title": "Tone.js 14",
+      "package": "tone",
+      "version": "14.9.17",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "build/Tone.js",
+          "sha256": "76fde2e44a0f10d1e20536543a0ac7289a8df8565e7107ad6cfa8cdc1eb3fda1"
+        },
+        {
+          "path": "LICENSE.md",
+          "license": true,
+          "sha256": "391ed5af60b7b5d1f74b31040c5fa645e6e238f3d9b4c971941a262a675bbdcd"
+        }
+      ]
+    },
+    {
+      "id": "anime",
+      "title": "anime.js 3",
+      "package": "animejs",
+      "version": "3.2.2",
+      "license": "MIT",
+      "files": [
+        {
+          "path": "lib/anime.min.js",
+          "sha256": "b5ce1be3c3f530f192e0f2571d1942846096d66119cbada34bfdc912c4873f35"
+        },
+        {
+          "path": "LICENSE.md",
+          "license": true,
+          "sha256": "f825f5c75974fda9ae806de442770f3d7686cf86245e78fa0c3c39913184af95"
+        }
+      ]
+    }
+  ]
+}

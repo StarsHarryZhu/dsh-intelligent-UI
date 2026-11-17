@@ -1,8 +1,8 @@
 /**
  * The page clipboard, where the page allows it.
  *
- * Shared by the button fallback in the card and the code block's copy button;
- * a module of its own so neither imports the other.
+ * Where a widget's message goes when the composer cannot take it: the reader
+ * then has it to paste.
  * @module dsh-intelligent-ui/client/clipboard
  */
 

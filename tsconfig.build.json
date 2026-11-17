@@ -9,5 +9,10 @@
     "declarationMap": false,
     "sourceMap": false
   },
-  "include": ["src/index.ts", "src/skill.ts", "src/host", "src/lang"]
+  "include": [
+    "src/index.ts",
+    "src/skill.ts",
+    "src/host",
+    "src/widget"
+  ]
 }

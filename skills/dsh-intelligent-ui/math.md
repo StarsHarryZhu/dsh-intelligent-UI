@@ -1,119 +1,126 @@
-# Math cards
+# Math widgets
 
-Every expression on a card is evaluated in the reader's browser, again on every
-control change. Trigonometry uses radians.
+## Formulas with KaTeX
 
-## Vocabulary
+Typeset with KaTeX rather than writing math as text. For a few formulas, call
+`katex.render`; for formulas inside prose, load auto-render and write `$…$` and
+`$$…$$` in the HTML.
 
-- Operators: `+ - * / % ^`, postfix `n!`, implicit products (`2x`, `3(x + 1)`,
-  `(a + b)(a - b)`), comparisons, `&& || !`, and `c ? a : b`. `-x^2` is
-  `-(x^2)` and `2^3^2` is `2^9`.
-- Constants: `pi`, `e`, `tau`, and `inf`, which is meaningful only as an
-  integral or limit bound. None of them can be a state name.
-- Functions: `sqrt cbrt root(x, n) exp ln log(x[, base]) log10 log2`,
-  `sin cos tan sec csc cot asin acos atan atan2(y, x)`,
-  `sinh cosh tanh asinh acosh atanh`,
-  `abs floor ceil round(x, d) sign trunc min max clamp(x, lo, hi) hypot`,
-  `gamma fact comb(n, k) perm(n, k) gcd lcm erf deg rad`.
-
-## Calculus
-
-The second argument names the variable. It exists only inside the first
-argument, and it may reuse a state name: the body sees the variable, the other
-arguments see the state. So `deriv(x^2, x, x)` is the slope at the slider's `x`.
-
-| Call | Value | Notes |
-|---|---|---|
-| `integral(f, x, a, b)` | ∫ₐᵇ f dx | adaptive Gauss–Kronrod; `a` or `b` may be `-inf` or `inf`; integrable endpoint singularities such as 1/√x work |
-| `deriv(f, x, at[, n])` | the n-th derivative at `at` | exact for smooth expressions; n up to 20 |
-| `limit(f, x, at[, side])` | the limit as x → at | `side` 1 is from above, -1 from below; `at` may be `inf`; sides that disagree give "—" |
-| `sum(f, k, a, b)`, `prod(f, k, a, b)` | Σ or Π over whole k from a to b | at most 10000 terms; for an infinite series use a large bound or the closed form |
-| `solve(f = g, x, lo, hi)` | a root inside [lo, hi] | the leftmost sign change of f − g; "—" when there is none |
-| `taylor(f, x, c, n, at)` | the degree-n Taylor polynomial around c, at `at` | n up to 30, and it may come from a slider |
-
-Results are good to about ten significant digits. "—" means the value could not
-be computed reliably: a divergent integral or limit, a point where the derivative
-does not exist, no root in the interval, or more work than one card may spend.
-It is never a guess. Calculus may nest three deep, so a double integral works.
-
-## Showing results
-
-- `formula "integral(x^2, x, 0, a)" label="Area"` typesets the expression and
-  appends its live value. `digits=` sets significant digits (default 6). An
-  equation such as `formula "a^2 + b^2 = c^2"` is shown without a value.
-- `metric "Area" value="integral(x^2, x, 0, a)" digits=6` gives the headline
-  figure.
-- In sentences, `{area}` shows a value with tiny ones in exponent form, while
-  `{fmt(area, 4)}` fixes four decimals and so rounds a tiny value to 0.0000.
-- `plot fn="f(x)"` draws up to four curves. Its options are `from=` and `to=`
-  (default -5 to 5), `ymin=` and `ymax=`, `labels=`, and `var=t` for another
-  variable name. `mark=` puts a point on the first curve, `tangent=true` draws
-  the tangent there, and `shadeFrom=` with `shadeTo=` shades the area under the
-  first curve. The plot prints the marked point, the slope, and the shaded area
-  beneath itself.
-
-## Recipes
-
-Area under a curve:
-
-```dil
-@state b = 2 min=0.5 max=4 step=0.1
-card "Area under y = x² from 0 to b"
-  slider "Upper limit b" bind=b
-  formula "integral(x^2, x, 0, b)" label="Area"
-  plot fn="x^2" from=0 to=4 shadeFrom=0 shadeTo=b
-  callout "The exact area is b³/3."
+```html
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.css">
+<p>The area under $f(x) = x^2$ from $0$ to $a$ is</p>
+<p id="result">$$\int_0^{a} x^2\,dx = \frac{a^3}{3}$$</p>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16/dist/contrib/auto-render.min.js"></script>
+<script>
+renderMathInElement(document.body, {
+  delimiters: [{ left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false }],
+  throwOnError: false,
+})
+</script>
 ```
 
-A derivative and its tangent:
+A formula that follows a slider is redrawn with
+`katex.render(tex, element, { displayMode: true, throwOnError: false })` in the
+update function. In a JavaScript string, double every backslash: `'\\frac{1}{2}'`.
 
-```dil
-@state p = 1 min=-2 max=2 step=0.1
-@calc slope = deriv(x^3 - 3x, x, p)
-card "Tangent to y = x³ − 3x"
-  slider "Point p" bind=p
-  plot fn="x^3 - 3x" from=-2.5 to=2.5 mark=p tangent=true
-  metric "Slope f′(p)" value=slope digits=4
-  text "The tangent is flat where f′(p) = 3p² − 3 = 0, at p = ±1."
+## Plotting a function
+
+Sample the function across the visible range, a few hundred points, and break
+the curve where the value is not finite or jumps off the plot, so an asymptote
+is not drawn as a vertical line. Keep axes, ticks, and the sampled range in one
+place:
+
+```js
+function plotPath(f, x0, x1, y0, y1, width, height) {
+  const X = x => (x - x0) / (x1 - x0) * width
+  const Y = y => height - (y - y0) / (y1 - y0) * height
+  let d = ''
+  let pen = false
+  for (let i = 0; i <= 400; i++) {
+    const x = x0 + (x1 - x0) * i / 400
+    const y = f(x)
+    if (!Number.isFinite(y) || y < y0 - (y1 - y0) || y > y1 + (y1 - y0)) { pen = false; continue }
+    d += `${pen ? 'L' : 'M'}${X(x).toFixed(1)} ${Y(y).toFixed(1)}`
+    pen = true
+  }
+  return d
+}
 ```
 
-A Taylor approximation that improves with its degree:
+Put the result in a `<path>` with `style="stroke: var(--series-1); fill: none"`.
+Label the axes, mark the point the reader controls, and print its coordinates.
 
-```dil
-@state n = 3 min=1 max=15 step=1
-card "Taylor polynomial of sin x at 0"
-  slider "Degree n" bind=n
-  plot fn=["sin(x)", "taylor(sin(t), t, 0, n, x)"] from=-6 to=6 ymin=-2 ymax=2 labels=["sin x", "degree n"]
-  formula "taylor(sin(t), t, 0, n, 2) - sin(2)" label="Error at x = 2" digits=3
+## dsh.math
+
+Plain sampling gets integrals, derivatives, and limits wrong near trouble.
+`dsh.math` computes them to about ten digits, and returns `NaN` where it cannot
+reach that accuracy, instead of a wrong number. Show `—` for `NaN`, and say why.
+
+- `dsh.math.integrate(f, a, b)`: adaptive Gauss–Kronrod. Takes `-Infinity` and
+  `Infinity` as bounds and integrable endpoint singularities such as
+  `1 / Math.sqrt(x)` on `[0, 1]`. A divergent integral gives `NaN`.
+- `dsh.math.derivative(f, x, order)`: order 1 (the default) or 2, by Ridders'
+  extrapolation. A corner such as `Math.abs` at 0 gives `NaN`.
+- `dsh.math.limit(f, x, side)`: side `-1`, `1`, or `0` for both, which must
+  agree. `x` may be `Infinity`. Handles removable singularities such as
+  `Math.sin(x) / x` at 0.
+- `dsh.math.root(f, lo, hi)`: a root where `f` changes sign in `[lo, hi]`, the
+  leftmost one found; `NaN` when there is none.
+- `dsh.math.gamma`, `erf`, `factorial`, and `binomial(n, k)`.
+
+```html
+<label>Upper limit a <input id="a" type="range" min="0.5" max="3" step="0.1" value="2"> <span id="a-out">2.0</span></label>
+<div class="row">
+  <div class="metric"><span class="label">Exact ∫₀ᵃ sin(x)/x dx</span><span class="value" id="exact">1.605</span></div>
+  <div class="metric"><span class="label">Left sum with 6 strips</span><span class="value" id="rough">1.692</span></div>
+</div>
+<p class="muted" id="gap">The rough sum is off by 0.087.</p>
+<script>
+const f = x => (x === 0 ? 1 : Math.sin(x) / x)
+function update() {
+  const a = Number(document.getElementById('a').value)
+  const exact = dsh.math.integrate(f, 0, a)
+  let rough = 0
+  for (let i = 0; i < 6; i++) rough += f(i * a / 6) * a / 6
+  document.getElementById('a-out').textContent = a.toFixed(1)
+  document.getElementById('exact').textContent = Number.isNaN(exact) ? '—' : exact.toFixed(3)
+  document.getElementById('rough').textContent = rough.toFixed(3)
+  document.getElementById('gap').textContent = `The rough sum is off by ${Math.abs(rough - exact).toFixed(3)}.`
+}
+document.addEventListener('input', update)
+update()
+</script>
 ```
 
-A limit approached numerically:
+## Typed expressions with math.js
 
-```dil
-@state h = 0.5 min=0.01 max=1 step=0.01
-card "sin(x)/x near 0"
-  slider "x" bind=h
-  formula "sin(h)/h" label="Value at x"
-  formula "limit(sin(x)/x, x, 0)" label="Limit"
-  plot fn="sin(x)/x" from=-10 to=10 mark=h
+When the reader types the function, parse it with math.js instead of `eval`,
+and show a parse error beside the field:
+
+```js
+let f = () => NaN
+function read(text) {
+  try {
+    const compiled = math.compile(text)
+    f = x => compiled.evaluate({ x })
+    f(1)
+    note.textContent = ''
+  } catch (error) {
+    note.textContent = error.message
+  }
+}
 ```
 
-An equation solved inside an interval:
+`math.derivative(text, 'x').toString()` gives a symbolic derivative to show, and
+`math.simplify` tidies it.
 
-```dil
-@state c = 2 min=0.5 max=10 step=0.5
-card "Where does cos x = x / c?"
-  slider "c" bind=c
-  formula "solve(cos(x) = x / c, x, 0, 10)" label="x" digits=8
-  plot fn=["cos(x)", "x / c"] from=0 to=6 labels=["cos x", "x / c"]
-```
+## What makes a good math widget
 
-Partial sums of a series:
-
-```dil
-@state n = 10 min=1 max=1000 step=1
-card "Σ 1/k² approaches π²/6"
-  slider "Terms n" bind=n
-  formula "sum(1/k^2, k, 1, n)" label="Partial sum" digits=8
-  formula "pi^2/6 - sum(1/k^2, k, 1, n)" label="Remaining" digits=3
-```
+- Show the object, not just the number: the shaded area, the tangent line, the
+  partial sums approaching the limit.
+- Let the reader move the one quantity the lesson is about, and print the exact
+  value next to the approximation.
+- Typeset every formula, including the ones in labels.
+- Keep the scale fixed while a slider moves, so changes are visible, unless the
+  lesson is about scale.

@@ -2,120 +2,92 @@
 
 ## Sources
 
-OpenAI has published no specification or API for Intelligent UI. Everything known about the original comes from third parties:
+Neither OpenAI nor Anthropic has published a specification for its interactive answers. What is known comes from these:
 
-- [How ChatGPT Intelligent UI works](https://www.openui.com/blog/how-chatgpt-intelligent-ui-works) — Thesys (OpenUI) engineering, published one day after the feature shipped. They reimplemented OpenAI's server compiler to byte parity and ran the unmodified sandbox runner locally, so the wire format, the compiled program, and the operation stream below are observed, not inferred. This is the primary source for everything in "The original".
-- [GPT-6 for everyone](https://openai.com/index/gpt-6-for-everyone/) — OpenAI's announcement. It returned 403 to automated readers, so its wording is known only through press coverage such as [@DIME](https://dime.jp/genre/2162284/). The behaviour claims here come from the teardown instead.
-- [Open Intelligent UI](https://github.com/CopilotKit/OpenIntelligentUI) — CopilotKit's open-source answer to the same problem, which took the other architectural branch (free HTML in a sandbox) and is cited here as the contrast.
-- [A2UI](https://github.com/a2ui-project/a2ui) — Google's declarative generative-UI specification, whose flat component list this plugin's compiled program resembles.
+- [How ChatGPT Intelligent UI works](https://www.openui.com/blog/how-chatgpt-intelligent-ui-works) — Thesys (OpenUI) engineering, published one day after the feature shipped. They reimplemented OpenAI's server compiler to byte parity and ran the unmodified sandbox runner locally, so the wire format and the operation stream below are observed, not inferred.
+- [GPT-6 for everyone](https://openai.com/index/gpt-6-for-everyone/) — OpenAI's announcement, known here through press coverage such as [@DIME](https://dime.jp/genre/2162284/); the behaviour claims come from the teardown instead.
+- Claude's inline visuals — Anthropic's version, known here from the guidance its own drawing tool hands the model, read in a Claude session on 2026-11-16, and from using it.
+- [Open Intelligent UI](https://github.com/CopilotKit/OpenIntelligentUI) — CopilotKit's open-source answer, which takes the same branch as Claude.
 
 Where a statement below is an inference rather than an observation, it says so.
 
-## The original
+## Two ways to answer with an interface
 
-### The model writes a language, not markup
+### A compiled language in a worker (ChatGPT)
 
-The model emits **DIL**: Markdown prose, JSX-like component tags, and JavaScript for state and logic.
+The model writes DIL: Markdown prose, JSX-like component tags, and JavaScript for state and logic. The server compiles it into a program plus a constants table, repairing what is half-written and validating every property against a catalog of about seventy native components. The program runs in a Web Worker inside a sandboxed frame, stripped of its network, timers, and messaging before anything is evaluated; a small reconciler inside diffs each render and sends the page an operation list (`CREATE #9 slider`, `SET min=1`). The page draws its own components from those operations and rejects any type it does not know, so the result looks native and model output cannot introduce markup. For anything the catalog cannot express there is `AppBlock`: a whole HTML application in a sandboxed frame.
 
-```
-## Team plan estimate
-Drag the slider to see the **monthly price** for your team.
-{@body const [seats,setSeats] = DIL.useState(8)}
-{@body const price = seats*29}
-<box border padding={3} gap={2}>
-  <slider min={1} max={50} value={seats} onChange={setSeats}/>
-  <title size="xl">${price}/mo</title>
-</box>
-```
+The teardown also measured what went wrong: 83% of streamed bytes were resent program, interaction state was lost on reload, the model could not see what the reader changed, a follow-up never modified an existing interface, logic errors were silent, and compiler diagnostics never reached the model.
 
-One design constraint explains the whole language: it must be writable token by token **and usable while half-written**. Statements occupy their own lines and any open element can be auto-closed, so the server can cut the source at its last complete construct and still compile something.
+### The model's own code in a sandboxed frame (Claude)
 
-### The server compiles, and the compiler is where the value is
+The model writes an HTML fragment or an SVG element, with styles first, content next, and scripts last. It streams into a sandboxed frame as it is written, and the scripts run once it is complete. The frame carries the host's colour variables and pre-styled controls, so bare HTML already looks like the host; it may load libraries from an allowlist of CDNs; and a `sendPrompt` function turns a click into the reader's next message. Written guidance carries the design judgement: when to draw, how to keep it on-brand, and that a diagram of a system with a control should give the reader that control.
 
-The response is compiled into a JavaScript program plus a JSON document, stored on the message under a metadata key. Five things happen there, and all five are the reason the result feels native:
+That branch is more expressive — any chart library, a 3D scene, a physics simulation, a game — and its look is guidance rather than a guarantee. CopilotKit's version works the same way, with the parameter order (CSS before HTML) as a contract so that a styled skeleton appears first.
 
-1. **Lowering.** Tags become `__dil.jsx(…)` calls, so the client needs no parser for the language.
-2. **Error isolation.** Every expression is wrapped in a safe-evaluation helper, so one throwing expression drops one element instead of the render.
-3. **Text and constants separate.** Static text is hoisted into a `constants` table, so as the answer streams "the growing text changes the data rather than the program".
-4. **Stable state keys.** A state value carries its key, so a slider the reader moved to 9 does not snap back on the next recompilation.
-5. **Repair and validation.** Incomplete statements are dropped, unclosed elements are closed, and invalid properties are removed against the component catalog and recorded as diagnostics such as `unknown_prop` and `invalid_literal`.
+## What this plugin does
 
-### The sandbox runs the program and sends back operations
+It takes the second branch, as one engine, and keeps what the plugin had built on DeepSeek Harness that neither original has. Each layer maps onto a mechanism the harness documents for plugins.
 
-The compiled program runs in a hidden `runner.html` frame with `sandbox="allow-scripts"` and a `default-src 'none'` policy, which starts a Web Worker. Before evaluating anything the worker removes its own network, timer, messaging, and dynamic-evaluation capabilities and freezes what remains; the program is then evaluated with `new Function` under a watchdog.
-
-The runtime inside is a small reconciler. It renders, keeps hook state in keyed slots, diffs against the previous tree, and encodes the difference as an operation list — `CREATE #9 slider`, `SET min=1`, `PLACE under #8 at 0`. **Functions never leave the worker**: a handler crosses as an identifier such as `fn#1`. The page applies operations by instantiating its own components and rejects any operation naming a type it does not know, so model output cannot introduce markup or styling.
-
-Dragging the slider sends a handler identifier and its arguments to the worker, which recomputes and returns a new operation list. **No model call happens.**
-
-### The catalog is the real interface
-
-Around seventy native components, design tokens for spacing, radius, colour, and size, and a 4px scale — `padding={3}` renders as 12px, `gap={2}` as 8px. The teardown's own conclusion matches the designers': the hard part of generative UI is not generating it, but making it "feel like it actually belongs".
-
-### What the original got wrong
-
-The same teardown measured the shipped behaviour, and the failures are more useful than the successes:
-
-- **83% of streamed bytes were resent program.** A 6,341-character answer produced about 275 KB of patches because the program is one nested expression whose closing brackets change on every recompile, so it cannot be appended — only replaced.
-- **State resets on reload.** Interaction state was sent to a view-state endpoint and lost.
-- **The model cannot see interface state.** Asked directly, it could not report values the reader had changed; it only ever receives the text a follow-up button constructed.
-- **A follow-up never modifies the existing interface.** Every turn produces a new program.
-- **One click resent unchanged properties**: 158 operations, 4 of which changed anything.
-- **Logic errors are silent.** One captured dashboard changed a revenue figure from $6,930 to $256,410 when the metric was switched, and nothing reported it.
-- **Compiler diagnostics did not reach the model**, which repeated the same rejected property in later answers.
-
-## The other branch
-
-CopilotKit's Open Intelligent UI sends the model's raw HTML, CSS, and JavaScript into a null-origin iframe with a content policy that allowlists four CDNs, and reaches the host through a validated message bridge. Its parameter order is a contract — `initialHeight`, `placeholderMessages`, `css`, `html`, `jsFunctions`, `jsExpressions` — because CSS arriving first lets the reader see a styled skeleton before the markup lands.
-
-That branch is more expressive and much harder to keep on-brand; its own documentation calls the output "unpredictable" and styling it "a dial, not a guarantee". Google's A2UI takes the third position explicitly: a declarative data format, never executable code, "safe like data, but expressive like code".
-
-## What this plugin reproduces
-
-The architecture, not the training. Each layer maps onto a mechanism DeepSeek Harness already documents for plugins.
-
-| Original layer | This plugin |
+| Layer | This plugin |
 |---|---|
-| Model emits a component language | The model calls one tool, `ui_render`, with a DIL program in `source`: one statement per line, components nested by indentation, a quoted string filling a component's main text, and `{…}` interpolation in any text. A JSON envelope is also accepted. |
-| Server compiles to a program plus constants | `src/lang/compile.ts` validates against the catalog, lowers readable expressions such as `seats * 29` to a closed JSON union, hoists literal text into a constants table, and repairs the tree instead of failing it, reporting every repair to the model. |
-| Program persisted with the message | The compiled program rides in `output.presentationMeta`, which the harness persists as `tool/result.meta` and replays on reload. |
-| Sandboxed runtime, operations to the page | The browser evaluates the program's expressions with the same total evaluator the host used and draws through a fixed registry keyed by catalog type, and an SVG drawing through a fixed table of elements. No model text is ever executed. |
-| Interface shown with the answer | Inside the answer, where the model called the tool. A Conversation Definition of the plugin's own builds one Chat node per `ui_render` call from the call's streamed argument deltas, its `tool/call`, and its `tool/result`, a hair after the call's tool row and at the `turn` group-tree position, so a finished turn folds its process rows around the card and the card stays between the text written before the call and the text written after it. The node previews the card while the arguments stream, compiled in the browser, and draws the settled program after; the tool row stays a status line beside it. A data-only Definition publishes each turn's cards, from which a card redrawn in the same turn leaves the reply. |
-| Component catalog plus design tokens | One table in `src/lang/catalog.ts` is the model's documentation, the validator's schema, and the renderer's allowlist; every colour, radius, and font is a host theme token, apart from the colours inside an SVG drawing. |
-| Buttons continue the conversation | A button sends its prompt through the session's own composer, as an ordinary user message, and the card locks after one send. A fill-in sentence (`blanks`) sends the same way: the sentence with the reader's answers in brackets, which the model grades; the card never holds the answer key. |
+| The model writes a widget | One tool, `ui_render`, with the widget in `source`: an HTML fragment or one `<svg>`, styles first, then content, then scripts; plus an optional `title` and `revises`. The description (under 4000 characters) names what the frame provides; a bundled skill carries the judgement and complete widgets. |
+| Checked before it is shown | `src/host/check.ts` compiles each inline script, module, and handler with `node:vm` — compiled, never run — so a syntax error comes back with its line and the model rewrites the widget in the same turn. Blocked addresses and habits the sandbox defeats come back as notes on a widget that is shown. |
+| Persisted with the message | The checked source rides in `output.presentationMeta` (`version: 2`), which the harness persists as `tool/result.meta` and replays on reload. The model reads a summary: shipped libraries, fetched addresses, control ids, what its buttons send, the visible text, and its card id. |
+| Shown inside the answer | A Conversation Definition of the plugin's own builds one Chat node per call, a hair after the call's tool row and at the `turn` group-tree position, so the widget stands between the text written before the call and the text written after it, and a finished turn folds its process rows around it. The tool row stays a status line. |
+| Streaming | The node shows the widget while its arguments stream: the page posts each prefix to the frame, which morphs it into the body with every handler stripped and no script run, keeping unchanged elements so it does not flicker. When the result lands, the frame runs the scripts in document order, as a page load would. The frame is one element throughout and never reloads. |
+| Native look | The page reads the chat's theme tokens and sends them into the frame as short variables; a base stylesheet styles bare buttons, inputs, sliders, selects, tables, and code like the host's, and adds a few classes, nine colour ramps, and six series colours, in both themes. |
+| Libraries | Fifteen libraries ship with the plugin, pinned by version and digest. A widget names them by their usual CDN address; when the address names a shipped library and major version, the frame loads the shipped copy, so it works offline. Anything else loads from the allowlisted CDNs. |
+| Clicks continue the conversation | `sendPrompt(text)`, a button with `data-prompt`, or a form with `data-send` sends the reader's next message through the session's own composer, as an ordinary user message. |
+
+### The security boundary
+
+The model's code never runs in the page. It exists only inside one kind of frame:
+
+- `sandbox="allow-scripts allow-forms"`: no same origin, so no access to the page, its storage, or its cookies; no top navigation, popups, modals, or downloads. Forms are allowed only so that `submit` events fire for the widget's own handlers.
+- An empty `allow`, so no camera, microphone, or location, and no referrer.
+- A content policy in the frame's own document: `default-src 'none'`, with scripts, styles, fonts, images, and requests let through only inline, from `blob:` and `data:`, and from four CDNs (cdnjs, jsDelivr, unpkg, esm.sh) and Google Fonts; `frame-src`, `object-src`, `form-action`, and `base-uri` are `'none'`.
+- The frame's document holds no part of the widget: the source arrives by message. Nothing the page sends in carries a token, a session id, or another card's data.
+- The page trusts nothing the frame sends. Every message is checked against its shape and the limits; a message to send or a link to open goes out only when the reader has just clicked inside that frame, at most once a second; a link must be http or https; kept values are bounded JSON the page stores without reading.
+- A frame that loads a second time has navigated away from its document, and is removed.
+- The page's own code never writes markup: no `innerHTML`, no `dangerouslySetInnerHTML`. Only the runtime inside the frame parses HTML.
+
+`tests/isolation.test.ts` holds the page code to these rules mechanically.
 
 ### Deliberate differences
 
-**No code execution.** The original evaluates model-authored JavaScript in a hardened worker. This plugin has no such layer: expressions are a closed JSON union with no member access, no call form beyond a fixed table of math functions and seven calculus operators, and no dynamic evaluation, so the sandbox is the type system. A program is lossless JSON, and every evaluation runs on a work budget.
+**Errors reach the model.** A syntax error is caught before the widget is shown, with its line, while the model can still fix it in the same turn. A runtime error is listed under the widget with a button that sends it, with the card id, as the reader's next message, so the model redraws it with `revises`. The originals' diagnostics did not reach their models.
 
-**The streamed channel is the source, not the program.** The original recompiles partial source and resends the whole program, which is where its 83% waste comes from. Here the browser compiles the arriving lines itself for the preview, and the compiled program is persisted once, when the result lands. Nothing is resent.
+**What the reader set survives a reload.** The frame keeps every control with an id, and whatever a widget stores with `dsh.state`, by sending it to the page, which writes it to the browser's local storage, keyed by session and call, for the 200 most recent cards. A reload, a scroll back, or a restart shows the widget as the reader left it. It belongs to that viewer: another browser, and the session log, still start from the widget as the model wrote it.
 
-**Failures are visible and forgiving.** A rejected prop names itself, the accepted values, and the repair. A bad optional prop is dropped on its own, a component without a parent joins the nearest card, and only an empty program fails. A truncated program says so to the model. Dividing by zero renders an empty figure rather than a wrong one.
+**A follow-up revises a widget.** Each result tells the model its card id; a later call with `revises=` that id draws a new widget that starts from the earlier one's kept values. The earlier widget is not deleted — the session log keeps every result — but it is no longer shown in full: redrawn in the same turn, it leaves the reply; revised in a later turn, it folds to a line the reader can open.
 
-**The model sees what it built.** The tool result tells the model what a text-only reader sees, with the figures computed, and lists what the compiler repaired, so the next call is cleaner — the original's diagnostics never reached its model.
+**Libraries are local first.** The originals load libraries from CDNs. Here the common ones ship with the plugin, as lazily loaded files fetched only when a widget names one, so a widget works offline and leaks nothing to a CDN; the CDN remains for everything else.
 
-**The catalog is scoped to what the host can style natively.** Thirty-six components rather than seventy, each drawn from theme tokens. A smaller catalog the model uses correctly is worth more than a large one it half-remembers.
+**Numbers come with error control.** `dsh.math` offers integration (adaptive Gauss–Kronrod, infinite bounds), derivatives (Ridders extrapolation, refusing at a corner), limits, and root finding; each returns `NaN` rather than a number it cannot vouch for.
 
-**Mathematics is computed, not written.** The original's cards show figures the model computed. Here a card can carry the computation itself: integrals (adaptive Gauss–Kronrod, with infinite bounds), derivatives (exact, by Taylor-mode automatic differentiation over the expression tree), limits (extrapolated, refusing when the sides disagree), finite sums and products, roots (Brent's method), and Taylor polynomials, with `plot` and `formula` to show them. A figure the engine cannot vouch for is shown as "—" rather than guessed, and the tool result hands the model the computed figures, so the reply and the card agree. Formulas are typeset by the plugin's own spans: React 18 cannot create MathML, and the host's KaTeX is not a plugin dependency.
-
-**A drawing is data, even when it is SVG.** A `canvas` draws `shape` lines whose coordinates are expressions, so sliders, a player, and the reader's own dragging move them; the reader's drag and click write ordinary state, with no model call. A canvas may also hold a picture the model wrote as SVG, which is more expressive than any list of shapes, and is the plugin's one concession toward the other branch: it keeps its own colours, so it may not suit both themes. It still never reaches the page as markup. It is parsed, without a DOM, into a JSON tree of allowlisted elements and attributes and drawn through a fixed table, with no scripts, handlers, styles, links, images, embedded documents, filters, or animation, and with every reference inside the drawing. Nothing in it can run or load anything, and the browser checks a stored tree against the same lists. The drawing itself never moves; a `use` shape places a part of it by id, and turns, scales, and fades that part with expressions, so motion comes from state like everything else on the card.
-
-**Code is data, not a program.** A `code` block shows text exactly as written — no interpolation, no evaluation — from a `"""` text block in the source, the one statement that spans lines. The plugin colours it with its own small scanner, losslessly, in the host's syntax palette, so a listing in a card reads like the host's code blocks without the card pulling in the host's highlighter.
-
-**Reader edits outlive the page, in the reader's browser.** The original sent interaction state to a view-state endpoint and lost it on reload. Here a card's edits — values, open tabs, ticks, sorts, filters, hidden series, and a sent button — are written to the browser's local storage, keyed by session and call, for the 200 most recent cards. They belong to that viewer: another browser, another device, and the session log still start from the model's values. Nothing read back is trusted: every value is checked against the card's own declarations again, and a damaged entry is ignored.
-
-**A moving picture is a player, not a timer.** Animation is one number state that a `player` advances on the browser's animation frames, about thirty times a second; every figure that reads it recomputes, as it does for a slider. With `autoplay=true` it runs by itself only while its card is on screen, never when the reader's system asks for less motion, and the bar stays, so the reader can always pause it. Frames pass through the page without being stored; storage keeps the frame a run stops on. When a card is drawn twice, the copy that starts a run plays it and the other stops, so two clocks never drive one value.
-
-**A follow-up revises a card; it does not patch one.** The original never modified an existing interface. Here each result tells the model its card id, and a later call with `revises=` that id draws a new card that starts from the reader's values for the states with the same names. The earlier card is not deleted — the session log keeps every result — but it is no longer served: a card the model redrew in the same turn is left out of the reply, and one revised in a later turn folds to a line the reader can open. The model still writes whole programs — no operation stream, no patch by component id — so each card stays honest about what the model wrote.
-
-**The judgement travels as a skill.** The tool description is the language reference; a bundled skill, registered under the plugin's name, carries when to draw a card, how to shape it, and complete recipes, and the model loads it only when a task matches. The skill is a row of the bundle of its own, registered the way the host's own skill packages register theirs, so the Plugin Manager shows it as a part of the plugin.
+**The judgement travels as a skill.** The description stays short because it is sent with every request; a bundled skill, registered the way the host's own skill packages register theirs, carries the rest, and the model loads it only when a task matches.
 
 ### Deliberate give-ups
 
-**No free-form escape hatch.** The original offers `AppBlock`, an entire embedded web app. A plugin may not host a page in a slot, and a generated page belongs in the document preview as a file, not as a card.
+**No native components.** ChatGPT draws its own seventy components from operations; here the look is the host's through variables and a base stylesheet, which a widget can override. It is guidance, not a guarantee.
 
-**No half-written card after a stop.** When a turn stops while the model is still writing a card, the host hides the call's row and never records the arguments that had streamed, so there is nothing left to draw or to regenerate from without changing the host.
+**No services behind the widget.** Image search, entity and citation cards, map tiles, and product cards depend on services DeepSeek Harness does not offer plugins. A map can load its shapes from a CDN, as data.
+
+**No attachments.** A widget cannot add a file to the conversation: the host does not open its attachment loader to plugins.
+
+**The model does not see the widget.** It reads a summary of what it wrote, not a picture; the syntax check, the runtime error button, and `revises` are what close the loop.
+
+**No half-written widget after a stop.** When a turn stops while the model is still writing a widget, the host hides the call's row and never records the arguments that had streamed.
+
+**Cards from before the rewrite show text.** The DIL engine is gone; a card it drew shows the text version it stored.
+
+## Known risks
+
+- A widget's script can loop forever. Whether that freezes only the frame or the whole page depends on whether the browser puts the frame in its own process, and nothing in the page can stop a running script.
+- A frame can navigate itself to an outside address. The request leaves before the page sees the second load and removes the frame; what it can carry is what the widget already showed, as with a remote image in Markdown.
+- A widget is one to five thousand tokens rather than a few hundred, so it takes longer and costs more to write. Streaming shows it as it grows.
 
 ## Not verified
 
-The behaviour above is proven by the unit suite in jsdom with real React, on the web UI by the run of 0.2.1-alpha.4 recorded in `VERIFY.md`, and on the macOS and Windows desktop apps by the run of 0.2.1-rc.2 recorded there. The desktop apps load the same `dsh.client` declaration and the same bundle as the web UI, so what the cards do on all three hosts is the same code. Kept reader edits, revised cards, table tools, and charts of several series ran live on the web UI and the macOS desktop app on 2026-10-26, and drawings ran live on the web UI on 2026-11-05, as recorded there; drawings that play by themselves and replaced cards ran only in headless Chrome on the built bundle. Cards in the reply ran with the host's real conversation engine on 2026-11-11, replaying a recorded session in a throwaway `DSH_HOME`, but not yet with a live model. Four things are not proven: a desktop release newer than 0.2.1-rc.2, drawings on a desktop app, a drawing that plays by itself, a replaced card, or a card a live model places in its reply, and the failure seen on 0.2.0-rc.2, which drew no card and kept past conversations from opening — that build is below the engine range, the plugin refuses it, and no root cause was ever named for it.
+The rewrite is proven by the unit suite (jsdom with real React, the frame runtime read back out of the built bundle) and by headless Chrome on the built bundle: every widget the skill teaches ran with no error in both themes, shipped libraries loaded with the network refused, and a frame that navigated or sent without a click was stopped (`VERIFY.md`, Part 1). A live model has written a widget for this engine on the macOS desktop app (2026-11-17): it drew, its shipped library loaded offline, and its button sent the next message. The rest of Part 1 and the other two hosts are still open.

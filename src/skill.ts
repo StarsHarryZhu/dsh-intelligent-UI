@@ -12,7 +12,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { createSkillProvider, readSkillCandidate, type SkillsLike } from './host/skill.ts'
-import { PLUGIN_ID } from './lang/identity.ts'
+import { PLUGIN_ID } from './widget/identity.ts'
 
 /** The row's plugin name: the tool row's name with a suffix, so both stay under the plugin's own id. */
 export const name = `${PLUGIN_ID}-skill`

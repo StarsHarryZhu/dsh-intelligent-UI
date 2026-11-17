@@ -3,9 +3,10 @@
  *
  * Contributes, all under this plugin's own names: the `ui_render` tool row; one
  * Chat node renderer and the Conversation Definition that builds its nodes, so
- * each card stands in the reply where the model called the tool; one data-only
- * Conversation Definition that collects a turn's cards; the card copy; and one
- * stylesheet. Every contribution is an effect of this plugin's context, so
+ * each widget stands in the reply where the model called the tool; one
+ * data-only Conversation Definition that collects a turn's cards; the chrome
+ * copy; and one stylesheet. Widgets themselves run in sandboxed frames, which
+ * add nothing to the page. Every contribution is an effect of this plugin's context, so
  * unloading the plugin removes all of them and nothing else.
  *
  * `apply` takes the context only. Cordis passes the entry's config as a second
@@ -16,16 +17,22 @@
  * @module dsh-intelligent-ui/client
  */
 
-import { CARD_NODE_KIND, CHAT_NODE_SLOT, LOCALE_NS, PLUGIN_ID, TOOL_VIEW_SLOT, UI_TOOL_NAME } from '../lang/identity.ts'
+import frameCss from '../frame/base.css'
+import frameRuntime from '../frame/main.runtime'
+import { CARD_NODE_KIND, CHAT_NODE_SLOT, LOCALE_NS, PLUGIN_ID, TOOL_VIEW_SLOT, UI_TOOL_NAME } from '../widget/identity.ts'
+import { framePolicy } from '../widget/policy.ts'
 import { cardNodeDefinition } from './card-node.ts'
+import { loadChunk } from './chunks.ts'
 import { createEditsStore } from './edits.ts'
 import type { ClientContextLike, LocaleLike, SlotsLike, UiConversationLike } from './host.ts'
+import { createLibraryLoader } from './libraries.ts'
 import { en, zh } from './locales.ts'
 import { createCardNodeView } from './node-view.tsx'
 import { createPresence } from './presence.ts'
 import css from './styles.css'
 import { createToolView } from './toolview.tsx'
 import { turnDataDefinition } from './turn-data.ts'
+import type { WidgetEnv } from './widget.tsx'
 
 export const name = PLUGIN_ID
 
@@ -43,10 +50,14 @@ export function apply(ctx: ClientContextLike): void {
     console.error(`${PLUGIN_ID}: the slots service is missing, so no card can render`)
     return
   }
-  const store = createEditsStore()
-  const presence = createPresence()
-  const ToolView = createToolView(store, presence)
-  const CardNodeView = createCardNodeView(store, presence)
+  const env: WidgetEnv = {
+    store: createEditsStore(),
+    presence: createPresence(),
+    parts: { runtime: frameRuntime, css: frameCss, policy: framePolicy() },
+    loadLibraries: createLibraryLoader(loadChunk),
+  }
+  const ToolView = createToolView(env)
+  const CardNodeView = createCardNodeView(env)
 
   guard('dictionaries', () => {
     if (locale !== undefined) ctx.effect?.(() => locale.register(LOCALE_NS, { zh, en }), `${PLUGIN_ID}: dictionaries`)

@@ -2,40 +2,38 @@
 
 ## 1. Role
 
-Intelligent UI for DeepSeek Harness: a **fully plugin-based** take on ChatGPT's
-Intelligent UI architecture. Its Chinese name, which the Plugin Manager shows from
-`locale/zh.json` and `README-zh.md` uses as its title, means "progressive
-interaction". The model writes a small, catalogued interface
-program, the chat renders it as a native card, and every control change
-recomputes in the browser with **zero model calls**.
+Intelligent UI for DeepSeek Harness: interactive widgets in the chat, as Claude
+and ChatGPT draw them, **fully plugin-based**. Its Chinese name, which the Plugin
+Manager shows from `locale/zh.json` and `README-zh.md` uses as its title, means
+"progressive interaction". The model writes a widget in HTML, SVG, CSS, and
+JavaScript; the chat runs it in a sandboxed frame inside the reply, where the
+model called the tool, styled like the host in both themes; every control
+recomputes in the browser with **zero model calls**, and a click can send the
+reader's next message.
 
-A reply can carry an interactive interface: an estimate the reader adjusts, a
-comparison table, a small chart, a function plot with a tangent or a shaded
-integral, a typeset formula with its live value, a short form, or a quiz question
-answered with one click, or a drawing the reader can reshape. The model never
-writes HTML, CSS, or JavaScript, and the browser never evaluates model text; SVG
-it writes for a drawing is read into a checked tree of allowed elements. What crosses the wire is a validated program
-over a fixed component catalog and a closed expression language, so a card
-inherits the host's own typography, spacing, and theme instead of approximating
-them.
+A reply can carry anything a small web page can do: an estimate the reader
+adjusts, a chart, a diagram the reader clicks, a typeset formula with a live
+plot, a simulation, an animation stepped through, a quiz or a form whose answers
+go back to the model, a small game. Fifteen common libraries ship with the
+plugin and load offline; anything else loads from four allowlisted CDNs.
 
-Why it exists: answering "what does this cost if…" or "what is this integral
-when…" with a sentence forces the reader to ask again for every variation. A card
-keeps the answer and the exploration in one place without spending a request per
-variation, and a button turns a choice into the next message without retyping it.
+Why it exists: answering "what does this cost if…" or "how does this algorithm
+work" with a paragraph forces the reader to ask again for every variation. A
+widget keeps the answer and the exploration in one place without spending a
+request per variation, and a button or a form turns a choice into the next
+message without retyping it.
 
 How it fits the host: the bundle mounts two rows. The tool row registers one
-tool, `ui_render`, which compiles the model's source and persists the compiled
-program as the tool result's presentation metadata; the skill row registers one
-skill, `dsh-intelligent-ui`, which teaches the model when and how to use the
-tool, the way the host's own skill packages register theirs. The browser half draws the
-program in the reply, where the model called the tool: a Chat node of its own,
-outside the process a finished turn folds, so the card sits between the text
-written before the call and the text written after it, with a live preview while
-the arguments stream. The call's tool row stays a one-line status beside it. It supports DeepSeek Harness
-0.2.1-rc.1 and later within 0.2.x on all three hosts it serves — the web UI,
-the macOS desktop app, and the Windows desktop app — through one `dsh.client`
-declaration, because the desktop apps wrap the same web client.
+tool, `ui_render`, which checks the model's source — every script compiled for
+its syntax, never run — and persists it as the tool result's presentation
+metadata; the skill row registers one skill, `dsh-intelligent-ui`, which teaches
+the model when and how to draw. The browser half draws each widget in the reply
+as a Chat node of its own, outside the process a finished turn folds, so it sits
+between the text written before the call and the text written after it, growing
+as the arguments stream. It supports DeepSeek Harness 0.2.1-rc.1 and later within
+0.2.x on all three hosts it serves — the web UI, the macOS desktop app, and the
+Windows desktop app — through one `dsh.client` declaration, because the desktop
+apps wrap the same web client.
 
 ## 2. Constraints
 
@@ -46,13 +44,13 @@ DeepSeek Harness checkout: no change to `packages/`, `apps/`, `docs/`, or any
 tracked file, no pnpm workspace membership, no tsconfig aggregate entry.
 `git -C deepseek-harness status --porcelain` stays empty. The plugin reaches the
 host only through the published plugin contract: services on its context, slot
-registrations, and the module table's `react`.
+registrations, the module table's `react`, and the module loader's lazy files.
 
 **Zero new session data.** No new session event type, ever, and no direct writes
-to a session log. A button sends an ordinary user message through the session's
-own composer. Whatever reaches the model is reconstructable from events the host
-already defines, which is what makes "uninstall the plugin and every session still
-opens" true.
+to a session log. A widget's message is an ordinary user message sent through the
+session's own composer. Whatever reaches the model is reconstructable from
+events the host already defines, which is what makes "uninstall the plugin and
+every session still opens" true.
 
 **Registered surface, exactly, all under this plugin's own names.** Host: two
 bundle rows, `dsh-intelligent-ui` with one tool, `ui_render`, and
@@ -61,71 +59,92 @@ bundle rows, `dsh-intelligent-ui` with one tool, `ui_render`, and
 `ui_render`; one keyed `conversation.chat.node` cell under
 `dsh-intelligent-ui.card` with the Conversation Definition of that kind that
 builds its nodes, one per `ui_render` call, registered and removed together; one
-data-only Conversation Definition of kind `dsh-intelligent-ui` (it publishes Turn
-data and builds no view node); one dictionary namespace; and one
-`<style data-plugin="dsh-intelligent-ui">`. A Chat node kind is a view of events
-the host already records, not session data. No store, no settings namespace, no
-replacement of a shipped cell, no agent-loop change, no assistant renderer.
+data-only Conversation Definition of kind `dsh-intelligent-ui`; one dictionary
+namespace; and one `<style data-plugin="dsh-intelligent-ui">`. No store, no
+settings namespace, no replacement of a shipped cell, no agent-loop change, no
+assistant renderer.
+
+**The security boundary.** The model's code runs only inside a widget frame, and
+the page treats the frame as hostile. `tests/isolation.test.ts` enforces each
+rule that can be checked in code.
+1. One kind of frame: an `<iframe>` with `sandbox="allow-scripts allow-forms"`
+   (`FRAME_SANDBOX`) — no same origin, top navigation, popups, modals, or
+   downloads; forms only so `submit` events fire — an empty `allow`, and no
+   referrer.
+2. The frame's own document carries a content policy (`framePolicy()`):
+   `default-src 'none'`; scripts, styles, fonts, images, and requests only
+   inline, from `blob:` and `data:`, and from cdnjs, jsDelivr, unpkg, esm.sh,
+   and Google Fonts; `frame-src`, `object-src`, `form-action`, and `base-uri`
+   `'none'`.
+3. The page never writes the model's markup and never runs its code: no
+   `innerHTML` and no `dangerouslySetInnerHTML` outside `src/frame/`, no
+   evaluation, no timers; the widget reaches the frame by `postMessage` only.
+4. The frame receives only the widget's source, the theme, the language, the
+   shipped libraries it names, and what that card itself kept: never a token, a
+   session id, or another card's data.
+5. Every message from a frame is checked against its shape and the limits in
+   `src/widget/policy.ts`. A message to send or a link to open (http or https
+   only) goes out only right after the reader clicked inside that frame, at most
+   once a second; kept values are bounded JSON; heights are clamped; errors are
+   cut short.
+6. A frame that fires `load` a second time has navigated away and is removed.
+7. Kept values are stored and handed back to the same frame; the page never
+   interprets them.
+Widening any of these is a security change: argue it here first.
+
+**The host half never runs the model's code.** `src/host/check.ts` compiles
+scripts with `node:vm`'s `new Script`, which parses without executing, and is
+the only file that imports `node:vm`.
 
 **The browser half imports nothing from the harness.** Only `react` and
-`react/jsx-runtime` leave the bundle, and the build fails on any other request.
-Host components are matched by copying their look into this plugin's own
-stylesheet, never by requiring a harness client package — which is also why
-formulas are typeset by this plugin rather than by the host's KaTeX.
+`react/jsx-runtime` leave the bundle, plus `require.async` of this package's own
+`client.lib-*.js` files; the build fails on any other request. Host components
+are matched by copying their look into this plugin's own stylesheets, never by
+requiring a harness client package.
 
 **`apply` takes the context only.** Cordis calls `apply(ctx, config)`, and a page
 entry's config is `undefined`; React comes from `require('react')`. Every browser
 contribution is registered inside its own `try`/`catch`, because a throw from
 `apply` marks the whole page's boot as failed.
 
-**Model output is data.** A compiled program is lossless JSON: no functions, no
-`eval`, no `new Function`, no element created from a model-supplied name. A
-renderer is reached only through the fixed registry keyed by catalog type, so an
-unknown type draws nothing; a math function is reached only through the fixed
-function table. No iframe, no Worker, no network access, and no timers in the
-browser half. Its one use of browser storage is the reader's own edits, kept in
-local storage by `src/client/edits.ts` alone, bounded, and never read back
-without checking each value against the card's declarations.
-
-**Bounded work.** Every evaluation draws on a work budget, calculus nests at most
-three deep, and a value that cannot be computed reliably is shown as "—", never
-as a guess. A program can make a card show nothing; it cannot make the page stall.
+**Shipped libraries are pinned and licensed.** Each is listed in
+`vendor/manifest.json` with an exact version, a SHA-256 per file, and a license
+that allows redistribution, whose text ships in `lib/licenses/`. The build
+refuses a file that does not match.
 
 **Three platforms, one registration.** The plugin must work on the web UI, the
 macOS desktop app, and the Windows desktop app. `dsh.client.platform` is `"web"`
 — the only value the module registry serves — and that one declaration is also
-what both desktop apps load, because they wrap the same web client; support is
-therefore a fact about this bundle, not a second build. `engines.dsh` is
-`>=0.2.1-rc.1 <0.3.0-0`, the range the host enforces, so a desktop app below
-it refuses the plugin rather than running it unverified. Nothing in either half
-branches on the operating system, and a defect seen on one platform blocks a
-release the same way a web one does. The package installs from a git checkout
-without a build step, so `lib/` is committed, no install-time script exists, line
-endings are pinned by `.gitattributes`, and the repository holds no symbolic link.
+what both desktop apps load. `engines.dsh` is `>=0.2.1-rc.1 <0.3.0-0`, the range
+the host enforces. Nothing branches on the operating system. The package
+installs from a git checkout without a build step, so `lib/` is committed, no
+install-time script exists, line endings are pinned by `.gitattributes`, and the
+repository holds no symbolic link.
 
-**No literal styling.** Every colour, radius, and font in `src/client/styles.css`
-comes from a host theme token, every selector is scoped under a `.dsh-iui-` class,
-and layout spacing is whole steps of 4px. Inside a typeset formula, spacing is in
-em, as mathematical spacing must scale with the formula.
+**No literal styling in the chrome.** Every colour, radius, and font in
+`src/client/styles.css` comes from a host theme token, every selector is scoped
+under a `.dsh-iui-` class, and layout spacing is whole steps of 4px. Inside the
+frame, `src/frame/base.css` maps the same tokens to short variables and carries
+the palette for the model's drawings.
 
 **Every registration is an effect.** Use the disposer a service's `register()`
 returns, inside `ctx.effect`. Unloading the plugin must remove every contribution.
 
-**Failures stay inside the card.** A malformed program, a program of another version, an
-unexpected host prop, or a client-side defect degrades that one card to readable
-text or to nothing. The surrounding transcript is not this plugin's to break.
+**Failures stay inside the widget.** Malformed meta, meta of another version, an
+unexpected host prop, a widget that throws, or a client-side defect degrades
+that one widget to a note, its text, or nothing. The surrounding transcript is
+not this plugin's to break.
 
-**One API version.** Programs and their envelope carry a `version` field set to
-`API_VERSION` (`src/lang/identity.ts`), currently 1. A client draws an API
-version it knows and shows the text of anything else, including cards persisted
-before the field existed. Fields are not dated one by one. The release version
-in `package.json` and the git tags is the maintainer's, and is independent of the
-API version. See `src/lang/AGENTS.md`.
+**One API version.** The persisted meta carries a `version` field set to
+`API_VERSION` (`src/widget/identity.ts`), currently 2: the widget's source.
+Version 1 was a DIL program; a card of version 1, or one without the field,
+shows the text version it carried. The release version in `package.json` and the
+git tags is the maintainer's, and is independent of the API version.
 
 **Naming.** `name` in `package.json` is the cordis row id, the client module id,
 the skill name, and the `__ModuleLoader__.load({ id })` key: one string,
-`dsh-intelligent-ui`, defined once in `src/lang/identity.ts`. The tool name is the
-slot key.
+`dsh-intelligent-ui`, defined once in `src/widget/identity.ts`. The tool name is
+the slot key.
 
 **Every folder documents itself.** Each directory holds an `AGENTS.md` with exactly
 the four sections of this file, in order, in English. The `Contents` list names
@@ -142,29 +161,34 @@ writing an empty section or inventing a fix. The English half reads `English ver
 shape with Chinese labels.
 
 **Build and test.** `node scripts/link-dev.mjs` links the toolchain from the
-sibling harness checkout. `node build.js` is the only build command and ends with
-a self-check that activates the bundle the way cordis does. `node build.js && node
-node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
-`src/`, never `lib/`.
+sibling harness checkout, and `node scripts/vendor.mjs` downloads and checks the
+pinned libraries into `vendor/cache/`. `node build.js` is the only build command
+and ends with a self-check that loads every library file and activates the
+bundle the way cordis does. `node build.js && node node_modules/vitest/vitest.mjs
+run` is the full check. `lib/` is generated: edit `src/`, never `lib/`.
 
 ## 3. Contents
 
 - `AGENTS.md` — this file: the project introduction and the rules for the tree.
-- `.gitignore` — what git must not carry: the client transpile scratch directory,
-  dependencies, test output, logs, local assistant memory, the unpublished market
-  submission in `docs/market/`, and editor and OS noise. `lib/` is deliberately
-  kept, because it is the published artifact and no install step regenerates it.
+- `.gitignore` — what git must not carry: the transpile scratch directories, the
+  library downloads in `vendor/cache/`, dependencies, test output, logs, local
+  assistant memory, the unpublished market submission in `docs/market/`, and
+  editor and OS noise. `lib/` is deliberately kept, because it is the published
+  artifact and no install step regenerates it.
 - `.gitattributes` — LF line endings in every checkout, Windows included.
 - `package.json` — the bundle manifest: entry points, the `dsh.bundle.patch` row,
   the `dsh.client` browser declaration, the supported harness range in
   `engines.dsh`, and the published file list.
 - `cordis.patch.yml` — the bundle's own patch layer, which inserts this package's
   two rows into a profile: the tool row and the skill row.
-- `build.js` — the build: type-check, emit the host half, compile and wrap the
-  browser half, and self-check the bundle. See its JSDoc for the exact steps.
+- `build.js` — the build: type-check, emit the host half, bundle the frame
+  runtime, compile and wrap the browser half, write the shipped library files,
+  and self-check. See its JSDoc for the exact steps.
 - `tsconfig.json` — the host-half type check (no DOM types).
 - `tsconfig.build.json` — the host-half emit (`src` → `lib`).
 - `tsconfig.client.json` — the browser-half compile (`src` → `.client-build`, no
+  Node types).
+- `tsconfig.frame.json` — the frame-runtime compile (`src` → `.frame-build`, no
   Node types).
 - `vitest.config.ts` — the test runner configuration.
 - `README.md` and `README-zh.md` — the package documentation in English and
@@ -176,213 +200,86 @@ node_modules/vitest/vitest.mjs run` is the full check. `lib/` is generated: edit
   row's, exported under `./skill/locale/`.
 - `icon.svg` — the plugin's icon, exported under `./icon`.
 - `LICENSE` — the MIT license text.
-- `lib/` — generated host and browser artifacts. Never edited by hand.
+- `lib/` — generated host and browser artifacts, the shipped library files, and
+  their licenses. Never edited by hand.
 - `src/` — all source. See `src/AGENTS.md`.
+- `vendor/` — the pins of the shipped libraries. See `vendor/AGENTS.md`.
 - `skills/` — the bundled skill that teaches the model to use `ui_render`, in the
   `skills/<name>/SKILL.md` layout. See `skills/AGENTS.md`.
-- `assets/` — the screenshots `screenshots.json` and the README show, including
-  one drawn card per component in `assets/catalog/`. See `assets/AGENTS.md`.
+- `assets/` — the screenshots `screenshots.json` and the README show. See
+  `assets/AGENTS.md`.
 - `tests/` — the unit, contract, isolation, and packaging suite. See
   `tests/AGENTS.md`.
-- `docs/` — the architecture write-up, the drawn component catalogue, the live
-  verification checklist, and the market submission. See `docs/AGENTS.md`.
-- `scripts/` — the development toolchain linker. See `scripts/AGENTS.md`.
+- `docs/` — the architecture write-up, the live verification checklist, and the
+  market submission. See `docs/AGENTS.md`.
+- `scripts/` — the toolchain linker and the library downloader. See
+  `scripts/AGENTS.md`.
 
 ## 4. Progress
 
 **Done.**
 
-- The host tool `ui_render` takes one required argument, `source`, plus an
-  optional `title` and `revises`, and compiles both grammars: indentation-nested DIL and a JSON
-  envelope with nested `children` (`tests/compile.test.ts`, `tests/dil.test.ts`).
-- The math engine: powers, factorials, implicit products, constants, a table of
-  thirty-seven functions, and seven calculus operators — integrals with infinite bounds,
-  exact derivatives by Taylor arithmetic, limits, finite sums and products, roots,
-  and Taylor polynomials — each pinned against known values
-  (`tests/math.test.ts`). `plot` and `formula` draw them.
-- The skill `dsh-intelligent-ui` (`skills/dsh-intelligent-ui/`) is its own
-  bundle row and registers as a bundled skill provider, so the Plugin Manager
-  lists it as a part of the plugin; every program it teaches compiles without a
-  repair (`tests/skill.test.ts`, `tests/isolation.test.ts`).
-- The browser half registers through `apply(ctx)` alone and the build proves it
-  on every run; the bundle is tested with real React 18.3.1, jsdom, and Testing
-  Library through its own `__ModuleLoader__` registration (`tests/client.test.tsx`).
-- Animation: `player` plays, pauses, steps, and scrubs a number state, with a
-  duration and a reader-chosen speed; `pick` and the `current=` and `mono=`
-  props let a card trace code line by line (`tests/client.test.tsx`).
-- Code blocks (2026-10-22): `code` shows code or preformatted text exactly as
-  written, from a `"""` text block or a text state, colours fifteen languages
-  with the host's syntax tokens, numbers its lines, highlights `current=` while
-  scrolling only itself, and copies its exact text (`tests/highlight.test.ts`,
-  `tests/compile.test.ts`, `tests/client.test.tsx`).
-- **Live run of 2026-10-22, web UI and macOS desktop app** (`docs/VERIFY.md`
-  steps 15, 16, D2): the Plugin Manager lists the skill row on both hosts and
-  `/` lists the skill; the model loaded the skill and drew a code card traced
-  line by line, with the host's syntax colours in both themes, a moving
-  highlight, and copying.
-- Reader edits kept and cards revised (2026-10-26): edits, ticks, sorts, and a
-  sent button survive a reload in this browser; a result names its card id, and
-  a call with `revises=` replaces that card, starting from the reader's values
-  for states with the same names and marking the earlier card
-  (`tests/client.test.tsx`, `tests/tool.test.ts`).
-- Long tables and charts of several series (2026-10-26): a table past 8 rows
-  filters, past 20 pages, and any table copies CSV or Markdown; `chart` holds up
-  to four `series` as grouped or stacked bars, lines, or areas, or draws a pie,
-  with a legend that hides series and a readout moved by keyboard
-  (`tests/compile.test.ts`, `tests/client.test.tsx`).
-- Checklist values and names (2026-10-26): `values=` makes `bind=` the sum of
-  the ticked items' numbers, and `names=` hands their names to a text state, so
-  a total and a button's prompt can say what was picked
-  (`tests/compile.test.ts`, `tests/client.test.tsx`).
-- Drawings (2026-11-05): `canvas` holds `shape` lines over an optional SVG read
-  into a checked tree; a dragged point writes the number states in its `x=` and
-  `y=`, and a clicked shape stores its `value=`
-  (`tests/svg.test.ts`, `tests/compile.test.ts`, `tests/client.test.tsx`).
-- **Live run of 2026-11-05, web UI** (`docs/VERIFY.md` step 18): model-written
-  cards with draggable vertices, a point held to a curve, and a 135-element SVG
-  with clickable parts drew with zero repairs and kept their settings across a
-  reload; touch was checked in Chrome's emulation. The desktop apps were not run.
-- Moving drawings (2026-11-05): `player loop=true autoplay=true` plays a card by
-  itself while it is on screen, not under reduced motion, and in one copy of a
-  card at a time; frames are not stored. Shapes turn, scale, and fade
-  (`rotate=`, `scale=`, `opacity=`), `kind=curve` samples a function or a
-  traced pair, and `kind=use` places a part of the SVG by id
-  (`tests/compile.test.ts`, `tests/client.test.tsx`). Checked in headless Chrome
-  on the built bundle; not yet run live (`docs/VERIFY.md` step 19). The tool
-  description no longer carries the comparison example, to stay under 9800.
-- Fill-in questions (2026-11-08): `blanks "… ___ …"` puts a blank in the line for
-  each run of underscores; Submit, or Enter in the last blank, sends the
-  sentence with the answers in brackets as the reader's next message, once, and
-  the blanks lock. Answers are kept like ticks, so the model declares no state,
-  and the card never checks them. The description made room by naming the
-  general containers once (9794 of 9800); the skill gained a fill-in bullet and
-  recipe (`tests/compile.test.ts`, `tests/client.test.tsx`, `tests/tool.test.ts`).
-  Live on 2026-11-11, macOS desktop app 0.2.2-rc.1 (`docs/VERIFY.md` step 21):
-  a submitted sentence arrived with both answers in brackets.
-- Cards in the reply (2026-11-11): a card stands where the model called
-  `ui_render`, as its own Chat node at the `turn` group-tree position, so a
-  finished turn folds its process around it and the card stays between the text
-  before the call and the text after it; it previews there while the arguments
-  stream, in every transcript view. The tool row stays a status line while the
-  reply copy is on the page; the turn-tail entry is gone. The description, each
-  result, and the skill tell the model to write the lead-in before calling and to
-  continue after the result (9787 of 9800). Unit-tested, and replayed with the
-  host's real engine: a session copied into a throwaway `DSH_HOME`, served by a
-  separate DSH web, drew text, card, text in both turns, the earlier card folded
-  and the rows a status line (`docs/VERIFY.md` step 22). Live on 2026-11-11,
-  macOS desktop app 0.2.2-rc.1: a model wrote its lead-in before the call, and
-  the card stood between that text and the follow-up written after the result.
-- Replaced cards (2026-11-07): a card that `revises=` replaces no longer shows in
-  full. Redrawn in the same turn, it is left out of the reply; revised in a later
-  turn, it folds to one line that can open it again, and its row says it was
-  replaced. Each result tells the model to pass `revises=` with its card id to
-  redraw it (`tests/client.test.tsx`, `tests/tool.test.ts`). A same-turn redraw
-  replaced its card live on 2026-11-11 (macOS desktop app 0.2.2-rc.1); a
-  later-turn fold has been checked only in headless Chrome.
-- **Live run of 2026-10-26, web UI and macOS desktop app** (`docs/VERIFY.md`
-  step 17): a model-written card with three series, a pie, and a 30-row table
-  drew with zero repairs; its settings survived a page reload and an app
-  restart; a revision started from the reader's slider value, clamped to the
-  new maximum, and marked the earlier card.
-- Pages, checklists, sortable tables, and flowcharts:
-  `tabs` and `tab` switch pages by click or arrow key, `checklist` counts ticked
-  items into an optional bound state, `table sortable=true` sorts by any column,
-  and `diagram` lays out boxes and arrows in layers with loops on a side lane
-  (`tests/compile.test.ts`, `tests/client.test.tsx`); one card using all four
-  drew in the web UI on 2026-10-19.
-- Programs and envelopes carry the API version; API version 1 renders, any
-  other version and anything persisted before the field existed shows its text;
-  an unknown component is skipped and counted.
-- The pluggability and packaging invariants are checked mechanically
-  (`tests/isolation.test.ts`, `tests/manifest.test.ts`), and the harness checkout
-  is unchanged.
-- **Live verification on the web UI, 2026-10-16**, DeepSeek Harness
-  0.2.1-alpha.4 with DeepSeek-V4.1-Flash, against `docs/VERIFY.md`:
-  - the plugin boots and mounts one stylesheet;
-  - a calculus card streamed a preview in its row, settled, and moved under the
-    reply when the turn folded; moving the slider to a = 3 showed area 9 and
-    slope 6 with no request;
-  - the model loaded the skill unprompted, read `math.md`, and wrote a correct
-    program on the first call, then quoted the computed figures in its reply;
-  - a Taylor card's error at degree 15 read -3.642e-10;
-  - a quiz button left a typed draft untouched (and, with the clipboard refused,
-    showed the text to copy), then sent "C" once the composer was empty and
-    locked the card;
-  - a malformed program showed a failed row and the model reported its
-    diagnostics;
-  - a reload rebuilt every card at its initial values, and the light theme drew
-    correctly;
-  - disabling the plugin in Settings → Plugins and restarting left every session
-    opening with no cards and no plugin event type in the logs; re-enabling
-    restored the cards.
+- **The rewrite of 2026-11-17.** The DIL engine — a declarative language over a
+  catalog of 36 components, compiled on the host and drawn by React — was
+  replaced by a sandboxed engine that runs the model's own HTML, SVG, CSS, and
+  JavaScript, to reach what Claude's and ChatGPT's interactive answers can do.
+  What the plugin had built on the harness carried over: the widget stands in
+  the reply where it was called, streams as it is written, keeps what the
+  reader set across reloads, and is revised with `revises`, folding the earlier
+  one away.
+- The host check: scripts, modules, and inline handlers compiled for their
+  syntax with their source lines; blocked addresses, shipped libraries, and
+  habits the sandbox defeats reported (`tests/check.test.ts`). The description
+  fell from 9978 characters to under 4000 (`tests/tool.test.ts`).
+- The frame: one fixed document per widget, fed by message; streaming without
+  running, then activation in document order; the theme as variables and a base
+  stylesheet; `sendPrompt`, `openLink`, `dsh.state`, `dsh.math`, `data-prompt`,
+  and `data-send`; kept control values (`tests/runtime.test.ts`,
+  `tests/client.test.tsx`).
+- The boundary: the sandbox, the content policy, the checked bridge, the
+  click requirement, and navigation removal (`tests/bridge.test.ts`,
+  `tests/isolation.test.ts`).
+- Fifteen shipped libraries, pinned and checked, loaded lazily and offline
+  (`tests/libs.test.ts`).
+- The skill, rewritten: seven files, thirteen complete widgets, every one
+  passing the check (`tests/skill.test.ts`).
+- Checked in headless Chrome on the built bundle (`docs/VERIFY.md`, recorded
+  runs): every skill widget ran with no error in both themes with the network
+  refused, and the sandbox probes behaved as written.
+- A live run on the macOS desktop app, 2026-11-17 (0.2.2-rc.1): a model wrote a
+  compound-interest widget, the check passed, the widget drew in the reply with
+  its shipped Chart.js copy loaded offline, and its `data-prompt` button sent
+  the next message as an ordinary user turn.
+- Unchanged from before: the pluggability and packaging invariants
+  (`tests/isolation.test.ts`, `tests/manifest.test.ts`), and the harness
+  checkout is unchanged.
 
 **Not done.**
 
-- **Infinite series.** `sum` and `prod` take finite bounds only.
-- **Image attachments.** `image` accepts only inline `data:image/…` sources; the
-  conversation's attachment loader is not wired.
-- **A `ui_catalog` query tool.** The catalog travels in the tool description; past
-  roughly forty components it should move behind a `deferLoading` tool.
-- **Cards in the exported session log as clean text.** Deferred (2026-10-22): the
-  tool result would carry the card's text view as its own block.
-
-**Defects found by live use, and the guard each now has.**
-
-- The browser half read React from `apply`'s second parameter, which cordis fills
-  with the entry config, so the tool row threw inside its slot registration and
-  never rendered. Guarded by the build self-check and `tests/client.test.tsx`.
-- A card drawn only in the tool row vanished when a finished turn folded its tool
-  rows. The turn tail carried settled cards until 2026-11-11; a Chat node of the
-  plugin's own now keeps each card in the reply where it was called.
-- Models confused the old `mode` and `source` parameters, and wrote comments with
-  `#`, which the old grammar read as nodes. One argument and `//` comments remain.
-- A copy fallback announced "copied" even when the page refused the clipboard.
-  It now shows the text to copy instead (`tests/client.test.tsx`).
-- A spaced expression in a bare prop value was cut at its first space. Bare values
-  now keep bracketed spaces and rejoin operator-led pieces (`tests/dil.test.ts`).
-- Earlier: the parameter dialect reached a provider once, and an unsupported
-  result schema failed activation once; `tests/tool.test.ts` pins both shapes.
-- A model opened a code block with `"""` on a line of its own under the
-  component, and the block was dropped. Such a block now attaches to the
-  component above it, with a repair note (`tests/dil.test.ts`).
+- **The rest of the live checklist.** Steps 4 to 13 of `docs/VERIFY.md` have at
+  most one live pass each: streaming, the form, runtime errors, reload, themes,
+  and `revises` still need a full run, and the description and skill need tuning
+  from it.
+- **The web UI and the Windows desktop app** have not loaded this build; macOS
+  has, by `link:` to the checkout.
+- **Native components, image search, entity cards, and attachments**, which
+  ChatGPT offers through services the harness does not give plugins.
+- **Sibling plugins** that teach DIL need their prompts updated: the
+  `/ddl` checklist of the assistant mode plugin and the course-review mode's
+  notes on `canvas` and `shape`.
 
 **Known defects.**
 
-- A card stands where the model called the tool. With the host's "Final answer
-  only" setting, text written before the call folds with the process while the
-  card stays.
-- A card called after a turn's last text, with nothing written after it, stands
-  after the closing reply, and the host then offers no branch from that reply.
-- The live streaming path (argument deltas building the node) is unit-tested
-  against the host's chunk shapes but has not run in a live DSH yet.
-- An item in `keys.items` or a cell in `table.rows` is read as text, so
-  `"Monthly: {monthly}"` interpolates while a bare expression there does not.
-- A bare expression item in a list prop, as in `points=[ax, ay, -3, -2.5, 3,
-  -2.5]`, is split at its commas and the repair drops the prop; quote each item
-  (`points=["ax", "ay", -3, -2.5, 3, -2.5]`), as sample 35 writes it.
-- `{fmt(x, 4)}` rounds a tiny value to `0.0000`; `{x}` shows it in exponent form.
-  The skill says so, but a model may still choose `fmt`.
-- Developing on Windows (Part 3, W4 of `docs/VERIFY.md`: link the toolchain,
-  build, run the suite) failed in the maintainer's 2026-10-16 run. The output was
-  not recorded, so the failing step is unknown, and no later attempt has been
-  made. Using the plugin on any of the three hosts does not depend on it.
+- A widget's script can loop forever, and nothing in the page can stop it;
+  whether it freezes the page as well depends on the browser's process model.
+- A frame can navigate itself to an outside address; the request leaves before
+  the frame is removed. It can carry only what the widget already showed.
+- A widget is several times the output of a DIL card, so it takes longer to
+  write.
+- The model reads a summary of its widget, not a picture of it; a layout that
+  looks wrong reaches it only when the reader says so.
+- Developing on Windows (W4 of `docs/VERIFY.md`) failed on 2026-10-16 with its
+  output lost, and has not been retried.
 
-**Desktop apps: verified on 0.2.1-rc.2.** The web UI, the macOS app, and the
-Windows app draw the same cards from one bundle. On 0.2.1-rc.2, Part 2 of
-`docs/VERIFY.md` passed on both apps — the card drew in the row while the turn ran
-and under the reply when it finished (the placement of that release), controls recomputed with no request, and
-past conversations opened with the plugin loaded — and W1, W2, and W3 passed, W3
-at 100% and 150% display scaling, the macOS app loading the plugin from the
-working checkout as a `link:` and the Windows app installing it from the GitHub
-URL.
-
-The earlier desktop run, on 0.2.0-rc.2, drew no card and, with the plugin loaded,
-**every past conversation failed to open**. That build is below the engine range
-and the plugin now refuses it, so the failure was never shipped; the version skew
-is the explanation that fits it, and the 0.2.1-rc.2 pass is what supersedes the
-record rather than a fix with a named cause. W4, developing on Windows, has still
-not passed.
-
-**Next goal.** Rerun Part 2 of `docs/VERIFY.md` on each new desktop version, and
-collect the output of W4 on Windows. Then submit the market entry in
-`docs/market/`, which is git-ignored and stays in the working tree.
+**Next goal.** Run `docs/VERIFY.md` Part 1 with a real model in the web UI, then
+Part 2 on the macOS desktop app, and fix what they find before a release.

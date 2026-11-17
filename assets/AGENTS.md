@@ -2,13 +2,14 @@
 
 ## 1. Role
 
-Screenshots of real cards, for the README and for plugin storefronts.
+Screenshots of real widgets, for the README and for plugin storefronts.
 `screenshots.json` at the repository root lists the images markets show, in
-order. The README opens with one live capture and then shows every component in
-`catalog/`. The images here are captures of cards the model drew in a live
-DeepSeek Harness session; the ones in `catalog/` are the plugin's own rendering of
-the sample programs in `docs/SAMPLES.md` (see `catalog/AGENTS.md`). None is a
-mock-up.
+order, and the README shows them under the widget each one comes from. Each
+image is this build's own rendering of a widget the bundled skill teaches: the
+widget's source passed through the `ui_render` tool, drawn by the built browser
+bundle in a sandboxed frame inside a static page that carries the host's own
+stylesheet, and captured by headless Chrome with the network refused, so every
+library came from the plugin's shipped copy. None is a mock-up.
 
 They live in the repository rather than in the installed package: markets read
 them from the repository, so they are left out of the published `files` and cost
@@ -16,50 +17,54 @@ an install nothing.
 
 ## 2. Constraints
 
-**Real drawings only.** Each image here comes from the running web UI with this
-build, captured element by element by a headless browser; each image in
-`catalog/` comes from this build's own browser bundle. Nothing is drawn or edited
-by hand.
+**Real drawings only.** Each image comes from this build's bundle and a widget
+the skill ships, captured element by element; nothing is drawn or edited by
+hand. When a widget in the skill changes, its image is captured again.
 
-**Nothing private.** A capture shows the transcript column or a single card,
-never the sidebar: the sidebar lists the user's own workspaces and sessions.
-Other plugins' floating widgets are hidden while capturing.
+**Nothing private.** A capture shows one widget, never the host's sidebar,
+which lists the user's own workspaces and sessions.
 
 **PNG, under 300 KB each, at twice the CSS pixel size,** so text stays sharp on
-high-density screens without bloating the repository.
+high-density screens without bloating the repository. The storefront list holds
+at most eight (`tests/manifest.test.ts`).
 
-**Names say what is shown.** `<subject>[-light].png`; dark theme is the default.
+**Names say what is shown.** `<subject>[-dark].png`; light theme is the default,
+and a dark capture uses stand-in values for the host's dark theme tokens.
 
 ## 3. Contents
 
 - `AGENTS.md` — this file: what the images are and how they are made.
-- `calculus-in-chat.png` — a calculus card under the model's reply, dark theme:
-  slider, metrics, a typeset integral, and the plot with its shaded area and
-  tangent.
-- `calculus-light.png` — the same card alone, light theme.
-- `taylor-light.png` — a Taylor approximation card with two curves, a legend,
-  and a typeset limit, light theme.
-- `quiz.png` — a multiple-choice question answered with one click, dark theme.
-- `catalog/` — one card per component, thirty-two in all, light theme, for the
-  README. See `catalog/AGENTS.md`.
+- `savings-chart.png` — a savings estimate: two sliders, a metric, and a
+  Chart.js area chart in the series colours (`charts.md`).
+- `code-trace.png` — binary search traced line by line, with the list it
+  searches and a step slider (`recipes.md`).
+- `loan.png` — a loan estimate in the dark theme, with a button that asks the
+  follow-up question (`recipes.md`).
+- `svg-diagram.png` — a hand-written SVG diagram in the colour ramps, whose boxes
+  ask about their step when clicked (`diagrams.md`).
+- `quiz-form.png` — a quiz with typed blanks and ticked answers sent at once
+  with `data-send` (`forms.md`).
+- `sorting-steps.png` — bubble sort as an animation the reader plays or steps
+  through (`interactive.md`).
+- `mermaid-dark.png` — a Mermaid flowchart in the dark theme (`diagrams.md`).
 
 ## 4. Progress
 
 **Done.**
 
-- Four captures from the live run of 2026-10-16, listed in `screenshots.json`.
-- All thirty-two components in `catalog/`, embedded in both READMEs.
+- Replaced on 2026-11-17: the DIL captures and the thirty-six component images
+  in `catalog/` went with the DIL; these seven come from the rewritten skill.
 
 **Not done.**
 
-- **No desktop capture yet.** Every image comes from the web UI. The macOS and
-  Windows apps draw the same cards (root `AGENTS.md`), so a capture from either is
-  possible now; none has been taken.
+- No capture of a widget in a live chat yet: a real model's widget in the
+  transcript column, with its lead-in and follow-up, belongs here after the live
+  run of `docs/VERIFY.md`.
 
 **Known defects.**
 
-- The captures show Chinese card text, because the session was in Chinese; the
-  card chrome follows the reader's interface language.
+- The captures use a static page, not the running web UI, so the chat's own
+  spacing around a widget is not shown.
 
-**Next goal.** Regenerate `catalog/` whenever a component's look changes, so the
-README never shows an old drawing.
+**Next goal.** Add one live capture of a widget between a model's lead-in and its
+follow-up, in each theme.

@@ -1,39 +1,28 @@
-/** Bundled client modules (37):
- *   client/blanks.js
- *   client/canvas.js
+/** Bundled client modules (26):
+ *   client/bridge.js
  *   client/card-node.js
- *   client/card.js
- *   client/chart.js
+ *   client/chunks.js
  *   client/clipboard.js
- *   client/code.js
- *   client/components.js
- *   client/diagram.js
+ *   client/document.js
  *   client/edits.js
- *   client/formula.js
  *   client/host.js
  *   client/index.js
+ *   client/libraries.js
  *   client/locales.js
  *   client/node-view.js
- *   client/parts.js
- *   client/plot.js
  *   client/presence.js
- *   client/program.js
+ *   client/read.js
  *   client/styles.css
- *   client/table.js
+ *   client/theme.js
  *   client/toolview.js
  *   client/turn-data.js
- *   lang/catalog.js
- *   lang/compile.js
- *   lang/dil.js
- *   lang/expr.js
- *   lang/highlight.js
- *   lang/identity.js
- *   lang/infix.js
- *   lang/limits.js
- *   lang/math.js
- *   lang/print.js
- *   lang/series.js
- *   lang/svg.js
- *   lang/text.js
- *   lang/types.js
+ *   client/widget.js
+ *   frame/base.css
+ *   frame/main.runtime
+ *   widget/identity.js
+ *   widget/libs.js
+ *   widget/messages.js
+ *   widget/normalize.js
+ *   widget/policy.js
+ *   widget/scan.js
  */

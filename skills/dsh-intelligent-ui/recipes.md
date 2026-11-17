@@ -1,204 +1,152 @@
-# Card recipes
+# Recipes
 
-Complete programs that compile without a repair. Adapt the names, bounds, and
-labels to the question, and write the labels in the user's language.
+Complete widgets to adapt. Change the labels to the reader's language and the
+numbers to their case; keep the structure.
 
-## A subscription estimate with a plan choice
+## A loan, with a follow-up question
 
-```dil
-@state seats = 10 min=1 max=200
-@state plan = "Pro" options=Basic|Pro|Enterprise
-@state yearly = false
-@calc rate = plan == "Enterprise" ? 45 : plan == "Pro" ? 29 : 12
-@calc monthly = seats * rate * (yearly ? 0.8 : 1)
-card "Team subscription"
-  slider "Seats" bind=seats
-  select "Plan" bind=plan
-  checkbox "Pay yearly (20% off)" bind=yearly
-  metric "Per month" value=monthly unit=USD
-  keys items=["Per seat: {rate} USD", "Per year: {monthly * 12} USD"]
-  callout "List prices before tax."
+```html
+<style>.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }</style>
+<div class="cols">
+  <label>Amount <input id="amount" type="range" min="50000" max="1000000" step="10000" value="300000"> <b id="amount-out">$300,000</b></label>
+  <label>Rate <input id="rate" type="range" min="1" max="12" step="0.1" value="6.5"> <b id="rate-out">6.5%</b></label>
+  <label>Years <select id="years"><option>15</option><option>20</option><option selected>30</option></select></label>
+</div>
+<div class="cols" style="margin-top:12px">
+  <div class="metric"><span class="label">Monthly payment</span><span class="value" id="monthly">$1,896</span></div>
+  <div class="metric"><span class="label">Total interest</span><span class="value" id="interest">$382,633</span></div>
+</div>
+<p><button id="ask" data-prompt="Is a 15-year loan better for me at these numbers?">Is a shorter loan better? ↗</button></p>
+<script>
+const $ = id => document.getElementById(id)
+const money = v => '$' + Math.round(v).toLocaleString('en-US')
+function update() {
+  const amount = Number($('amount').value)
+  const rate = Number($('rate').value) / 100 / 12
+  const months = Number($('years').value) * 12
+  const growth = (1 + rate) ** months
+  const monthly = amount * rate * growth / (growth - 1)
+  $('amount-out').textContent = money(amount)
+  $('rate-out').textContent = Number($('rate').value).toFixed(1) + '%'
+  $('monthly').textContent = money(monthly)
+  $('interest').textContent = money(monthly * months - amount)
+  $('ask').dataset.prompt = `Is a shorter loan better than ${$('years').value} years for ${money(amount)} at ${$('rate').value}%?`
+}
+document.addEventListener('input', update)
+update()
+</script>
 ```
 
-## A loan payment
-
-```dil
-@state principal = 300000 min=10000 max=1000000 step=10000
-@state rate = 4.5 min=0.5 max=10 step=0.1
-@state years = 30 min=5 max=40 step=1
-@calc r = rate / 100 / 12
-@calc n = years * 12
-@calc payment = principal * r / (1 - (1 + r)^-n)
-card "Monthly mortgage payment"
-  slider "Loan" bind=principal unit=USD
-  slider "Annual rate" bind=rate unit=%
-  slider "Term" bind=years unit=years
-  metric "Payment" value=payment unit=USD
-  keys items=["Total paid: {fmt(payment * n, 0)} USD", "Interest: {fmt(payment * n - principal, 0)} USD"]
-  plot "Balance owed by month" fn="principal * (1 + r)^m - payment * ((1 + r)^m - 1) / r" var=m from=0 to=n ymin=0
-```
-
-## A unit conversion
-
-```dil
-@state celsius = 20 min=-40 max=120
-card "Temperature"
-  slider "Celsius" bind=celsius unit=°C
-  grid columns=2
-    metric "Fahrenheit" value="celsius * 9 / 5 + 32" unit=°F
-    metric "Kelvin" value="celsius + 273.15" unit=K
-```
-
-## Binomial probabilities
-
-```dil
-@state n = 20 min=1 max=100
-@state p = 0.3 min=0.01 max=0.99 step=0.01
-@state k = 6 min=0 max=100
-@calc exactly = comb(n, k) * p^k * (1 - p)^(n - k)
-@calc atMost = sum(comb(n, j) * p^j * (1 - p)^(n - j), j, 0, k)
-card "Binomial probabilities"
-  slider "Trials n" bind=n
-  slider "Success probability p" bind=p
-  slider "Successes k" bind=k
-  grid columns=2
-    metric "P(X = k)" value=exactly digits=4
-    metric "P(X ≤ k)" value=atMost digits=4
-  plot "Normal approximation" fn="exp(-(x - n*p)^2 / (2*n*p*(1 - p))) / sqrt(2*pi*n*p*(1 - p))" from=0 to=n
-```
-
-## The standard normal distribution
-
-```dil
-@state z = 1.96 min=-4 max=4 step=0.01
-card "Standard normal"
-  slider "z" bind=z
-  formula "(1 + erf(z / sqrt(2))) / 2" label="P(Z ≤ z)" digits=4
-  plot fn="exp(-x^2 / 2) / sqrt(2pi)" from=-4 to=4 shadeFrom=-4 shadeTo=z
-```
-
-## Projectile motion
-
-```dil
-@state speed = 20 min=1 max=50
-@state angle = 45 min=5 max=85
-@calc g = 9.81
-@calc theta = rad(angle)
-@calc distance = speed^2 * sin(2theta) / g
-@calc peak = (speed * sin(theta))^2 / (2g)
-card "Projectile without air resistance"
-  slider "Launch speed" bind=speed unit=m/s
-  slider "Angle" bind=angle unit=°
-  grid columns=2
-    metric "Range" value=distance unit=m digits=4
-    metric "Peak height" value=peak unit=m digits=4
-  plot "Trajectory" fn="x * tan(theta) - g * x^2 / (2 * speed^2 * cos(theta)^2)" from=0 to=distance ymin=0
-```
-
-## A quiz series
-
-Send one question per card and wait for the reader's click before the next one.
-Keep a running position in the title so the reader knows how far they are.
-
-```dil
-card "Question 3 of 5"
-  text "True or false: every differentiable function is continuous."
-  row
-    button "True" prompt="True"
-    button "False" prompt="False"
-```
-
-When the answer arrives, reply in prose: right or wrong, a two-line explanation,
-then the next card. After the last question, summarise the score in prose; a
-`table` of question, answer, and result works well for a review.
-
-## A fill-in question
-
-When the answer is a word or a number the reader should produce rather than pick,
-write the sentence in `blanks` with `___` where each answer goes; a longer run of
-underscores draws a wider blank. The reader fills them in and presses Submit, or
-Enter in the last blank, and you receive the sentence with each answer in
-brackets. Grade it in your reply, as for a clicked answer.
-
-```dil
-card "Fill in · 2 of 5"
-  text "Complete the sentence."
-  blanks "The derivative of sin x is ______, and of e^x it is ___."
-```
-
-You receive, for example: `The derivative of sin x is [cos x], and of e^x it is [e^x].`
-Accept equivalent forms (`cos(x)`, `cosx`) and say so when you do. Ask one
-sentence per card, so each answer arrives on its own.
-
-## Priced add-ons
-
-Give each item its price in `values=`, in the same order as `items=`: `bind=`
-receives the sum of the ticked prices and `names=` the ticked names, so the
-total follows the ticks and the button tells you what the reader chose.
-
-```dil
-@state extra = 0
-@state picked = ""
-@calc total = 699 + extra
-card "Phone with add-ons"
-  checklist "Add-ons" items=["Case","Charger","Screen film"] values=[99, 149, 39] bind=extra names=picked
-  metric "Total" value=total unit="CNY"
-  button "Order these" prompt="I'll take the phone with: {picked}. Total {total} CNY."
-```
-
-Start the bound states at 0 and `""`, which is what nothing ticked gives.
-
-## Revenue by source, with its split
-
-Indent one `series` per quantity under the chart; `stacked=true` shows the total
-as well as the parts. A pie beside it shows one month's split. A value may be a
-quoted expression, so the charts follow the slider.
-
-```dil
-@state ads = 3 min=0 max=10 step=0.5
-card "Revenue, January to April"
-  chart shape=area stacked=true labels=["Jan","Feb","Mar","Apr"] unit="k USD"
-    series "Subscriptions" values=[12, 14, 15, 18]
-    series "Services" values=[5, 6, 8, 7]
-    series "Ads" values=[2, 2, 3, "ads"]
-  chart shape=pie labels=["Subscriptions","Services","Ads"] values=[18, 7, "ads"] caption="April"
-  slider "April ad revenue" bind=ads unit="k USD"
-```
-
-Use `shape=bar` to set the series side by side, or `shape=line` for trends that
-cross. The reader can hide a series from the legend.
+The button's question follows the controls, so your next reply starts from the
+reader's actual numbers.
 
 ## Code traced line by line
 
-Trace the program by hand first, one frame per executed line, then write each
-column of the trace as one `pick`. Frame 11 highlights no line, because the run
-has ended.
-
-```dil
-@state frame = 1 min=1 max=11 step=1
-@calc line = pick(frame, 1, 2, 3, 4, 2, 3, 4, 1, 2, 3, 0)
-@calc i = pick(frame, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1)
-@calc j = pick(frame, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0)
-@calc items = pick(frame, "3 1 2", "3 1 2", "3 1 2", "1 3 2", "1 3 2", "1 3 2", "1 2 3", "1 2 3", "1 2 3", "1 2 3", "1 2 3")
-@calc note = pick(frame, "First pass", "Compare positions 0 and 1", "3 > 1, so swap", "Swapped", "Compare positions 1 and 2", "3 > 2, so swap", "Swapped", "Second pass", "Compare positions 0 and 1", "1 > 2 is false", "Sorted")
-card "Bubble sort on 3 1 2"
-  code lang=python current=line numbers=true """
-    for i in range(n - 1):
-        for j in range(n - 1 - i):
-            if a[j] > a[j + 1]:
-                a[j], a[j + 1] = a[j + 1], a[j]
-  """
-  keys items=["i: {i}", "j: {j}", "a: {items}"]
-  callout "{note}"
-  player "Step" bind=frame unit="/ 11"
+```html
+<style>
+.code { font-family: var(--font-mono); font-size: 13px; background: var(--surface-1); border-radius: var(--radius); padding: 8px 0; margin-bottom: 8px; }
+.code div { padding: 0 12px; white-space: pre; }
+.code div.on { background: var(--bg-accent); }
+.cells { display: flex; gap: 4px; margin-bottom: 8px; }
+.cells span { flex: 1; text-align: center; padding: 4px 0; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
+.cells span.in { background: var(--bg-accent); }
+.cells span.mid { border-color: var(--accent); font-weight: 600; }
+</style>
+<div class="code" id="code"></div>
+<div class="cells" id="cells"></div>
+<p id="say">Search the whole list</p>
+<div class="row">
+  <button id="back" aria-label="Previous step">◀</button>
+  <input id="step" type="range" min="0" max="12" value="0" style="flex:1" aria-label="Step">
+  <button id="next" aria-label="Next step">▶</button>
+</div>
+<script>
+const code = [
+  'def search(items, target):',
+  '    lo, hi = 0, len(items) - 1',
+  '    while lo <= hi:',
+  '        mid = (lo + hi) // 2',
+  '        if items[mid] == target:',
+  '            return mid',
+  '        if items[mid] < target:',
+  '            lo = mid + 1',
+  '        else:',
+  '            hi = mid - 1',
+  '    return -1',
+]
+const items = [2, 5, 8, 12, 16, 23, 38, 56, 72, 91]
+const target = 23
+const steps = []
+let lo = 0, hi = items.length - 1, mid
+const note = (line, text) => steps.push({ line, lo, hi, mid, text })
+note(2, 'Search the whole list')
+for (;;) {
+  note(3, lo <= hi ? `lo ${lo} ≤ hi ${hi}: keep going` : 'lo > hi: not found')
+  if (lo > hi) { note(11, 'Return -1'); break }
+  mid = Math.floor((lo + hi) / 2)
+  note(4, `The middle index ${mid} holds ${items[mid]}`)
+  if (items[mid] === target) { note(6, `Found ${target} at index ${mid}`); break }
+  note(7, items[mid] < target ? `${items[mid]} < ${target}: look right` : `${items[mid]} > ${target}: look left`)
+  if (items[mid] < target) { lo = mid + 1; note(8, `lo = ${lo}`) } else { hi = mid - 1; note(10, `hi = ${hi}`) }
+}
+const slider = document.getElementById('step')
+slider.max = steps.length - 1
+const escape = text => text.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+function draw() {
+  const s = steps[Number(slider.value)]
+  document.getElementById('code').innerHTML = code.map((line, i) => `<div class="${i + 1 === s.line ? 'on' : ''}">${escape(line) || ' '}</div>`).join('')
+  document.getElementById('cells').innerHTML = items.map((v, i) => `<span class="${i >= s.lo && i <= s.hi ? 'in' : ''} ${i === s.mid ? 'mid' : ''}">${v}</span>`).join('')
+  document.getElementById('say').textContent = s.text
+}
+document.getElementById('back').onclick = () => { slider.value = Number(slider.value) - 1; draw() }
+document.getElementById('next').onclick = () => { slider.value = Number(slider.value) + 1; draw() }
+slider.addEventListener('input', draw)
+draw()
+</script>
 ```
 
-## A tangent sweeping a curve
+For colours in longer code, load highlight.js and its `github` and
+`github-dark` styles, and highlight each line with
+`hljs.highlight(line, { language: 'python' }).value`.
 
-```dil
-@state x0 = -2 min=-2 max=2 step=0.01
-card "The tangent along y = x³ − 3x"
-  plot fn="x^3 - 3x" from=-2.5 to=2.5 ymin=-4 ymax=4 mark=x0 tangent=true
-  metric "Slope f′(x)" value="deriv(x^3 - 3x, x, x0)" digits=3
-  player "x" bind=x0 duration=6
+## A small game that remembers the board
+
+```html
+<style>
+.board { display: grid; grid-template-columns: repeat(3, 64px); gap: 6px; margin-bottom: 8px; }
+.board button { height: 64px; font-size: 28px; padding: 0; }
+</style>
+<p id="turn">X to play</p>
+<div class="board" id="board"></div>
+<div class="row">
+  <button id="reset">New game</button>
+  <button id="hint" data-prompt="What is the best move for X on an empty board?">Ask for a hint ↗</button>
+</div>
+<script>
+const lines = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]]
+let cells = dsh.state.get()?.cells ?? Array(9).fill('')
+const winner = () => lines.map(([a, b, c]) => (cells[a] && cells[a] === cells[b] && cells[a] === cells[c] ? cells[a] : '')).find(Boolean) ?? ''
+const player = () => (cells.filter(Boolean).length % 2 === 0 ? 'X' : 'O')
+function draw() {
+  const won = winner()
+  const full = cells.every(Boolean)
+  const board = document.getElementById('board')
+  board.replaceChildren(...cells.map((mark, i) => {
+    const button = document.createElement('button')
+    button.textContent = mark
+    button.disabled = Boolean(mark || won)
+    button.setAttribute('aria-label', mark || `Square ${i + 1}`)
+    button.onclick = () => { cells[i] = player(); dsh.state.set({ cells }); draw() }
+    return button
+  }))
+  document.getElementById('turn').textContent = won ? `${won} wins` : full ? 'A draw' : `${player()} to play`
+  const rows = [0, 3, 6].map(i => cells.slice(i, i + 3).map(mark => mark || '·').join(' ')).join(' / ')
+  document.getElementById('hint').dataset.prompt = `In tic-tac-toe the board is ${rows}. What is the best move for ${player()}?`
+}
+document.getElementById('reset').onclick = () => { cells = Array(9).fill(''); dsh.state.set({ cells }); draw() }
+draw()
+</script>
 ```
+
+The board survives a reload through `dsh.state`, and the hint button carries the
+current position, so you can answer about the real game.

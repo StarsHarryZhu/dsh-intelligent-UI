@@ -9,8 +9,8 @@
  * @module dsh-intelligent-ui/client/turn-data
  */
 
-import { TURN_DATA_KEY, UI_TOOL_NAME } from '../lang/identity.ts'
-import { asRecord } from './program.ts'
+import { TURN_DATA_KEY, UI_TOOL_NAME } from '../widget/identity.ts'
+import { asRecord, isShownMeta } from './read.ts'
 
 /** One settled card in a turn. */
 export interface TurnCard {
@@ -53,12 +53,6 @@ function turnOf(event: { readonly data?: unknown }): number | undefined {
   return typeof turn === 'number' && Number.isInteger(turn) ? turn : undefined
 }
 
-/** Whether persisted meta is a renderable card of this plugin. */
-function isCardMeta(meta: unknown): boolean {
-  const record = asRecord(meta)
-  return record.ok === true && typeof record.program === 'object' && record.program !== null
-}
-
 /** Identity of a matched event: its turn. */
 function identify(event: { readonly data?: unknown }, role: 'start' | 'update'): { id: string; role: 'start' | 'update' } | null {
   const turn = turnOf(event)
@@ -73,7 +67,7 @@ export const turnDataDefinition = {
     'tool/call': (event: { data?: unknown }) => (asRecord(event.data).name === UI_TOOL_NAME ? identify(event, 'update') : null),
     'tool/result': (event: { data?: unknown; surfaceOp?: unknown }) =>
       // A replaced surface range re-presents an older result; only the original append counts.
-      event.surfaceOp === 'append' && isCardMeta(asRecord(event.data).meta) ? identify(event, 'update') : null,
+      event.surfaceOp === 'append' && isShownMeta(asRecord(event.data).meta) ? identify(event, 'update') : null,
   },
   start(_context: unknown, match: MatchLike): TurnState {
     return { turn: turnOf(match.event) ?? 0, calls: new Set(), cards: [] }

@@ -20,7 +20,7 @@
 import { readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { PLUGIN_ID } from '../lang/identity.ts'
+import { PLUGIN_ID } from '../widget/identity.ts'
 
 /** The skill's name: the plugin id, so it cannot collide with a user's own skill by accident. */
 export const SKILL_NAME = PLUGIN_ID

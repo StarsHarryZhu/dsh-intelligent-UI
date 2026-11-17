@@ -1,8 +1,14 @@
 # --- Build residue ----------------------------------------------------------
 #
-# The client transpile scratch directory. `node build.js` deletes and recreates
-# it on every run, and nothing reads it afterwards.
+# The client and frame transpile scratch directories. `node build.js` deletes
+# and recreates them on every run, and nothing reads them afterwards.
 .client-build/
+.frame-build/
+
+# Library downloads `scripts/vendor.mjs` checks against vendor/manifest.json
+# before the build turns them into lib/client.lib-*.js. The generated files are
+# committed; the downloads are not.
+vendor/cache/
 
 # `lib/` is deliberately NOT ignored. It is the published artifact, it is what a
 # profile's `link:` install resolves, and this package has no `prepare` script,

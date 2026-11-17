@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Intelligent UI · Skill",
-    "description": "The skill that teaches the model when an interactive card beats prose, how to shape one, how to write math and code cards, and how to repair a failed ui_render call."
+    "description": "The skill that teaches the model when an interactive widget beats prose, how to design one, which library fits a chart, diagram, or formula, how to write questions and forms, and how to fix a ui_render widget that failed."
   }
 }

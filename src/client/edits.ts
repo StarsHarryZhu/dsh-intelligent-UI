@@ -1,26 +1,27 @@
 /**
- * The reader's edits, kept in this browser.
+ * What each widget keeps, in this browser.
  *
- * One card can be drawn twice — in the reply and, where no reply copy is drawn, in
- * its tool row — and a chat list may unmount a row that scrolls away. Keeping
- * edits here, keyed by session and call, makes both copies and every remount show
- * the same state. Each card's memory is also written to the browser's own storage,
- * so a reload or a restart shows the card as the reader left it. The storage is
- * per viewer: another browser, or the session log, still starts from the model's
- * initial values. This is the only file of the browser half that touches storage.
+ * A widget's frame has no storage of its own: it is sandboxed. What it keeps —
+ * the value it stores with `dsh.state`, the values of its controls, and its last
+ * height — is sent to the page and kept here, keyed by session and call, so a
+ * remount, a reload, or a restart shows the widget as the reader left it. Each
+ * card's memory is also written to the browser's own storage. The storage is per
+ * viewer: another browser, or the session log, still starts from the widget as
+ * the model wrote it. This is the only file of the browser half that touches
+ * storage, and the page only stores what a frame sends; it never interprets it.
  * @module dsh-intelligent-ui/client/edits
  */
 
-import type { JsonValue } from '../lang/types.ts'
+import type { Json } from '../widget/messages.ts'
 
 /** What the store remembers for one card. */
 export interface CardMemory {
-  /** State values the reader changed, by key. */
-  values: Readonly<Record<string, JsonValue>>
-  /** The button whose prompt was sent, by node id. */
-  sent?: string
-  /** What the reader set on a component itself, by node id: the open tab, ticked items, a sort. */
-  ui?: Readonly<Record<string, JsonValue>>
+  /** What the widget kept with `dsh.state`. */
+  state?: Json
+  /** Control values by element id. */
+  controls?: Readonly<Record<string, Json>>
+  /** The frame's last height, so a reload draws it at its size at once. */
+  height?: number
   /** Call id of a later card that revises this one. */
   revisedBy?: string
 }
@@ -47,11 +48,11 @@ export interface StorageLike {
 /** Most cards remembered at once, in the page and in storage; the oldest are forgotten first. */
 const MAX_CARDS = 200
 /** Storage key of one card's memory, before its memory key. */
-const CARD_PREFIX = 'dsh-intelligent-ui.card.v1:'
+const CARD_PREFIX = 'dsh-intelligent-ui.card.v2:'
 /** Storage key of the stored cards' memory keys, oldest first. */
-const INDEX_KEY = 'dsh-intelligent-ui.cards.v1'
+const INDEX_KEY = 'dsh-intelligent-ui.cards.v2'
 /** Largest memory written to storage; a larger one lives for the page only. */
-const MAX_STORED_CHARS = 16 * 1024
+const MAX_STORED_CHARS = 40 * 1024
 
 /**
  * The browser's local storage, when the page may use it.
@@ -161,17 +162,17 @@ function readIndex(storage: StorageLike): string[] {
 }
 
 /**
- * Check a stored memory's shape. Values are checked again against the card's own
- * declarations when it renders, so this only has to keep the shape honest.
+ * Check a stored memory's shape. What the widget kept is handed back to its
+ * frame as it was stored; the page itself never interprets it.
  * @param value - the parsed JSON.
  * @returns the memory, or undefined when the shape is wrong.
  */
 export function readMemory(value: unknown): CardMemory | undefined {
-  if (!isRecord(value) || !isRecord(value.values)) return undefined
+  if (!isRecord(value)) return undefined
   return {
-    values: value.values as Record<string, JsonValue>,
-    ...(typeof value.sent === 'string' ? { sent: value.sent } : {}),
-    ...(isRecord(value.ui) ? { ui: value.ui as Record<string, JsonValue> } : {}),
+    ...(value.state === undefined ? {} : { state: value.state as Json }),
+    ...(isRecord(value.controls) ? { controls: value.controls as Record<string, Json> } : {}),
+    ...(typeof value.height === 'number' && Number.isFinite(value.height) ? { height: value.height } : {}),
     ...(typeof value.revisedBy === 'string' ? { revisedBy: value.revisedBy } : {}),
   }
 }

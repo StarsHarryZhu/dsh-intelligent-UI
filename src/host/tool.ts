@@ -1,11 +1,12 @@
 /**
- * The `ui_render` tool: the one place a model-authored interface enters DSH.
+ * The `ui_render` tool: the one place a model-authored widget enters DSH.
  *
- * The tool is a compiler, not a renderer. It validates the source against the
- * catalog and returns either a short summary to the model or the diagnostics it
- * must repair from. The compiled program travels separately, as presentation
- * metadata, because that is the channel the session log persists and the client
- * replays after a reload.
+ * The model writes a widget as HTML, SVG, CSS, and JavaScript. The tool never
+ * runs it: it cleans the source, compiles each script for its syntax only, and
+ * returns either what the reader will see or the problems the model must fix.
+ * The source travels separately, as presentation metadata, because that is the
+ * channel the session log persists and the browser replays after a reload; the
+ * browser runs it in a sandboxed frame.
  *
  * Parameters are authored in the harness's own dialect and compiled by
  * `defineTool`. That is not a formality: `ToolDefinition.parameters` must already
@@ -16,50 +17,68 @@
  */
 
 import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'
-import { catalogHash, SENDERS } from '../lang/catalog.ts'
-import { compileSource } from '../lang/compile.ts'
-import { API_VERSION, CARD_ID_PATTERN, UI_TOOL_NAME } from '../lang/identity.ts'
-import { LIMITS } from '../lang/limits.ts'
-import type { Diagnostic, JsonValue, UIProgram } from '../lang/types.ts'
+import { API_VERSION, CARD_ID_PATTERN, UI_TOOL_NAME } from '../widget/identity.ts'
+import { LIMITS } from '../widget/policy.ts'
+import { controlIds, promptTexts, scriptBlocks, visibleText } from '../widget/scan.ts'
+import { checkWidget, type Problem } from './check.ts'
 import { REPAIR_HINT, UI_TOOL_DESCRIPTION } from './model-brief.ts'
 
-/** What the model receives when the program is usable. */
+/** A value the session log can hold. */
+type Json = string | number | boolean | null | Json[] | { [key: string]: Json }
+
+/** One problem as the result carries it. */
+export interface ReportedProblem {
+  line?: number
+  message: string
+  repair: string
+}
+
+/** What the model receives when the widget is shown. */
 export interface UIRenderSuccess {
   ok: true
-  /** Components actually rendered. */
-  components: number
-  /** Interactive controls the reader can change. */
-  controls: number
-  /** Whether a bound was hit, so the model knows the answer was cut short. */
-  truncated: boolean
-  /** The readable stand-in, so the model can see what a text-only reader would see. */
-  summary: string
-  /** Problems that were repaired or ignored, written as instructions. */
+  /** Lines of the cleaned source. */
+  lines: number
+  /** Script elements in it. */
+  scripts: number
+  /** Shipped libraries it loads, which work offline. */
+  shipped: string[]
+  /** Addresses it loads from code hosts. */
+  fetched: string[]
+  /** Controls with an id, which the frame keeps across reloads. */
+  controls: string[]
+  /** Messages its buttons send, where the source writes them in place. */
+  prompts: string[]
+  /** The text shown before any script runs, cut short. */
+  text: string
+  /** Problems that do not keep it from being shown, written as instructions. */
   notes: string[]
   /** This card's id, the call id, which a later call passes as `revises` to change it. */
   card?: string
   /** Id of the earlier card this one replaces, when the model named a valid one. */
   revises?: string
   /**
-   * The compiled program, as lossless JSON. Present in the result value so
-   * `output.presentationMeta` can persist it; it never reaches the model, because
-   * `output.render` projects only the summary.
+   * The cleaned source. Present in the result value so `output.presentationMeta`
+   * can persist it; it never reaches the model, because `output.render` projects
+   * only the summary.
    */
-  program: Record<string, JsonValue>
+  source: string
 }
 
-/** What the model receives when the program cannot be rendered. */
+/** What the model receives when the widget is not shown. */
 export interface UIRenderFailure {
   ok: false
-  diagnostics: Diagnostic[]
+  problems: ReportedProblem[]
   hint: string
 }
 
 /** The result value. */
 export type UIRenderValue = UIRenderSuccess | UIRenderFailure
 
-/** Notes and failed diagnostics persisted for the card, so the reader sees why. */
-const MAX_META_DIAGNOSTICS = 5
+/** Characters of visible text the model reads back. */
+const MAX_TEXT = 600
+
+/** Problems persisted for a widget that was not shown, so the reader sees why. */
+const MAX_META_PROBLEMS = 6
 
 /**
  * Build the tool definition.
@@ -73,15 +92,15 @@ export function createUIRenderTool(): ToolDefinition {
       source: {
         type: 'string',
         required: true,
-        description: 'The interface program in DIL: one statement per line, components nested by two-space indentation.',
+        description: 'The widget: an HTML fragment (styles first, then content, then scripts) or one <svg> element.',
       },
       title: {
         type: 'string',
-        description: 'Short label for the card, shown in its header.',
+        description: 'Short label for the widget, shown in its status line.',
       },
       revises: {
         type: 'string',
-        description: 'Card id of an earlier ui_render result that this card replaces: the earlier card folds away, and the reader\'s settings carry over to states with the same name.',
+        description: 'Card id of an earlier ui_render result that this widget replaces: the earlier one folds away, and the reader\'s saved values carry over.',
       },
     },
     output: {
@@ -90,22 +109,23 @@ export function createUIRenderTool(): ToolDefinition {
         additionalProperties: false,
         properties: {
           ok: { type: 'boolean', required: true },
-          components: { type: 'number' },
-          controls: { type: 'number' },
-          truncated: { type: 'boolean' },
-          summary: { type: 'string' },
+          lines: { type: 'number' },
+          scripts: { type: 'number' },
+          shipped: { type: 'array', items: { type: 'string' } },
+          fetched: { type: 'array', items: { type: 'string' } },
+          controls: { type: 'array', items: { type: 'string' } },
+          prompts: { type: 'array', items: { type: 'string' } },
+          text: { type: 'string' },
           notes: { type: 'array', items: { type: 'string' } },
           card: { type: 'string' },
           revises: { type: 'string' },
-          diagnostics: {
+          problems: {
             type: 'array',
             items: {
               type: 'object',
               additionalProperties: false,
               properties: {
-                code: { type: 'string', required: true },
                 line: { type: 'number' },
-                path: { type: 'string' },
                 message: { type: 'string', required: true },
                 repair: { type: 'string', required: true },
               },
@@ -113,57 +133,51 @@ export function createUIRenderTool(): ToolDefinition {
           },
           hint: { type: 'string' },
           /**
-           * The compiled program. Declared because the registry validates this
+           * The cleaned source. Declared because the registry validates this
            * value and rejects undeclared keys; it is still never spoken to the
            * model, because `render` projects only the summary.
            */
-          program: { type: 'object', additionalProperties: true },
+          source: { type: 'string' },
         },
       },
       render: (_args, value) => [{ type: 'text', text: renderForModel(value) }],
       presentationMeta: (args, value) => buildPresentationMeta(args, value),
     },
     async execute(args, exec) {
-      const result = compileSource(args.source)
-      if (!result.ok) {
-        return {
-          ok: false,
-          diagnostics: result.diagnostics.slice(0, LIMITS.maxDiagnosticsReported),
-          hint: REPAIR_HINT,
-        }
+      const checked = checkWidget(args.source)
+      const errors = checked.problems.filter(problem => problem.severity === 'error')
+      if (errors.length > 0) {
+        return { ok: false, problems: errors.slice(0, LIMITS.maxDiagnostics).map(reported), hint: REPAIR_HINT }
       }
-      const { program } = result
-      const notes = program.diagnostics.slice(0, LIMITS.maxDiagnosticsReported).map(formatDiagnostic)
+      const notes = checked.problems.filter(problem => problem.severity === 'warning').slice(0, LIMITS.maxDiagnostics).map(formatProblem)
       const card = readCallId(exec)
       const revises = args.revises === undefined || args.revises.trim() === '' ? undefined : args.revises.trim()
       const revisable = revises !== undefined && CARD_ID_PATTERN.test(revises) && revises !== card
       if (revises !== undefined && !revisable) {
-        notes.push('- revises was ignored: it is not the id of another card. Pass the "Card id" an earlier ui_render result reported')
+        notes.push('- revises was ignored: it is not the id of another card. Pass the "Card id" an earlier ui_render result reported.')
       }
+      const source = checked.source
       return {
         ok: true,
-        components: program.nodes.length,
-        controls: program.nodes.filter(node => node.bind !== undefined || SENDERS.has(node.type)).length,
-        truncated: program.truncated !== undefined,
-        summary: program.fallback,
+        lines: source.split('\n').length,
+        scripts: scriptBlocks(source).length,
+        shipped: checked.shipped,
+        fetched: checked.fetched,
+        controls: controlIds(source).slice(0, 24),
+        prompts: promptTexts(source).slice(0, 12),
+        text: visibleText(source, MAX_TEXT),
         notes,
         ...(card === undefined ? {} : { card }),
         ...(revisable ? { revises } : {}),
-        program: programAsJson(program),
+        source,
       }
     },
   })
 }
 
-/**
- * View a compiled program as lossless JSON.
- *
- * `UIProgram` is JSON by construction — every member is a scalar, an array, or a
- * plain object — but TypeScript cannot see that without an index signature, and
- * adding one to the program type would weaken it everywhere else.
- */
-function programAsJson(program: UIProgram): Record<string, JsonValue> {
-  return program as unknown as Record<string, JsonValue>
+/** A problem without its severity, as the result carries it. */
+function reported(problem: Problem): ReportedProblem {
+  return { ...(problem.line === undefined ? {} : { line: problem.line }), message: problem.message, repair: problem.repair }
 }
 
 /** The call id the host runs this call under, when it is one a later call can name. */
@@ -172,32 +186,40 @@ function readCallId(exec: unknown): string | undefined {
   return typeof callId === 'string' && CARD_ID_PATTERN.test(callId) ? callId : undefined
 }
 
-/** Where the card stands, told with every card so the model goes on writing after it. */
+/** Where the widget stands, told with every widget so the model goes on writing after it. */
 export const PLACEMENT_NOTE = 'It stands in your reply here, where you called ui_render; continue your answer below it.'
 
-/** Render the tool result for the model: the summary, or the repair list when it failed. */
+/** One problem line, written as an instruction the model can act on. */
+function formatProblem(problem: ReportedProblem): string {
+  return `- ${problem.line === undefined ? '' : `line ${problem.line}: `}${problem.message}. ${problem.repair}`
+}
+
+/** Quote a list for one line of the result. */
+function listed(values: readonly string[]): string {
+  return values.map(value => JSON.stringify(value)).join(', ')
+}
+
+/** Render the tool result for the model: what the reader sees, or the problems to fix. */
 export function renderForModel(value: unknown): string {
   const record = (typeof value === 'object' && value !== null ? value : {}) as Partial<UIRenderSuccess> & Partial<UIRenderFailure>
   if (record.ok !== true) {
-    const lines = (record.diagnostics ?? []).map(formatDiagnostic)
-    return ['The card was not shown: the program did not compile.', ...lines, record.hint ?? REPAIR_HINT].join('\n')
+    const lines = (record.problems ?? []).map(formatProblem)
+    return ['The widget was not shown: its code has errors.', ...lines, record.hint ?? REPAIR_HINT].join('\n')
   }
   const notes = record.notes ?? []
   return [
-    `The card is shown: ${String(record.components ?? 0)} component(s), ${String(record.controls ?? 0)} control(s).`,
+    `The widget is shown: ${String(record.lines ?? 0)} line(s), ${String(record.scripts ?? 0)} script(s).`,
     PLACEMENT_NOTE,
-    typeof record.card === 'string' ? `Card id: ${record.card} (to redraw or change this card, call ui_render with revises=${record.card}; the reader then sees only the new card)` : '',
-    typeof record.revises === 'string' ? `It replaces card ${record.revises}, which now folds away; states with the same names keep the reader's values.` : '',
-    record.truncated === true ? 'A size limit was reached, so part of the source was left out.' : '',
-    notes.length > 0 ? `Repaired or ignored (fix these next time):\n${notes.join('\n')}` : '',
-    `What a text-only reader sees:\n${record.summary ?? ''}`,
+    typeof record.card === 'string' ? `Card id: ${record.card} (to redraw or change this widget, call ui_render with revises=${record.card}; the reader then sees only the new one)` : '',
+    typeof record.revises === 'string' ? `It replaces card ${record.revises}, which now folds away; the reader's saved values carry over.` : '',
+    (record.shipped ?? []).length > 0 ? `Shipped libraries, loaded offline: ${(record.shipped ?? []).join(', ')}.` : '',
+    (record.fetched ?? []).length > 0 ? `Loaded from code hosts: ${(record.fetched ?? []).join(', ')}.` : '',
+    (record.controls ?? []).length > 0 ? `Controls kept across reloads: ${(record.controls ?? []).join(', ')}.` : '',
+    (record.prompts ?? []).length > 0 ? `Buttons send: ${listed(record.prompts ?? [])}.` : '',
+    notes.length > 0 ? `Check these; they may not work in the frame:\n${notes.join('\n')}` : '',
+    `Text shown before scripts run: ${record.text === undefined || record.text === '' ? '(none)' : record.text}`,
+    'You cannot see the widget; if the reader reports a problem, fix it with revises.',
   ].filter(line => line !== '').join('\n')
-}
-
-/** One diagnostic line, written as an instruction the model can act on. */
-function formatDiagnostic(diagnostic: Diagnostic): string {
-  const where = diagnostic.line === undefined ? diagnostic.path ?? '' : `line ${diagnostic.line}`
-  return `- ${where === '' ? '' : `${where}: `}${diagnostic.message}. ${diagnostic.repair}`
 }
 
 /**
@@ -205,30 +227,28 @@ function formatDiagnostic(diagnostic: Diagnostic): string {
  *
  * This is the only channel that survives a reload: the harness attaches the
  * returned JSON to `tool/result.meta`, which the session log persists and the
- * client replays into the card. The program — not the model's source — is what
- * the client renders.
+ * client replays into the widget.
  * @param args - the model's validated arguments.
  * @param value - the tool's result value.
  * @returns the persisted presentation metadata.
  */
-export function buildPresentationMeta(args: { title?: string | undefined }, value: unknown): JsonValue {
+export function buildPresentationMeta(args: { title?: string | undefined }, value: unknown): Json {
   const candidate = (typeof value === 'object' && value !== null ? value : {}) as Partial<UIRenderSuccess> & Partial<UIRenderFailure>
-  const meta: Record<string, JsonValue> = { version: API_VERSION }
+  const meta: { [key: string]: Json } = { version: API_VERSION }
   if (typeof args.title === 'string' && args.title.trim() !== '') meta.title = args.title.trim().slice(0, 120)
-  if (candidate.ok === true && candidate.program !== undefined) {
+  if (candidate.ok === true && typeof candidate.source === 'string') {
     meta.ok = true
     if (typeof candidate.revises === 'string') meta.revises = candidate.revises
-    meta.program = candidate.program
+    meta.source = candidate.source
     return meta
   }
   meta.ok = false
-  meta.diagnostics = (candidate.diagnostics ?? []).slice(0, MAX_META_DIAGNOSTICS).map((diagnostic) => {
-    const entry: Record<string, JsonValue> = { message: diagnostic.message, repair: diagnostic.repair }
-    if (diagnostic.line !== undefined) entry.line = diagnostic.line
+  meta.problems = (candidate.problems ?? []).slice(0, MAX_META_PROBLEMS).map((problem) => {
+    const entry: { [key: string]: Json } = { message: problem.message, repair: problem.repair }
+    if (problem.line !== undefined) entry.line = problem.line
     return entry
   })
   return meta
 }
 
-/** Re-exported so the host entry and tests share one catalog hash. */
-export { catalogHash, UI_TOOL_NAME }
+export { UI_TOOL_NAME }

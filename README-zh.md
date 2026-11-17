@@ -1,6 +1,6 @@
 # 渐进式交互（dsh-intelligent-ui）
 
-在 DeepSeek Harness 的对话里显示可交互的卡片。模型写一段小的界面程序，对话把它画成原生卡片；调整控件时，所有数字都在浏览器里重算，不会再调用模型。按钮会把上面的文字作为你的下一条消息发出。
+在 DeepSeek Harness 的对话里显示可交互的界面，做法和 Claude、ChatGPT 一样：模型写一个小网页（HTML、SVG、CSS 和 JavaScript），对话把它放进回复里的沙盒框架中运行，深浅色都跟随宿主样式。滑块、图表、示意图、模拟和测验都在你的浏览器里响应，不会再调用模型；点击可以把你的下一条消息发出去。
 
 [English](README.md)
 
@@ -8,249 +8,100 @@
 |---|---|
 | 版本要求 | DeepSeek Harness **>= 0.2.1-rc.1**（低于 0.3.0） |
 | 平台 | 网页版、macOS 桌面版、Windows 桌面版——同一份构建，两个桌面版加载的就是同一个网页客户端 |
-| 已验证 | 网页版 0.2.1-alpha.4；macOS 和 Windows 桌面版 0.2.1-rc.2 |
+| 已验证 | 新引擎：单元测试、构建产物在无头 Chrome 里的检查，以及 macOS 桌面版上的一次实测——模型写的界面画出来了，自带的 Chart.js 离线加载，按钮把下一条消息发了出去。网页版和 Windows 的实测还没做（见 `docs/VERIFY.md`） |
 | 安装 | 设置 → 插件 → 添加插件 → `https://github.com/StarsHarryZhu/dsh-intelligent-UI`（需要 `PATH` 里有 `git`），然后重启 harness 并刷新页面 |
+
+## 能画什么
+
+下面每张图都是本插件画出的、内置技能里教的界面。
+
+<img src="assets/savings-chart.png" alt="带两个滑块、总额和面积图的储蓄估算" width="720">
+
+可以调的估算：拖动滑块，图表和总额立刻重画。
+
+<img src="assets/code-trace.png" alt="逐行演示二分查找" width="720">
+
+逐行演示算法，旁边是它处理的数据。
+
+<img src="assets/loan.png" alt="深色主题下带追问按钮的贷款估算" width="720">
+
+一个按钮替你问出下一个问题。
+
+<img src="assets/svg-diagram.png" alt="请求经过浏览器、服务器和数据库的示意图" width="720">
+
+点击示意图的某个部分，就能问它是做什么的。
+
+<img src="assets/quiz-form.png" alt="带填空和复选框的测验" width="720">
+
+一次把所有答案交给模型批改的测验。
+
+<img src="assets/sorting-steps.png" alt="带播放和单步控件的冒泡排序柱状图" width="720">
+
+可以播放或单步的动画。
+
+<img src="assets/mermaid-dark.png" alt="深色主题下的 Mermaid 流程图" width="720">
+
+Mermaid 排版的流程图，用的是对话的配色。
 
 ## 工作方式
 
-- 插件注册一个工具 `ui_render` 和一个技能 `dsh-intelligent-ui`，技能教模型什么时候用卡片比用文字好。技能是插件里单独的一部分：插件管理页单独列出它、有自己的开关，安装插件时一起装上。模型不写 HTML 或 JavaScript：它写的程序按 36 个组件的目录校验，随工具结果一起保存；它为一张图写的 SVG 会被解析成校验过的树，里面没有脚本、样式、链接或图片。
-- 卡片出现在回复里模型画它的位置，夹在前后两段文字中间；模型写卡片时就在那里逐步显示出来，回合结束、工作过程折叠后它也留在原处。调整控件时，所有数字都在本地重算；你调过的设置保存在这个浏览器里，刷新后卡片保持原样。
-- 让模型修改一张卡片，或者卡片画坏了时，模型会画一张新版本，从你调好的设置开始；同一回合里重画的旧卡不会出现在回复里，之前回合的旧卡收成一行，可以点开查看。
-- `player` 让卡片动起来：逐行演示代码执行、算法的每一轮、点沿曲线移动。加上 `loop=true autoplay=true`，图会在出现在屏幕上时自己循环播放，像动图一样：滚动的轮子、行进的波、绕转的月亮。播放在浏览器里进行，不会发消息给模型；系统设置了“减少动态效果”时不会自己播放。
-- `canvas` 画出模型勾勒的图，可以用形状行，也可以用 SVG。你可以拖动图上的点、点击图上的部件，一切都在本地重算；按钮能把你的选择告诉模型。
-- 卡片能算定积分（含无穷积分限）、导数、极限、求和与连乘、方程求根和泰勒多项式。算不准的值显示“—”，不会给出猜测的数。
+- 插件注册一个工具 `ui_render` 和一个技能 `dsh-intelligent-ui`。技能教模型什么时候用界面比用文字好、怎样设计、该用哪个库、出错了怎么修；插件管理页把它单独列为插件的一部分。
+- 界面出现在回复里模型画它的位置，夹在前后两段文字中间；模型写的时候就在那里逐步显示，写完后脚本才开始运行。
+- 显示之前，每段脚本都会做语法检查（只编译、不运行），模型在同一回合里就能改正。界面运行时出错，下面会有一个按钮，把错误发给模型重画。
+- 你在界面里调过的东西（控件的值，以及界面自己选择记住的内容）保存在这个浏览器里，刷新或重启后保持原样。让模型修改界面时，它会画一个新版本，从你的设置开始，旧版本收起。
+- 裸写的 HTML 就像宿主自己的样子：按钮、滑块、输入框、表格和代码都跟随对话主题；界面还能通过 CSS 变量拿到对话的配色，以及一套给示意图和图表用的色板。
+- 带 `data-prompt` 的按钮、带 `data-send` 的表单，或脚本里的 `sendPrompt()`，都会通过对话自己的输入框发出你的下一条消息，而且只在你点击之后。
 - 卸载后，所有会话照常打开，之前的调用显示为普通工具行。
+
+## 库
+
+插件自带 15 个库。界面照常写它们的 CDN 地址，插件会换成自带的副本，所以离线也能用，也不会向 CDN 发请求。每个库只在有界面用到时才下载。
+
+| 库 | 版本 | 许可证 |
+|---|---|---|
+| Chart.js | 4.6.1 | MIT |
+| ECharts | 5.6.0 | Apache-2.0 |
+| D3 | 7.9.2 | ISC |
+| topojson-client | 3.1.0 | ISC |
+| KaTeX（含字体和 auto-render） | 0.16.47 | MIT |
+| Three.js（r128，以及带 OrbitControls 的 0.160） | 0.128.0、0.160.1 | MIT |
+| highlight.js | 11.12.0 | BSD-3-Clause |
+| marked | 12.0.2 | MIT |
+| Mermaid | 11.17.2 | MIT |
+| math.js | 14.9.1 | Apache-2.0 |
+| Tabler Icons（图标字体） | 3.52.0 | MIT |
+| Matter.js | 0.20.0 | MIT |
+| Tone.js | 14.9.17 | MIT |
+| anime.js | 3.2.2 | MIT |
+
+其他库从 cdnjs、jsDelivr、unpkg 或 esm.sh 加载。各库的许可证全文在 `lib/licenses/`。
+
+## 安全
+
+模型写的代码从不在对话页面里运行。每个界面运行在自己的沙盒框架里：
+
+- 碰不到页面、页面的存储和你的会话；不能弹窗、不能让页面跳转，也用不了摄像头、麦克风和定位；
+- 内容安全策略只允许它从插件自带的副本、四个代码 CDN 和 Google Fonts 加载，其他请求（包括把数据发到别的网站）一律拦截；
+- 它只收到自己的源码、主题和它保存的内容，收不到令牌、会话 id 或别的界面的数据；
+- 页面检查它发来的每条消息：只有你刚在这个界面里点击过，消息或链接才会发出；界面试图跳转到别处会被立即移除。
+
+界面里的脚本仍可能很耗资源；万一卡住，刷新页面即可。
+
+## 从 0.1.x 升级
+
+早期版本用一种声明式语言画卡片。那些卡片现在显示它们保存的文字版本，并附一条说明；新的回答用新的界面。
 
 ## 开发
 
 ```sh
 node scripts/link-dev.mjs   # 从同级 harness checkout 链接工具链
+node scripts/vendor.mjs     # 下载并校验固定版本的库
 node build.js               # 类型检查、构建并自检 bundle
 node node_modules/vitest/vitest.mjs run
 ```
 
-目录规则见 `AGENTS.md`，线上验证清单见 `docs/VERIFY.md`。
-
-## 36 个组件
-
-每个组件一张卡片，由本插件按宿主的浅色主题绘制。每张卡片的程序原文见 [`docs/SAMPLES.md`](docs/SAMPLES.md)。
-
-### `card` — 布局
-
-<img src="assets/catalog/card.png" alt="card" width="720">
-
-带边框的根容器，可设标题、内边距和间距。
-
-### `col` — 布局
-
-<img src="assets/catalog/col.png" alt="col" width="720">
-
-按阅读顺序垂直堆叠。
-
-### `row` — 布局
-
-<img src="assets/catalog/row.png" alt="row" width="720">
-
-等宽并排，窄屏自动换行。
-
-### `grid` — 布局
-
-<img src="assets/catalog/grid.png" alt="grid" width="720">
-
-1 到 4 列的等宽网格。
-
-### `tabs` — 布局
-
-<img src="assets/catalog/tabs.png" alt="tabs" width="720">
-
-读者点击或用方向键切换的分页，只画打开的那一页。
-
-### `tab` — 布局
-
-<img src="assets/catalog/tab.png" alt="tab" width="720">
-
-`tabs` 里的一页，以标题作标签；各页共用卡片的状态。
-
-### `title` — 文本
-
-<img src="assets/catalog/title.png" alt="title" width="720">
-
-标题行，五种字号。
-
-### `text` — 文本
-
-<img src="assets/catalog/text.png" alt="text" width="720">
-
-正文句子，可用 `{…}` 插入实时数值。
-
-### `badge` — 文本
-
-<img src="assets/catalog/badge.png" alt="badge" width="720">
-
-状态词，五种色调。
-
-### `callout` — 文本
-
-<img src="assets/catalog/callout.png" alt="callout" width="720">
-
-强调提示：假设、注意事项或下一步。
-
-### `divider` — 文本
-
-<img src="assets/catalog/divider.png" alt="divider" width="720">
-
-细分隔线。
-
-### `link` — 文本
-
-<img src="assets/catalog/link.png" alt="link" width="720">
-
-引用链接，读者点击才打开。
-
-### `image` — 文本
-
-<img src="assets/catalog/image.png" alt="image" width="720">
-
-内联图片（只接受 `data:` 地址），带替代文字和说明。
-
-### `code` — 文本
-
-<img src="assets/catalog/code.png" alt="code" width="720">
-
-代码或其他需要保留格式的文本，原样显示：按宿主的配色做语法高亮，可显示行号，带复制按钮，`current=` 高亮正在执行的行。
-
-### `metric` — 数据
-
-<img src="assets/catalog/metric.png" alt="metric" width="720">
-
-头条数字，控件一动就重算。
-
-### `progress` — 数据
-
-<img src="assets/catalog/progress.png" alt="progress" width="720">
-
-占比条。
-
-### `table` — 数据
-
-<img src="assets/catalog/table.png" alt="table" width="720">
-
-对比表；`current=` 高亮当前行，`sortable=true` 让读者按任意列排序。每张表都能复制为 CSV 或 Markdown；超过 8 行出现筛选框，超过 20 行自动分页。
-
-### `keys` — 数据
-
-<img src="assets/catalog/keys.png" alt="keys" width="720">
-
-标签与数值对照。
-
-### `list` — 数据
-
-<img src="assets/catalog/list.png" alt="list" width="720">
-
-无序列表；`current=` 高亮当前项。
-
-### `steps` — 数据
-
-<img src="assets/catalog/steps.png" alt="steps" width="720">
-
-有序步骤；加上 `mono=true` 和 `current=` 就是高亮当前执行行的代码清单。
-
-### `chart` — 数据
-
-<img src="assets/catalog/chart.png" alt="chart" width="720">
-
-柱状图、折线图、面积图或饼图；`values=` 画一个序列，或者在下面缩进最多四行 `series`。
-
-### `series` — 数据
-
-<img src="assets/catalog/series.png" alt="series" width="720">
-
-图表里的一个具名序列，可以堆叠或并排；点图例隐藏或显示它，读数行显示某一列的数值。
-
-### `diagram` — 数据
-
-<img src="assets/catalog/diagram.png" alt="diagram" width="720">
-
-分层排布的流程图；回到前面的箭头沿侧边绕回，`current=` 高亮当前框。
-
-### `canvas` — 数据
-
-<img src="assets/catalog/canvas.png" alt="canvas" width="720">
-
-一张图：`shape` 行画在可选的 SVG 上面，SVG 会被解析成校验过的树。图中点了一个区域。
-
-### `shape` — 数据
-
-<img src="assets/catalog/shape.png" alt="shape" width="720">
-
-画布上的一个图形：线、矩形、圆、多边形、路径、函数曲线、文字、点、看不见的可点区域，或按 id 摆放的 SVG 部件。坐标、旋转、缩放和透明度都是表达式，所以播放条能让它们动起来；`point` 加 `drag=true` 后读者可以拖动，点击图形能把一个值存进 state。
-
-### `plot` — 数学
-
-<img src="assets/catalog/plot.png" alt="plot" width="720">
-
-函数图像：标点、切线和积分阴影。
-
-### `formula` — 数学
-
-<img src="assets/catalog/formula.png" alt="formula" width="720">
-
-排版好的公式，后面跟实时数值。
-
-### `slider` — 控件
-
-<img src="assets/catalog/slider.png" alt="slider" width="720">
-
-绑定数值的范围滑块。
-
-### `numberInput` — 控件
-
-<img src="assets/catalog/numberInput.png" alt="numberInput" width="720">
-
-精确数字输入。
-
-### `textInput` — 控件
-
-<img src="assets/catalog/textInput.png" alt="textInput" width="720">
-
-单行文本输入。
-
-### `select` — 控件
-
-<img src="assets/catalog/select.png" alt="select" width="720">
-
-下拉选择。
-
-### `checkbox` — 控件
-
-<img src="assets/catalog/checkbox.png" alt="checkbox" width="720">
-
-开关。
-
-### `checklist` — 控件
-
-<img src="assets/catalog/checklist.png" alt="checklist" width="720">
-
-可勾选的清单，显示完成数；`bind=` 把完成数（或已勾选项 `values=` 的总和）交给卡片里的其他组件，`names=` 收到已勾选项的名字。
-
-### `blanks` — 动作
-
-<img src="assets/catalog/blanks.png" alt="blanks" width="720">
-
-要你补全的句子：每个 `___` 变成句中的一个空。点“提交”把填好的整句（答案加方括号）作为你的下一条消息发出，空格随即锁定，由模型批改。
-
-### `button` — 动作
-
-<img src="assets/catalog/button.png" alt="button" width="720">
-
-把按钮文字作为你的下一条消息发出，随后锁定卡片。
-
-### `player` — 动画
-
-<img src="assets/catalog/player.png" alt="player" width="720">
-
-固定在卡片底部的播放条：让一个数值随时间播放、暂停、单步和拖动，倍速 0.5× 到 2×；引用它的内容逐帧更新。`loop=true` 循环播放，`autoplay=true` 在卡片出现在屏幕上时自动开始。
+目录规则见 `AGENTS.md`，架构见 `docs/PRINCIPLE.md`，实测清单见 `docs/VERIFY.md`。
 
 ## 许可证
 
-[MIT License](LICENSE) © 2026 Starfield。
+[MIT License](LICENSE) © 2026 Starfield。自带的库保留各自的许可证，见上表。

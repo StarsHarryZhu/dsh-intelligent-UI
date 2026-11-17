@@ -1,6 +1,6 @@
 # dsh-intelligent-ui
 
-Interactive cards in DeepSeek Harness chats. The model writes a small interface program, the chat draws it as a native card, and every control recomputes in your browser without another model call. A button sends its text as your next message.
+Interactive widgets in DeepSeek Harness chats, the way Claude and ChatGPT draw them. The model writes a small web page — HTML, SVG, CSS, and JavaScript — and the chat runs it in a sandboxed frame right in the reply, styled like the host in both themes. Sliders, charts, diagrams, simulations, and quizzes respond in your browser without another model call, and a click can send your next message.
 
 [中文](README-zh.md)
 
@@ -8,249 +8,100 @@ Interactive cards in DeepSeek Harness chats. The model writes a small interface 
 |---|---|
 | Requires | DeepSeek Harness **>= 0.2.1-rc.1** (below 0.3.0) |
 | Platforms | Web UI, macOS desktop app, and Windows desktop app — one bundle, because both desktop apps load the same web client |
-| Verified | Web UI 0.2.1-alpha.4; macOS and Windows desktop apps 0.2.1-rc.2 |
+| Verified | This engine: the unit suite, headless Chrome on the built bundle, and a live run on the macOS desktop app — a model-written widget drew, its shipped Chart.js loaded offline, and its button sent the next message. Web UI and Windows live runs are pending (`docs/VERIFY.md`) |
 | Install | Settings → Plugins → Add plugin → `https://github.com/StarsHarryZhu/dsh-intelligent-UI` (needs `git` on `PATH`), then restart the harness and reload the page |
+
+## What it draws
+
+Each image is this plugin drawing a widget its bundled skill teaches.
+
+<img src="assets/savings-chart.png" alt="A savings estimate with two sliders, a total, and an area chart" width="720">
+
+An estimate you adjust: the sliders redraw the chart and the total at once.
+
+<img src="assets/code-trace.png" alt="Binary search traced line by line" width="720">
+
+An algorithm traced line by line, with the data it works on.
+
+<img src="assets/loan.png" alt="A loan estimate in the dark theme with a follow-up button" width="720">
+
+A button that asks the follow-up question for you.
+
+<img src="assets/svg-diagram.png" alt="A diagram of a request passing through a browser, a server, and a database" width="720">
+
+A diagram whose parts you click to ask about them.
+
+<img src="assets/quiz-form.png" alt="A quiz with fill-in blanks and checkboxes" width="720">
+
+A quiz whose answers go back to the model together.
+
+<img src="assets/sorting-steps.png" alt="Bubble sort as bars with play and step controls" width="720">
+
+An animation you play or step through.
+
+<img src="assets/mermaid-dark.png" alt="A Mermaid flowchart in the dark theme" width="720">
+
+A flowchart laid out by Mermaid, in the chat's colours.
 
 ## How it works
 
-- The plugin registers one tool, `ui_render`, and one skill, `dsh-intelligent-ui`, which teaches the model when a card beats prose. The skill is its own part of the plugin: the Plugin Manager lists it with its own switch, and installing the plugin installs it. The model never writes HTML or JavaScript: its program is checked against the 36-component catalog and stored with the tool result. SVG it writes for a drawing is read into a checked tree with no scripts, styles, links, or images.
-- A card stands in the reply where the model drew it, between the text before it and the text after it, and builds up there while the model writes it; folding a finished turn's work leaves it in place. Moving a control recomputes every figure locally, and this browser keeps what you set, so a reload shows the card as you left it.
-- Asked to change a card, or when a card came out wrong, the model draws a revised one that starts from your settings; a card redrawn in the same turn never reaches the reply, and an earlier one folds to a line you can open.
-- A `player` animates a card: code traced line by line, an algorithm's passes, a point moving along a curve. With `loop=true autoplay=true` a drawing plays by itself while it is on screen, like a GIF: a rolling wheel, a travelling wave, an orbit. Playback runs in the browser and sends nothing to the model, and nothing starts by itself if your system asks for less motion.
-- A `canvas` draws what the model sketches, from shape lines or SVG. You can drag its points and click its parts, and everything recomputes locally; a button can tell the model what you chose.
-- Cards compute integrals (including infinite bounds), derivatives, limits, sums and products, roots, and Taylor polynomials. A value that cannot be computed reliably shows "—", never a guess.
+- The plugin registers one tool, `ui_render`, and one skill, `dsh-intelligent-ui`. The skill teaches the model when a widget beats prose, how to design one, which library fits, and how to fix one that failed; the Plugin Manager lists it as its own part of the plugin.
+- A widget stands in the reply where the model drew it, between the text before it and the text after it, and builds up there while the model writes it. Its scripts run once it is complete.
+- Before a widget is shown, every script is checked for syntax errors — compiled, never run — so the model fixes a mistake in the same turn. If a widget fails while running, a button under it sends the error to the model, which redraws it.
+- What you set in a widget — its controls and whatever it chose to remember — is kept in this browser, so a reload or a restart shows it as you left it. Asked to change a widget, the model draws a new version that starts from your settings, and the old one folds away.
+- Bare HTML already looks like the host: buttons, sliders, inputs, tables, and code take the chat's theme, and widgets get its colours as CSS variables, with a palette for diagrams and charts.
+- A button with `data-prompt`, a form with `data-send`, or `sendPrompt()` in a script sends your next message through the chat's own composer, only when you clicked.
 - Uninstalling leaves every session opening as before; earlier calls show as ordinary tool rows.
+
+## Libraries
+
+Fifteen libraries ship with the plugin. A widget names them by their usual CDN address, and the plugin loads its own copy instead, so they work offline and nothing is fetched from a CDN. Each is downloaded only when a widget uses it.
+
+| Library | Version | License |
+|---|---|---|
+| Chart.js | 4.6.1 | MIT |
+| ECharts | 5.6.0 | Apache-2.0 |
+| D3 | 7.9.2 | ISC |
+| topojson-client | 3.1.0 | ISC |
+| KaTeX (with fonts and auto-render) | 0.16.47 | MIT |
+| Three.js (r128 and 0.160 with OrbitControls) | 0.128.0, 0.160.1 | MIT |
+| highlight.js | 11.12.0 | BSD-3-Clause |
+| marked | 12.0.2 | MIT |
+| Mermaid | 11.17.2 | MIT |
+| math.js | 14.9.1 | Apache-2.0 |
+| Tabler Icons (webfont) | 3.52.0 | MIT |
+| Matter.js | 0.20.0 | MIT |
+| Tone.js | 14.9.17 | MIT |
+| anime.js | 3.2.2 | MIT |
+
+Any other library loads from cdnjs, jsDelivr, unpkg, or esm.sh. Their license texts are in `lib/licenses/`.
+
+## Safety
+
+The model's code never runs in the chat page. Each widget runs in its own sandboxed frame:
+
+- no access to the page, its storage, or your session; no popups, no navigation of the page, no camera, microphone, or location;
+- a content policy that lets it load only from the plugin's own copies, the four code CDNs, and Google Fonts — anything else, including sending data to another site, is blocked;
+- it receives only its own source, the theme, and what it kept; never a token, a session id, or another widget's data;
+- the page checks every message it sends: a message or a link goes out only right after you clicked inside that widget, and a widget that tries to navigate away is removed.
+
+A widget can still run a heavy script; if one ever freezes, reload the page.
+
+## Upgrading from 0.1.x
+
+Earlier versions drew cards from a declarative language. Those cards now show the text version they stored, with a note; new answers use widgets.
 
 ## Development
 
 ```sh
 node scripts/link-dev.mjs   # link the toolchain from the sibling harness checkout
+node scripts/vendor.mjs     # download and check the pinned libraries
 node build.js               # type-check, build, and self-check the bundle
 node node_modules/vitest/vitest.mjs run
 ```
 
-`AGENTS.md` holds the rules of the tree; `docs/VERIFY.md` is the live checklist.
-
-## The 36 components
-
-One card per component, drawn by this plugin in the host's light theme. The program behind each card is in [`docs/SAMPLES.md`](docs/SAMPLES.md).
-
-### `card` — Layout
-
-<img src="assets/catalog/card.png" alt="card" width="720">
-
-The framed root: optional title, padding, and gap.
-
-### `col` — Layout
-
-<img src="assets/catalog/col.png" alt="col" width="720">
-
-A vertical stack in reading order.
-
-### `row` — Layout
-
-<img src="assets/catalog/row.png" alt="row" width="720">
-
-Equal-width cells side by side; they wrap on a narrow screen.
-
-### `grid` — Layout
-
-<img src="assets/catalog/grid.png" alt="grid" width="720">
-
-An even grid of one to four columns.
-
-### `tabs` — Layout
-
-<img src="assets/catalog/tabs.png" alt="tabs" width="720">
-
-Pages the reader switches between, by click or arrow key; only the open page is drawn.
-
-### `tab` — Layout
-
-<img src="assets/catalog/tab.png" alt="tab" width="720">
-
-One page of `tabs`, labelled by its title; pages share the card's state.
-
-### `title` — Text
-
-<img src="assets/catalog/title.png" alt="title" width="720">
-
-A headline line in five sizes.
-
-### `text` — Text
-
-<img src="assets/catalog/text.png" alt="text" width="720">
-
-A sentence, with `{…}` live values.
-
-### `badge` — Text
-
-<img src="assets/catalog/badge.png" alt="badge" width="720">
-
-A one-word status label in five tones.
-
-### `callout` — Text
-
-<img src="assets/catalog/callout.png" alt="callout" width="720">
-
-One emphasized remark: an assumption, a caveat, a next step.
-
-### `divider` — Text
-
-<img src="assets/catalog/divider.png" alt="divider" width="720">
-
-A hairline separator.
-
-### `link` — Text
-
-<img src="assets/catalog/link.png" alt="link" width="720">
-
-A citation link, opened only when clicked.
-
-### `image` — Text
-
-<img src="assets/catalog/image.png" alt="image" width="720">
-
-An inline `data:` image with alt text and a caption.
-
-### `code` — Text
-
-<img src="assets/catalog/code.png" alt="code" width="720">
-
-Code or other preformatted text, kept exactly as written, with syntax colours in the host's palette, line numbers, a copy button, and `current=` highlighting the running line.
-
-### `metric` — Data
-
-<img src="assets/catalog/metric.png" alt="metric" width="720">
-
-One prominent number that recomputes as controls move.
-
-### `progress` — Data
-
-<img src="assets/catalog/progress.png" alt="progress" width="720">
-
-A proportion bar.
-
-### `table` — Data
-
-<img src="assets/catalog/table.png" alt="table" width="720">
-
-A comparison table; `current=` highlights a row, and `sortable=true` lets the reader sort by any column. Any table copies as CSV or Markdown; past 8 rows it gains a filter, and past 20 it pages.
-
-### `keys` — Data
-
-<img src="assets/catalog/keys.png" alt="keys" width="720">
-
-Label and value pairs for exact figures.
-
-### `list` — Data
-
-<img src="assets/catalog/list.png" alt="list" width="720">
-
-A bulleted list; `current=` highlights an item.
-
-### `steps` — Data
-
-<img src="assets/catalog/steps.png" alt="steps" width="720">
-
-A numbered procedure; with `mono=true` and `current=`, a code listing with the running line highlighted.
-
-### `chart` — Data
-
-<img src="assets/catalog/chart.png" alt="chart" width="720">
-
-A bar, line, area, or pie chart of one `values=` series, or of up to four `series` lines.
-
-### `series` — Data
-
-<img src="assets/catalog/series.png" alt="series" width="720">
-
-One named series of a chart, stacked or side by side; the legend hides and shows it, and a readout names one column's figures.
-
-### `diagram` — Data
-
-<img src="assets/catalog/diagram.png" alt="diagram" width="720">
-
-A flowchart laid out in layers; loops return along the side, and `current=` highlights a box.
-
-### `canvas` — Data
-
-<img src="assets/catalog/canvas.png" alt="canvas" width="720">
-
-A drawing: `shape` lines over an optional SVG, which is read into a checked tree. Pictured with one area clicked.
-
-### `shape` — Data
-
-<img src="assets/catalog/shape.png" alt="shape" width="720">
-
-One thing on a canvas: a line, rectangle, circle, polygon, path, curve of a function, text, point, invisible area to click, or a part of the SVG placed by its id. Coordinates, turns, sizes, and fades are expressions, so a player animates them; a `point` with `drag=true` moves under the reader's pointer, and a click stores a value in a state.
-
-### `plot` — Math
-
-<img src="assets/catalog/plot.png" alt="plot" width="720">
-
-Curves of y = f(x) with a marked point, its tangent, and a shaded integral.
-
-### `formula` — Math
-
-<img src="assets/catalog/formula.png" alt="formula" width="720">
-
-A typeset expression with its live value.
-
-### `slider` — Controls
-
-<img src="assets/catalog/slider.png" alt="slider" width="720">
-
-A range slider bound to a number.
-
-### `numberInput` — Controls
-
-<img src="assets/catalog/numberInput.png" alt="numberInput" width="720">
-
-Exact number entry.
-
-### `textInput` — Controls
-
-<img src="assets/catalog/textInput.png" alt="textInput" width="720">
-
-A one-line text field.
-
-### `select` — Controls
-
-<img src="assets/catalog/select.png" alt="select" width="720">
-
-A dropdown choice.
-
-### `checkbox` — Controls
-
-<img src="assets/catalog/checkbox.png" alt="checkbox" width="720">
-
-An on/off switch.
-
-### `checklist` — Controls
-
-<img src="assets/catalog/checklist.png" alt="checklist" width="720">
-
-Items to tick off with a done count; `bind=` hands the count — or the sum of the ticked items' `values=` — to the rest of the card, and `names=` the ticked names.
-
-### `blanks` — Action
-
-<img src="assets/catalog/blanks.png" alt="blanks" width="720">
-
-A sentence you complete: each `___` becomes a blank in the line. Submit sends the sentence with your answers in brackets as your next message, and the blanks lock; the model grades it.
-
-### `button` — Action
-
-<img src="assets/catalog/button.png" alt="button" width="720">
-
-Sends its text as your next message, then locks the card.
-
-### `player` — Animation
-
-<img src="assets/catalog/player.png" alt="player" width="720">
-
-A control bar at the bottom of the card: plays, pauses, steps, and scrubs a number at 0.5× to 2×; everything that reads it follows. `loop=true` repeats a run, and `autoplay=true` starts it while the card is on screen.
+`AGENTS.md` holds the rules of the tree, `docs/PRINCIPLE.md` the architecture, and `docs/VERIFY.md` the live checklist.
 
 ## License
 
-[MIT License](LICENSE) © 2026 Starfield.
+[MIT License](LICENSE) © 2026 Starfield. The shipped libraries keep their own licenses, listed above.

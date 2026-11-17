@@ -30,7 +30,7 @@ here is built.
 
 - `AGENTS.md` — this file: the layout and how the skills are registered.
 - `dsh-intelligent-ui/` — the skill that teaches `ui_render`: its instructions
-  and two reference files.
+  and six reference files.
 
 ## 4. Progress
 
@@ -43,6 +43,9 @@ here is built.
 - Confirmed live on 2026-10-22 in the web UI and the macOS desktop app: the
   Plugin Manager lists the skill row, `/` lists the skill, and the model loads
   it before drawing a card.
+
+- Rewritten on 2026-11-17 for widgets written in HTML, SVG, CSS, and
+  JavaScript; the DIL lessons are gone.
 
 **Not done.**
 

@@ -1,0 +1,237 @@
+/*
+ * The look every widget frame starts from.
+ *
+ * The page sends the chat's theme as the variables below; the values here are
+ * the light theme's, used until the first theme message arrives. Bare elements
+ * look like the host's own controls, a few classes cover the common layouts, and
+ * the colour ramps give drawings fills, strokes, and text that read in both
+ * themes; the six series colours do the same for data. The ramps are Tailwind
+ * CSS's palette (MIT).
+ */
+:root {
+  --text-primary: #0f1115;
+  --text-secondary: #61666b;
+  --text-muted: #81858c;
+  --surface-0: #ffffff;
+  --surface-1: #f4f5f7;
+  --surface-2: #ffffff;
+  --border: rgba(0, 0, 0, 0.1);
+  --border-strong: rgba(0, 0, 0, 0.16);
+  --hover: rgba(38, 49, 72, 0.06);
+  --active: rgba(38, 49, 72, 0.1);
+  --accent: #4176e6;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ec1313;
+  --text-accent: var(--accent);
+  --text-success: #15803d;
+  --text-warning: #b45309;
+  --text-danger: #b91c1c;
+  --primary-fill: #0f1115;
+  --on-primary: #ffffff;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --font-size: 16px;
+  --bg-accent: color-mix(in srgb, var(--accent) 12%, transparent);
+  --bg-success: color-mix(in srgb, var(--success) 14%, transparent);
+  --bg-warning: color-mix(in srgb, var(--warning) 16%, transparent);
+  --bg-danger: color-mix(in srgb, var(--danger) 12%, transparent);
+  --gray-50: #fafafa;
+  --gray-100: #f5f5f5;
+  --gray-200: #e5e5e5;
+  --gray-400: #a3a3a3;
+  --gray-600: #525252;
+  --gray-800: #262626;
+  --gray-900: #171717;
+  --blue-50: #eff6ff;
+  --blue-100: #dbeafe;
+  --blue-200: #bfdbfe;
+  --blue-400: #60a5fa;
+  --blue-600: #2563eb;
+  --blue-800: #1e40af;
+  --blue-900: #1e3a8a;
+  --teal-50: #f0fdfa;
+  --teal-100: #ccfbf1;
+  --teal-200: #99f6e4;
+  --teal-400: #2dd4bf;
+  --teal-600: #0d9488;
+  --teal-800: #115e59;
+  --teal-900: #134e4a;
+  --green-50: #f0fdf4;
+  --green-100: #dcfce7;
+  --green-200: #bbf7d0;
+  --green-400: #4ade80;
+  --green-600: #16a34a;
+  --green-800: #166534;
+  --green-900: #14532d;
+  --amber-50: #fffbeb;
+  --amber-100: #fef3c7;
+  --amber-200: #fde68a;
+  --amber-400: #fbbf24;
+  --amber-600: #d97706;
+  --amber-800: #92400e;
+  --amber-900: #78350f;
+  --orange-50: #fff7ed;
+  --orange-100: #ffedd5;
+  --orange-200: #fed7aa;
+  --orange-400: #fb923c;
+  --orange-600: #ea580c;
+  --orange-800: #9a3412;
+  --orange-900: #7c2d12;
+  --red-50: #fef2f2;
+  --red-100: #fee2e2;
+  --red-200: #fecaca;
+  --red-400: #f87171;
+  --red-600: #dc2626;
+  --red-800: #991b1b;
+  --red-900: #7f1d1d;
+  --purple-50: #faf5ff;
+  --purple-100: #f3e8ff;
+  --purple-200: #e9d5ff;
+  --purple-400: #c084fc;
+  --purple-600: #9333ea;
+  --purple-800: #6b21a8;
+  --purple-900: #581c87;
+  --pink-50: #fdf2f8;
+  --pink-100: #fce7f3;
+  --pink-200: #fbcfe8;
+  --pink-400: #f472b6;
+  --pink-600: #db2777;
+  --pink-800: #9d174d;
+  --pink-900: #831843;
+  --series-1: var(--blue-600);
+  --series-2: var(--teal-600);
+  --series-3: var(--amber-600);
+  --series-4: var(--purple-600);
+  --series-5: var(--red-600);
+  --series-6: var(--green-600);
+  color-scheme: light;
+}
+[data-theme=dark] {
+  --text-success: #4ade80;
+  --text-warning: #fbbf24;
+  --text-danger: #f87171;
+  --series-1: var(--blue-400);
+  --series-2: var(--teal-400);
+  --series-3: var(--amber-400);
+  --series-4: var(--purple-400);
+  --series-5: var(--red-400);
+  --series-6: var(--green-400);
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; background: transparent; }
+body {
+  padding: 2px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-wrap: anywhere;
+}
+h1, h2, h3, h4 { margin: 0 0 8px; font-weight: 500; line-height: 1.35; color: var(--text-primary); }
+h1 { font-size: 22px; }
+h2 { font-size: 18px; }
+h3, h4 { font-size: 16px; }
+p { margin: 0 0 8px; }
+a { color: var(--text-accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+small, .muted { color: var(--text-secondary); }
+hr { border: 0; border-top: 1px solid var(--border); margin: 12px 0; }
+img, video, canvas { max-width: 100%; }
+svg:not([width]) { width: 100%; height: auto; }
+svg { overflow: visible; }
+svg text { fill: var(--text-primary); font-family: var(--font-sans); font-size: 14px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+button {
+  font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  padding: 7px 14px;
+  color: var(--text-primary);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background-color 0.12s ease, transform 0.06s ease;
+}
+button:hover { background: var(--hover); }
+button:active { transform: scale(0.98); background: var(--active); }
+button:disabled { opacity: 0.5; cursor: default; transform: none; }
+button.primary, button[type=submit] { background: var(--primary-fill); border-color: var(--primary-fill); color: var(--on-primary); }
+button.primary:hover, button[type=submit]:hover { opacity: 0.88; }
+button[aria-pressed=true], button.selected { border-color: var(--accent); background: var(--bg-accent); color: var(--text-accent); }
+input, select, textarea {
+  font: inherit;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+input:not([type]), input[type=text], input[type=number], input[type=email], input[type=search], input[type=url], input[type=tel], input[type=date], input[type=time], input[type=datetime-local], input[type=month], select {
+  height: 36px;
+  padding: 0 10px;
+}
+textarea { padding: 8px 10px; min-height: 72px; resize: vertical; width: 100%; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--bg-accent); }
+input[type=range] { accent-color: var(--accent); padding: 0; border: 0; background: transparent; height: auto; vertical-align: middle; }
+input[type=checkbox], input[type=radio] { accent-color: var(--accent); width: 16px; height: 16px; margin: 0 6px 0 0; vertical-align: -3px; }
+input[type=color] { padding: 2px; height: 36px; width: 48px; }
+label { color: var(--text-primary); }
+label:has(> input[type=checkbox], > input[type=radio]) { display: inline-flex; align-items: center; margin-right: 16px; }
+fieldset { border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px 12px; margin: 0 0 12px; }
+legend { padding: 0 4px; color: var(--text-secondary); font-size: 14px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+th { color: var(--text-secondary); font-weight: 500; font-size: 13px; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+code, kbd, samp, pre { font-family: var(--font-mono); font-size: 0.875em; }
+code { background: var(--surface-1); padding: 1px 5px; border-radius: 4px; }
+pre { background: var(--surface-1); padding: 12px 14px; border-radius: var(--radius); overflow: auto; line-height: 1.5; }
+pre code { background: transparent; padding: 0; }
+
+.card { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 20px; }
+.metric { display: flex; flex-direction: column; gap: 2px; background: var(--surface-1); border-radius: var(--radius); padding: 12px 16px; min-width: 0; }
+.metric .label { font-size: 13px; color: var(--text-secondary); }
+.metric .value { font-size: 24px; font-weight: 500; line-height: 1.3; font-variant-numeric: tabular-nums; }
+.badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; line-height: 18px; padding: 1px 8px; border-radius: 999px; background: var(--surface-1); color: var(--text-secondary); }
+.note { padding: 10px 14px; border-radius: var(--radius); background: var(--surface-1); color: var(--text-primary); font-size: 14px; }
+.badge.accent, .note.accent { background: var(--bg-accent); color: var(--text-accent); }
+.badge.success, .note.success { background: var(--bg-success); color: var(--text-success); }
+.badge.warning, .note.warning { background: var(--bg-warning); color: var(--text-warning); }
+.badge.danger, .note.danger { background: var(--bg-danger); color: var(--text-danger); }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.stack { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+
+.c-gray { --ramp-fill: #fafafa; --ramp-tint: #f5f5f5; --ramp-stroke: #525252; --ramp-text: #262626; --ramp-sub: #525252; }
+[data-theme=dark] .c-gray { --ramp-fill: #171717; --ramp-tint: #262626; --ramp-stroke: #a3a3a3; --ramp-text: #f5f5f5; --ramp-sub: #e5e5e5; }
+.c-blue { --ramp-fill: #eff6ff; --ramp-tint: #dbeafe; --ramp-stroke: #2563eb; --ramp-text: #1e40af; --ramp-sub: #2563eb; }
+[data-theme=dark] .c-blue { --ramp-fill: #1e3a8a; --ramp-tint: #1e40af; --ramp-stroke: #60a5fa; --ramp-text: #dbeafe; --ramp-sub: #bfdbfe; }
+.c-teal { --ramp-fill: #f0fdfa; --ramp-tint: #ccfbf1; --ramp-stroke: #0d9488; --ramp-text: #115e59; --ramp-sub: #0d9488; }
+[data-theme=dark] .c-teal { --ramp-fill: #134e4a; --ramp-tint: #115e59; --ramp-stroke: #2dd4bf; --ramp-text: #ccfbf1; --ramp-sub: #99f6e4; }
+.c-green { --ramp-fill: #f0fdf4; --ramp-tint: #dcfce7; --ramp-stroke: #16a34a; --ramp-text: #166534; --ramp-sub: #16a34a; }
+[data-theme=dark] .c-green { --ramp-fill: #14532d; --ramp-tint: #166534; --ramp-stroke: #4ade80; --ramp-text: #dcfce7; --ramp-sub: #bbf7d0; }
+.c-amber { --ramp-fill: #fffbeb; --ramp-tint: #fef3c7; --ramp-stroke: #d97706; --ramp-text: #92400e; --ramp-sub: #d97706; }
+[data-theme=dark] .c-amber { --ramp-fill: #78350f; --ramp-tint: #92400e; --ramp-stroke: #fbbf24; --ramp-text: #fef3c7; --ramp-sub: #fde68a; }
+.c-orange { --ramp-fill: #fff7ed; --ramp-tint: #ffedd5; --ramp-stroke: #ea580c; --ramp-text: #9a3412; --ramp-sub: #ea580c; }
+[data-theme=dark] .c-orange { --ramp-fill: #7c2d12; --ramp-tint: #9a3412; --ramp-stroke: #fb923c; --ramp-text: #ffedd5; --ramp-sub: #fed7aa; }
+.c-red { --ramp-fill: #fef2f2; --ramp-tint: #fee2e2; --ramp-stroke: #dc2626; --ramp-text: #991b1b; --ramp-sub: #dc2626; }
+[data-theme=dark] .c-red { --ramp-fill: #7f1d1d; --ramp-tint: #991b1b; --ramp-stroke: #f87171; --ramp-text: #fee2e2; --ramp-sub: #fecaca; }
+.c-purple { --ramp-fill: #faf5ff; --ramp-tint: #f3e8ff; --ramp-stroke: #9333ea; --ramp-text: #6b21a8; --ramp-sub: #9333ea; }
+[data-theme=dark] .c-purple { --ramp-fill: #581c87; --ramp-tint: #6b21a8; --ramp-stroke: #c084fc; --ramp-text: #f3e8ff; --ramp-sub: #e9d5ff; }
+.c-pink { --ramp-fill: #fdf2f8; --ramp-tint: #fce7f3; --ramp-stroke: #db2777; --ramp-text: #9d174d; --ramp-sub: #db2777; }
+[data-theme=dark] .c-pink { --ramp-fill: #831843; --ramp-tint: #9d174d; --ramp-stroke: #f472b6; --ramp-text: #fce7f3; --ramp-sub: #fbcfe8; }
+svg :is(rect, circle, ellipse, polygon):is(.c-gray, .c-blue, .c-teal, .c-green, .c-amber, .c-orange, .c-red, .c-purple, .c-pink), svg :is(.c-gray, .c-blue, .c-teal, .c-green, .c-amber, .c-orange, .c-red, .c-purple, .c-pink) :is(rect, circle, ellipse, polygon) { fill: var(--ramp-fill); stroke: var(--ramp-stroke); }
+svg :is(path, line, polyline):is(.c-gray, .c-blue, .c-teal, .c-green, .c-amber, .c-orange, .c-red, .c-purple, .c-pink), svg :is(.c-gray, .c-blue, .c-teal, .c-green, .c-amber, .c-orange, .c-red, .c-purple, .c-pink) :is(line, polyline) { stroke: var(--ramp-stroke); }
+svg text:is(.c-gray, .c-blue, .c-teal, .c-green, .c-amber, .c-orange, .c-red, .c-purple, .c-pink), svg :is(.c-gray, .c-blue, .c-teal, .c-green, .c-amber, .c-orange, .c-red, .c-purple, .c-pink) text { fill: var(--ramp-text); }
+svg :is(.c-gray, .c-blue, .c-teal, .c-green, .c-amber, .c-orange, .c-red, .c-purple, .c-pink) text.ts { fill: var(--ramp-sub); }
+:is(.c-gray, .c-blue, .c-teal, .c-green, .c-amber, .c-orange, .c-red, .c-purple, .c-pink):not(svg, svg *) { background: var(--ramp-fill); color: var(--ramp-text); border-color: var(--ramp-stroke); }
+svg .t { font-size: 14px; }
+svg .ts { font-size: 12px; fill: var(--text-secondary); }
+svg .th { font-size: 14px; font-weight: 500; }

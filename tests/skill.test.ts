@@ -3,10 +3,11 @@ import { tmpdir } from 'node:os'
 import { join, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { BUNDLED_SKILL_RANK, createSkillProvider, parseSkill, readSkillCandidate, SKILL_DIRECTORY, SKILL_FILE, SKILL_NAME } from '../src/host/skill.ts'
-import { compileSource } from '../src/lang/compile.ts'
+import { Script } from 'node:vm'
+import { checkWidget } from '../src/host/check.ts'
 
 /** The bundled skill's files: the instructions and the references they name. */
-const FILES = ['SKILL.md', 'math.md', 'recipes.md', 'drawing.md']
+const FILES = ['SKILL.md', 'interactive.md', 'charts.md', 'diagrams.md', 'math.md', 'forms.md', 'recipes.md']
 
 /** The host's own skill-name rule and its convention for one rendered skill file. */
 const SKILL_NAME_RULE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u
@@ -33,21 +34,40 @@ describe('the bundled skill', () => {
 
   it('names only reference files that exist', () => {
     const named = [...new Set([...read('SKILL.md').matchAll(/`([\w-]+\.md)`/gu)].map(match => match[1] as string))]
-    expect(named.sort()).toEqual(['drawing.md', 'math.md', 'recipes.md'])
+    expect(named.sort()).toEqual(['charts.md', 'diagrams.md', 'forms.md', 'interactive.md', 'math.md', 'recipes.md'])
     for (const name of named) expect(() => read(name)).not.toThrow()
   })
 
-  it('teaches only programs that compile without a single repair', () => {
+  it('teaches only widgets that pass the host\'s check without a single problem', () => {
     let count = 0
     for (const name of FILES) {
-      for (const match of read(name).matchAll(/```dil\n([\s\S]*?)```/gu)) {
-        const result = compileSource(match[1] as string)
-        expect(result.ok, `${name}: ${match[1]}`).toBe(true)
-        if (result.ok) expect(result.program.diagnostics, `${name}: ${match[1]}`).toEqual([])
+      for (const match of read(name).matchAll(/```html\n([\s\S]*?)```/gu)) {
+        const checked = checkWidget(match[1] as string)
+        expect(checked.problems, `${name}: ${(match[1] as string).slice(0, 80)}`).toEqual([])
+        expect(checked.fetched, `${name}: every library a recipe loads is shipped`).toEqual([])
         count += 1
       }
     }
-    expect(count).toBeGreaterThanOrEqual(12)
+    expect(count).toBeGreaterThanOrEqual(10)
+  })
+
+  it('teaches only snippets that parse', () => {
+    let count = 0
+    for (const name of FILES) {
+      for (const match of read(name).matchAll(/```js\n([\s\S]*?)```/gu)) {
+        expect(() => new Script(match[1] as string, { filename: name }), `${name}: ${(match[1] as string).slice(0, 80)}`).not.toThrow()
+        count += 1
+      }
+    }
+    expect(count).toBeGreaterThanOrEqual(8)
+  })
+
+  it('names only theme variables and classes the frame has', () => {
+    const css = readFileSync(join(SKILL_DIRECTORY, '..', '..', 'src', 'frame', 'base.css'), 'utf8')
+    for (const name of FILES) {
+      for (const match of read(name).matchAll(/var\((--[a-z0-9-]+)\)/gu)) expect(css, `${name}: ${match[1] as string}`).toContain(`${match[1] as string}:`)
+      for (const match of read(name).matchAll(/\bc-(?:gray|blue|teal|green|amber|orange|red|purple|pink|coral)\b/gu)) expect(css, `${name}: ${match[0]}`).toContain(`.${match[0]} {`)
+    }
   })
 
   it('sits in the skills/<name>/SKILL.md layout the host\'s own skill packages use', () => {
@@ -68,7 +88,7 @@ describe('the bundled skill', () => {
       resourceBase: { kind: 'directory', path: SKILL_DIRECTORY },
     })
     expect(entry.candidate.description).toBe(parseSkill(read('SKILL.md'))?.description)
-    for (const name of ['math.md', 'recipes.md']) expect(() => readFileSync(join(SKILL_DIRECTORY, name))).not.toThrow()
+    for (const name of FILES) expect(() => readFileSync(join(SKILL_DIRECTORY, name))).not.toThrow()
   })
 
   it('loads the body fresh on every get, without the provider\'s private fields', async () => {

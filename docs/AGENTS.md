@@ -3,33 +3,32 @@
 ## 1. Role
 
 Longer-form documentation that does not belong in a README: the architecture this
-plugin follows and how it differs from the original, the catalogue as it was drawn
-component by component, the checklist that proves the cards work in the running
-harness on each platform, and the plugin-list submission.
+plugin follows and how it differs from the interfaces it reproduces, the
+checklist that proves widgets work in the running harness on each platform, and
+the plugin-list submission.
 
-A README states what the plugin is and how to install it. These three files hold what
-a contributor needs before changing behaviour, what the model's output looks like
-when it is right, and what a verifier needs after a restart.
+A README states what the plugin is and how to install it. These files hold what a
+contributor needs before changing behaviour and what a verifier needs after a
+restart.
 
 ## 2. Constraints
 
 **One fact, one home.** Installation lives in the README. The click-through
-verification lives in `VERIFY.md`. The architecture comparison lives in
-`PRINCIPLE.md`. The drawn catalogue lives in `SAMPLES.md`. Do not restate a step in
-two files.
+verification lives in `VERIFY.md`. The architecture and the security boundary's
+reasons live in `PRINCIPLE.md`. Do not restate a step in two files.
 
 **State current behaviour, not history.** A mechanism is described as it is. What
-it replaced belongs in a commit or in the root `AGENTS.md` defect list.
+it replaced belongs in a commit or in the root `AGENTS.md`.
 
-**Attribute the sources.** `PRINCIPLE.md` describes the original architecture,
-which comes from third-party reverse engineering and one open-source
-reimplementation. Name those sources and mark what is inferred rather than
-observed.
+**Attribute the sources.** `PRINCIPLE.md` describes ChatGPT's and Claude's
+interactive answers, known from third-party reverse engineering, an
+announcement, and the guidance Claude's own tool hands its model. Name those
+sources and mark what is inferred rather than observed.
 
 **`VERIFY.md` steps must be runnable as written.** Every step names the exact
-place, command, or console expression, and states what a pass looks like. A run
-is recorded with its date, platform, and harness version, and with every step it
-did not exercise.
+place, prompt, command, or console expression, and states what a pass looks
+like. A run is recorded with its date, platform, and harness version, and with
+every step it did not exercise.
 
 **Say what is unverified.** Both files carry a section for what has not been
 proven.
@@ -39,18 +38,14 @@ proven.
 ## 3. Contents
 
 - `AGENTS.md` — this file: what belongs in this directory.
-- `PRINCIPLE.md` — how the original Intelligent UI works, source by source; the
-  layers this plugin reproduces on DeepSeek Harness mechanisms; the deliberate
-  differences; and what was given up.
-- `VERIFY.md` — the checklist in three parts: the web UI (activation, persisted
-  cards, math cards, the skill, buttons, a bad program, reload, themes, the
-  uninstall regression, an animated card, the newer components, a code block,
-  the skill row, kept edits with revised cards, drawings, drawings that play by themselves, replaced cards, fill-in questions, and a card inside the answer), the macOS and Windows desktop apps, and what only
-  Windows shows; plus the recorded runs. All three parts are required: Part 1
-  passed on the web UI, Parts 2 and 3 on both desktop apps of 0.2.1-rc.2, and
-  only W4 has no recorded pass.
-- `SAMPLES.md` — the catalog tour: one drawn card per component, with the exact
-  source and result of each, and the defects the tour found.
+- `PRINCIPLE.md` — how ChatGPT's and Claude's interactive answers work, the
+  layers this plugin builds on DeepSeek Harness mechanisms, the security
+  boundary, the deliberate differences and give-ups, and the known risks.
+- `VERIFY.md` — the checklist in three parts: the web UI (build, activation, an
+  earlier card's text, a live widget, shipped libraries, sending, forms, the
+  syntax check, runtime errors, kept values, themes, the sandbox, an unshipped
+  library, the harness untouched, removal, the skill row), the macOS and
+  Windows desktop apps, and what only Windows shows; plus the recorded runs.
 - `market/` — the awesome-dsh-plugin entry and how to submit it. See
   `market/AGENTS.md`. The folder is git-ignored and stays in the working tree:
   it is never published with the code.
@@ -59,50 +54,23 @@ proven.
 
 **Done.**
 
-- `PRINCIPLE.md` describes the two drawing surfaces, the turn data Definition,
-  button sends, and the streaming preview as they are implemented.
-- `VERIFY.md` covers every acceptance criterion with a runnable step, including a
-  check that costs no model call: a persisted card, and a card from before the
-  version fields showing its text. The web part was run on 2026-10-16 and the
-  desktop parts on 2026-10-17; both are recorded there.
-- `SAMPLES.md` carries all thirty-six components: samples 1 to 27 as they were
-  actually drawn, samples 28 to 35 as compiled by the built tool (28 to 31 drew
-  together in one web-UI card on 2026-10-19; a model-written code card drew
-  live on both the web UI and the macOS app on 2026-10-22; sample 36, `blanks`,
-  added on 2026-11-08), and
-  doubles as a compile corpus: `tests/compile.test.ts` compiles the samples a
-  live model wrote and pins samples 33 to 35 to their recorded text views.
-- Screenshots of rendered cards live in the repository's `assets/`.
+- Rewritten on 2026-11-17 for the sandboxed engine. `SAMPLES.md`, the drawn tour
+  of the DIL catalog, went with the DIL; the widgets the skill teaches take its
+  place as examples.
+- `VERIFY.md` records the headless Chrome run of 2026-11-17 on the built bundle.
 
 **Not done.**
 
-- **W4 of `VERIFY.md` has no recorded pass.** Developing on Windows — link the
-  toolchain, build, run the suite — failed on 2026-10-16 with its output lost, and
-  no later attempt is recorded. Everything else in the checklist has passed.
-- **No desktop record of its own yet.** Parts 2 and 3 passed on both desktop apps
-  of 0.2.1-rc.2, and the root `AGENTS.md` and `VERIFY.md` carry that run; no
-  separate capture or write-up from a desktop session exists in `docs/`.
+- **No live run of the new engine.** Parts 1 to 3 of `VERIFY.md` have not been
+  run against it; the DIL builds' records are in the file's git history.
+- **W4 of `VERIFY.md` has never passed.** Developing on Windows failed on
+  2026-10-16 with its output lost.
 
 **Known defects.**
 
-- `VERIFY.md` names one specific historical session for the zero-cost check; on
-  another machine, any session with a settled `ui_render` call serves instead.
+- Steps 8, 9, 12, and 13 of `VERIFY.md` ask the model to call the tool with a
+  given source; a model may still change it, and the step then needs a second
+  try.
 
-- **Step 18 has no desktop record.** Drawings ran on the web UI on 2026-11-05;
-  the macOS app was open and did not exit when asked to quit, and the command line
-  refuses to change its profile.
-- **Step 19 has not run live.** Drawings that play by themselves ran only in
-  headless Chrome on the built bundle (recorded); the web UI and the desktop apps
-  have no record.
-- **Step 21 has not run live.** A fill-in question ran only in headless Chrome
-  on the built bundle (recorded); no live model has written one yet.
-- **Step 20 has not run live.** Replaced cards (a redraw in the same turn left
-  out of the reply, an earlier card folded) ran only in headless Chrome on the
-  built bundle (recorded).
-- **Step 22 has not run live.** A card inside the answer ran with the host's own
-  conversation engine on a replayed session in a throwaway `DSH_HOME`
-  (recorded); the streaming preview in the reply and a model placing its own
-  card have no record.
-
-**Next goal.** Rerun Parts 2 and 3 of `VERIFY.md` on each new desktop version, in
-a throwaway session first, and record the output of W4.
+**Next goal.** Run Part 1 with a real model, record it, and tune the tool
+description and the skill from what it shows.
