@@ -18,7 +18,7 @@
  */
 
 import { LIMITS } from '../widget/policy.ts'
-import { CHANNEL, type FromFrame, type Json, type ShippedText, type Unmarked } from '../widget/messages.ts'
+import { CHANNEL, type FromFrame, type Json, SCROLL_INTERVAL_MS, SCROLL_KEYS, type ScrollInput, type ShippedText, type Unmarked } from '../widget/messages.ts'
 import { scriptBlocks } from '../widget/scan.ts'
 import * as math from './math.ts'
 
@@ -187,6 +187,23 @@ export function boot(win: FrameWindow): Runtime {
   }
   doc.addEventListener('input', keep, true)
   doc.addEventListener('change', keep, true)
+
+  // --- the reader's scrolling ----------------------------------------------
+  // The page never sees input inside the frame, so it would take a scroll the
+  // frame passes on for one it did not ask for, and undo it. Each input that may
+  // scroll is named to the page, at most once per interval for each kind.
+  const lastScroll: Record<ScrollInput, number> = { wheel: Number.NEGATIVE_INFINITY, touch: Number.NEGATIVE_INFINITY, key: Number.NEGATIVE_INFINITY }
+  const scrolling = (input: ScrollInput, key?: string): void => {
+    const now = win.performance.now()
+    if (now - lastScroll[input] < SCROLL_INTERVAL_MS) return
+    lastScroll[input] = now
+    post(key === undefined ? { t: 'scroll', input } : { t: 'scroll', input, key })
+  }
+  win.addEventListener('wheel', () => { scrolling('wheel') }, { capture: true, passive: true })
+  win.addEventListener('touchstart', () => { scrolling('touch') }, { capture: true, passive: true })
+  win.addEventListener('keydown', (event) => {
+    if (SCROLL_KEYS.has(event.key)) scrolling('key', event.key)
+  }, true)
 
   // --- height -------------------------------------------------------------
   let heightQueued = false

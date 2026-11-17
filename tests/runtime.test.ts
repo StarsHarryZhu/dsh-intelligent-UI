@@ -296,6 +296,23 @@ describe('what a widget may ask of the page', () => {
   })
 })
 
+describe('the reader\'s scrolling', () => {
+  it('is named to the page, at most once per interval for each kind, and only for keys that scroll', async () => {
+    const frame = await run('<p id="p">Text</p><input id="field">')
+    const { window: w, document: d } = frame
+    d.getElementById('p')?.dispatchEvent(new w.WheelEvent('wheel', { bubbles: true, deltaY: 40 }))
+    d.body.dispatchEvent(new w.WheelEvent('wheel', { bubbles: true, deltaY: 40 }))
+    d.body.dispatchEvent(new w.Event('touchstart', { bubbles: true }))
+    d.getElementById('field')?.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'a', bubbles: true }))
+    d.body.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'PageDown', bubbles: true }))
+    expect(frame.sent('scroll')).toEqual([
+      { channel: CHANNEL, t: 'scroll', input: 'wheel' },
+      { channel: CHANNEL, t: 'scroll', input: 'touch' },
+      { channel: CHANNEL, t: 'scroll', input: 'key', key: 'PageDown' },
+    ])
+  })
+})
+
 describe('messages to the frame', () => {
   it('follows the page\'s theme and tells the widget', async () => {
     const frame = await run('<script>window.themes = []; window.addEventListener("dsh:theme", (event) => { window.themes.push([event.detail.dark, dsh.theme]) })</script>')

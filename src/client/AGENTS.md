@@ -86,6 +86,16 @@ with the frame focused), at most once every `SEND_INTERVAL_MS`; otherwise the
 widget gets a notice that it was stopped. A frame that fires `load` a second time
 has left its document, and is removed with a note.
 
+**The reader's scrolling over a frame reaches the chat.** Input events inside a
+frame never reach the page, but a frame that cannot scroll passes the scroll on
+to the chat, which tells the reader's scrolling from its own by the wheel,
+touch, and key events it watches on the way down; without them it undoes the
+scroll while it keeps a reading anchor. The frame names each such input and
+`widget.tsx` repeats it on the frame element as a non-bubbling event that
+scrolls nothing, at most once per `SCROLL_INTERVAL_MS` for each kind, a key only
+while the frame has the focus. A widget that forges these can only make the chat
+believe the reader scrolled.
+
 **Messages go through the composer.** A widget's message calls
 `inputActions.setDraft` and `submit` only when the composer is empty and idle;
 otherwise the text is copied and the widget says so, and where the page refuses
@@ -176,6 +186,10 @@ forbidden.
   changes all pass through checked messages (`tests/client.test.tsx`,
   `tests/bridge.test.ts`, `tests/runtime.test.ts`, `tests/isolation.test.ts`).
 - Cards drawn by the DIL builds show the text version they carried.
+- The reader's wheel, touch, and scrolling keys inside a frame are repeated to
+  the chat, which no longer pulls back a scroll started over a widget while it
+  keeps a reading anchor (`tests/client.test.tsx`; headless Chrome in
+  `docs/VERIFY.md`, step 14).
 - Checked in headless Chrome on the built bundle (`docs/VERIFY.md`, Part 1):
   every widget the skill teaches runs with no error in both themes, shipped
   libraries load with the network refused, and a frame that navigates or sends

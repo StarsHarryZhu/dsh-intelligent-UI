@@ -76,6 +76,22 @@ export type FromFrame = {
 } | {
     channel: typeof CHANNEL;
     t: 'ran';
+} | {
+    channel: typeof CHANNEL;
+    t: 'scroll';
+    input: ScrollInput;
+    key?: string;
 };
+/**
+ * How the reader started to scroll inside a frame. A frame's input events never
+ * reach the page, yet a frame that cannot scroll passes the scroll itself on to
+ * the chat; the chat tells the reader's scrolling from its own by these events,
+ * so the frame names them and the page repeats them on the frame's element.
+ */
+export type ScrollInput = 'wheel' | 'touch' | 'key';
+/** The keys that scroll, as the chat counts them. */
+export declare const SCROLL_KEYS: ReadonlySet<string>;
+/** Least time between two scroll inputs a frame reports, in milliseconds. */
+export declare const SCROLL_INTERVAL_MS = 50;
 /** A message of either direction without its channel mark, as a sender writes it. */
 export type Unmarked<M> = M extends unknown ? Omit<M, 'channel'> : never;

@@ -12,7 +12,7 @@
  */
 
 import { Component, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { CHANNEL, type Json, type ToFrame, type Unmarked } from '../widget/messages.ts'
+import { CHANNEL, type Json, SCROLL_INTERVAL_MS, type ScrollInput, type ToFrame, type Unmarked } from '../widget/messages.ts'
 import { normalizeSource } from '../widget/normalize.ts'
 import { FRAME_SANDBOX } from '../widget/policy.ts'
 import { addresses, moduleAddresses } from '../widget/scan.ts'
@@ -202,6 +202,8 @@ interface FrameLive {
   lastSend: number
   lastStream: number
   heightSavedAt: number
+  /** When each kind of the reader's scrolling was last repeated to the chat. */
+  lastScroll: Record<ScrollInput, number>
   frame: number | undefined
 }
 
@@ -219,7 +221,7 @@ function WidgetFrame(props: FrameProps): ReactNode {
   // The frame element carries the colour scheme its document uses: where the two
   // differ, the browser paints the frame opaque instead of keeping it transparent.
   const [dark, setDark] = useState(opening.dark)
-  const live = useRef<FrameLive>({ props, loads: 0, ready: false, posted: '', final: false, ran: false, asked: new Set(), libraries: Promise.resolve(), lastSend: Number.NEGATIVE_INFINITY, lastStream: Number.NEGATIVE_INFINITY, heightSavedAt: Number.NEGATIVE_INFINITY, frame: undefined })
+  const live = useRef<FrameLive>({ props, loads: 0, ready: false, posted: '', final: false, ran: false, asked: new Set(), libraries: Promise.resolve(), lastSend: Number.NEGATIVE_INFINITY, lastStream: Number.NEGATIVE_INFINITY, heightSavedAt: Number.NEGATIVE_INFINITY, lastScroll: { wheel: Number.NEGATIVE_INFINITY, touch: Number.NEGATIVE_INFINITY, key: Number.NEGATIVE_INFINITY }, frame: undefined })
   live.current.props = props
 
   const post = useCallback((message: Unmarked<ToFrame>) => {
@@ -324,6 +326,19 @@ function WidgetFrame(props: FrameProps): ReactNode {
         case 'ran':
           state.ran = true
           return
+        case 'scroll': {
+          // The chat tells the reader's scrolling from its own by input events, and none
+          // from inside the frame reach it: repeat the reader's on the frame element, so a
+          // scroll the frame passes on to the chat is not taken back. A key counts only
+          // while the frame has the focus, as the key could reach it only then.
+          const element = frame.current
+          if (element === null || (action.input === 'key' && document.activeElement !== element)) return
+          const now = performance.now()
+          if (now - state.lastScroll[action.input] < SCROLL_INTERVAL_MS) return
+          state.lastScroll[action.input] = now
+          element.dispatchEvent(scrollEvent(action.input, action.key))
+          return
+        }
         case 'state':
           current.update(memory => ({ ...memory, state: action.value }))
           return
@@ -390,6 +405,17 @@ function WidgetFrame(props: FrameProps): ReactNode {
       ) : null}
     </div>
   )
+}
+
+/**
+ * The event the chat would have met had the reader's input landed outside the
+ * frame. It does not bubble, so it reaches only listeners that watch the way
+ * down to the frame, as the chat's scroll container does; it scrolls nothing.
+ */
+function scrollEvent(input: ScrollInput, key: string | undefined): Event {
+  if (input === 'wheel') return new WheelEvent('wheel')
+  if (input === 'key') return new KeyboardEvent('keydown', { key: key ?? '' })
+  return new Event('touchstart')
 }
 
 /** The page's theme before the frame has a place to read it from: the body carries the chat's tokens. */

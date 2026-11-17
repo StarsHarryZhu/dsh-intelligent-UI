@@ -71,10 +71,12 @@ need the build first: run `node build.js` before the suite.
 - `bridge.test.ts` — every message a frame may send, checked and bounded, and
   the frame's document.
 - `runtime.test.ts` — the frame runtime in jsdom: streaming without running,
-  activation order, kept values, forms and markers, theme, and messages.
+  activation order, kept values, forms and markers, theme, scroll inputs, and
+  messages.
 - `client.test.tsx` — the browser half through its real registration: the frame,
-  streaming, sending and links, kept values, revisions, the tool row, cards from
-  before the rewrite, Turn data, cards in the reply, theme, and libraries.
+  streaming, sending and links, scrolling over a frame, kept values, revisions,
+  the tool row, cards from before the rewrite, Turn data, cards in the reply,
+  theme, and libraries.
 - `math.test.ts` — the quadrature rule's constants, integrals, derivatives and
   corners, limits, roots, and special functions.
 - `skill.test.ts` — the bundled skill: its layout, size, and frontmatter; every

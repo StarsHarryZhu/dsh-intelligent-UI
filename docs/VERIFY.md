@@ -127,7 +127,13 @@ Send:
 
 Pass: the result lists the address under fetched addresses, not shipped libraries; the network panel shows it loaded from jsDelivr; the ball moves.
 
-## 14. Nothing else moved
+## 14. Scrolling over a widget
+
+Open a session whose earlier turns hold several widgets. Jump to one of those turns with the turn navigator, or press the button that loads earlier turns. Then, with the pointer over a widget, scroll up and down with the wheel or the trackpad; click inside a widget and scroll with Page Up and Page Down.
+
+Pass: the chat scrolls under the pointer as it does over text, and is never pulled back to where it was.
+
+## 15. Nothing else moved
 
 ```sh
 git -C /Users/starfield/Documents/deepseek-harness/deepseek-harness status --porcelain
@@ -135,13 +141,13 @@ git -C /Users/starfield/Documents/deepseek-harness/deepseek-harness status --por
 
 Pass: no output.
 
-## 15. Removing it changes nothing else
+## 16. Removing it changes nothing else
 
-Disable the plugin in Settings → Plugins and restart DSH web. Open the sessions of steps 3 to 13.
+Disable the plugin in Settings → Plugins and restart DSH web. Open the sessions of steps 3 to 14.
 
 Pass: every session opens; the calls show as ordinary tool rows with no widget; no session line holds a plugin-owned event type (`grep -c '"type":"dsh-intelligent-ui' <session file>` reads 0 after decompressing it with `zstd -dc`). Re-enable the plugin and restart: the widgets come back with what the reader set.
 
-## 16. The skill is a part of the plugin
+## 17. The skill is a part of the plugin
 
 Pass: Settings → Plugins lists two rows, 渐进式交互 and 渐进式交互 · 技能 (Intelligent UI and Intelligent UI · Skill), both running; typing `/` lists `dsh-intelligent-ui` among the skills. Switching the skill row off removes it from `/` without a restart while widgets keep drawing.
 
@@ -159,7 +165,7 @@ Pass: the install reports success with no compatibility error (a host older than
 
 Open the app's developer tools and run the two console expressions of step 2.
 
-Pass: `true`, then `1`, and Settings → Plugins lists both rows of step 16.
+Pass: `true`, then `1`, and Settings → Plugins lists both rows of step 17.
 
 ## D3. The standard transcript view
 
@@ -169,7 +175,7 @@ Pass: while the turn runs, the step group is collapsed and the widget still grow
 
 ## D4. The rest
 
-Run steps 5 to 13 and step 15 in the app.
+Run steps 5 to 14 and step 16 in the app.
 
 Pass: as written for the web. The desktop app grants the clipboard, so in step 6 the widget says the question was copied, and pasting shows it.
 
@@ -216,8 +222,9 @@ Pass: the linker creates directory junctions without asking for administrator ri
   - Every complete widget in the skill (thirteen) ran with no runtime error in the light theme and, with stand-in values for the host's dark tokens, in the dark theme, with every request outside the page refused. The dark run found the frame painting an opaque background (fixed: the frame element's `color-scheme` follows the theme) and Mermaid's edge labels on black boxes (fixed in `diagrams.md`).
   - With the network refused, the shipped copies of Chart.js 4 (written as cdnjs 4.4.1), KaTeX 0.16 with its fonts and auto-render, Three.js 0.160 through an import map with `three/addons/` and OrbitControls, Mermaid (written as 10, served 11), and Tabler Icons drew.
   - A click on `data-prompt` sent its text once; `sendPrompt` from a timer was stopped with a note; a frame that set `location.href` was removed with a note; a form submitted by script to an outside address stayed in place; inline `onclick` and `oninput` handlers worked after streaming; a streamed source showed its content before its script ran, ran it only after the result, in the same frame element; a slider and a `dsh.state` counter came back after a page reload.
+- 2026-11-17, headless Chrome, scrolling over a widget (step 14's mechanics). A wheel over a sandboxed frame scrolled the page while no `wheel` event reached the page's listeners. On the static page with a stand-in for the chat's reading anchor (any scroll that no wheel, touch, or scrolling key started is undone, as the chat does after a turn jump or loading earlier turns), four wheel ticks over the estimate widget were all pulled back with the 0.2.0 bundle; with this build the page saw four reader inputs and scrolled 480 px with nothing pulled back. Not yet run in the real chat.
 - Runs of the DIL builds, from 2026-10-16 to 2026-11-16, verified an engine this build no longer has; their records are in the git history of this file.
 
 # Not verified
 
-Steps 4, 5, and 7 to 13 have no full live pass: streaming, the form, runtime errors, reload, themes, and `revises` were exercised only in headless Chrome, and no model has used `revises` live. The web UI and the Windows desktop app have not loaded this build, and W4 has never passed. Whether a widget that loops forever freezes only its frame or the whole page has not been tried in the web UI or either desktop app.
+Steps 4, 5, and 7 to 14 have no full live pass: streaming, the form, runtime errors, reload, themes, and `revises` were exercised only in headless Chrome, and no model has used `revises` live. The web UI and the Windows desktop app have not loaded this build, and W4 has never passed. Whether a widget that loops forever freezes only its frame or the whole page has not been tried in the web UI or either desktop app.

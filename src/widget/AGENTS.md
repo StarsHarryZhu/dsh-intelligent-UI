@@ -59,7 +59,8 @@ independent of it.
   kind, the Turn data key, the API versions, and the card id pattern.
 - `policy.ts` — the code and font hosts, the frame's sandbox tokens and content
   policy, the address check, and every limit.
-- `messages.ts` — the messages between a frame and the page, both ways.
+- `messages.ts` — the messages between a frame and the page, both ways, and the
+  scroll inputs a frame names with their keys and interval.
 - `libs.ts` — the shipped libraries, reading a code-host address, and matching
   it to a shipped file.
 - `normalize.ts` — cleaning a source into the fragment the frame shows: fences,

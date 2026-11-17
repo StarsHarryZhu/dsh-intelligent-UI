@@ -9,7 +9,7 @@
  * @module dsh-intelligent-ui/client/bridge
  */
 
-import { CHANNEL, type Json } from '../widget/messages.ts'
+import { CHANNEL, type Json, SCROLL_KEYS, type ScrollInput } from '../widget/messages.ts'
 import { LIMITS } from '../widget/policy.ts'
 
 /** One checked request from a frame. */
@@ -21,6 +21,7 @@ export type FrameAction =
   | { kind: 'controls'; value: Record<string, Json> }
   | { kind: 'error'; message: string }
   | { kind: 'ran' }
+  | { kind: 'scroll'; input: ScrollInput; key?: string }
 
 /** Most control ids the page keeps for one widget. */
 const MAX_CONTROLS = 200
@@ -71,6 +72,11 @@ export function readFrameMessage(data: unknown): FrameAction | undefined {
     }
     case 'ran':
       return { kind: 'ran' }
+    case 'scroll': {
+      if (message.input === 'wheel' || message.input === 'touch') return { kind: 'scroll', input: message.input }
+      if (message.input !== 'key' || typeof message.key !== 'string' || !SCROLL_KEYS.has(message.key)) return undefined
+      return { kind: 'scroll', input: 'key', key: message.key }
+    }
     default:
       return undefined
   }

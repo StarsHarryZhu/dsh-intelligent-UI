@@ -49,6 +49,7 @@ The model's code never runs in the page. It exists only inside one kind of frame
 - A content policy in the frame's own document: `default-src 'none'`, with scripts, styles, fonts, images, and requests let through only inline, from `blob:` and `data:`, and from four CDNs (cdnjs, jsDelivr, unpkg, esm.sh) and Google Fonts; `frame-src`, `object-src`, `form-action`, and `base-uri` are `'none'`.
 - The frame's document holds no part of the widget: the source arrives by message. Nothing the page sends in carries a token, a session id, or another card's data.
 - The page trusts nothing the frame sends. Every message is checked against its shape and the limits; a message to send or a link to open goes out only when the reader has just clicked inside that frame, at most once a second; a link must be http or https; kept values are bounded JSON the page stores without reading.
+- The reader's input inside a frame never reaches the page, yet the chat tells the reader's scrolling from its own by that input. So the frame names a wheel, a touch, or a scrolling key, and the page repeats it on the frame element as an event that does not bubble and scrolls nothing; otherwise the chat, while it keeps a reading anchor, would undo every scroll started over a widget.
 - A frame that loads a second time has navigated away from its document, and is removed.
 - The page's own code never writes markup: no `innerHTML`, no `dangerouslySetInnerHTML`. Only the runtime inside the frame parses HTML.
 

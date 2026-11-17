@@ -443,6 +443,27 @@ describe('what a frame asks is checked by the page', () => {
     expect(frame.iframe.style.height).not.toBe('999px')
   })
 
+  it('repeats the reader\'s scrolling inside the frame to the chat, without letting it bubble', async () => {
+    const { frame, view } = await drawn()
+    const seen: string[] = []
+    const bubbled: string[] = []
+    for (const type of ['wheel', 'touchstart', 'keydown']) {
+      view.container.addEventListener(type, (event) => { seen.push(event instanceof KeyboardEvent ? `${type} ${event.key}` : type) }, true)
+      view.container.addEventListener(type, () => { bubbled.push(type) })
+    }
+    frame.say({ t: 'scroll', input: 'wheel' })
+    frame.say({ t: 'scroll', input: 'wheel' })
+    frame.say({ t: 'scroll', input: 'touch' })
+    // A key reaches the frame only while it has the focus.
+    frame.say({ t: 'scroll', input: 'key', key: 'PageDown' })
+    clickInside(frame.iframe)
+    frame.say({ t: 'scroll', input: 'key', key: 'PageDown' })
+    frame.say({ t: 'scroll', input: 'key', key: 'Enter' })
+    frame.say({ t: 'scroll', input: 'pointer' })
+    expect(seen).toEqual(['wheel', 'touchstart', 'keydown PageDown'])
+    expect(bubbled).toEqual([])
+  })
+
   it('sends a message only after a click inside the frame', async () => {
     const { frame, session } = await drawn()
     frame.say({ t: 'send', text: 'Sent by a timer' })

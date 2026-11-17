@@ -74,6 +74,15 @@ describe('messages from a frame are untrusted', () => {
   it('reads the mark that scripts have run, ignoring anything sent with it', () => {
     expect(readFrameMessage(from({ t: 'ran', extra: 'ignored' }))).toEqual({ kind: 'ran' })
   })
+
+  it('reads the reader\'s scrolling as one of three inputs, and only the keys that scroll', () => {
+    expect(readFrameMessage(from({ t: 'scroll', input: 'wheel', key: 'Enter', deltaY: 9 }))).toEqual({ kind: 'scroll', input: 'wheel' })
+    expect(readFrameMessage(from({ t: 'scroll', input: 'touch' }))).toEqual({ kind: 'scroll', input: 'touch' })
+    expect(readFrameMessage(from({ t: 'scroll', input: 'key', key: 'PageDown' }))).toEqual({ kind: 'scroll', input: 'key', key: 'PageDown' })
+    for (const message of [{ input: 'key' }, { input: 'key', key: 'Enter' }, { input: 'key', key: 'Escape' }, { input: 'key', key: 7 }, { input: 'pointer' }, {}]) {
+      expect(readFrameMessage(from({ t: 'scroll', ...message })), JSON.stringify(message)).toBeUndefined()
+    }
+  })
 })
 
 describe('the frame\'s document', () => {

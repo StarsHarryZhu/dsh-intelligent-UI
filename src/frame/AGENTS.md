@@ -80,7 +80,8 @@ could be computed rather than show a wrong one.
 - `AGENTS.md` — this file: what runs inside a frame and what it may assume.
 - `main.ts` — the entry: starts the runtime in the frame's window.
 - `runtime.ts` — the runtime: messages, streaming morph, script activation,
-  shipped libraries, helpers, kept values, forms, height, and errors.
+  shipped libraries, helpers, kept values, forms, height, the reader's scroll
+  inputs, and errors.
 - `base.css` — the frame's base stylesheet: theme variables, styled elements,
   classes, colour ramps, and series colours.
 - `math.ts` — special functions and the calculus routines behind `dsh.math`:
@@ -95,7 +96,7 @@ could be computed rather than show a wrong one.
   engine, keeping its integrator, limits, and root finder and gaining a
   derivative that refuses corners (`tests/math.test.ts`).
 - Streaming, activation order, external script order, kept values, forms, both
-  markers, theme changes, and error reporting are tested in jsdom
+  markers, theme changes, scroll inputs, and error reporting are tested in jsdom
   (`tests/runtime.test.ts`), and every widget the skill teaches ran with no
   error in headless Chrome in both themes (`docs/VERIFY.md`, Part 1).
 

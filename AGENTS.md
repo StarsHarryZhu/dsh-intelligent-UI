@@ -86,7 +86,10 @@ rule that can be checked in code.
    `src/widget/policy.ts`. A message to send or a link to open (http or https
    only) goes out only right after the reader clicked inside that frame, at most
    once a second; kept values are bounded JSON; heights are clamped; errors are
-   cut short.
+   cut short. A scroll the reader starts inside a frame (wheel, touch, or a
+   scrolling key while the frame has the focus) is repeated on the frame element
+   as a non-bubbling event, at most once per 50 ms for each kind, so the chat
+   does not take back a scroll the frame passes on to it.
 6. A frame that fires `load` a second time has navigated away and is removed.
 7. Kept values are stored and handed back to the same frame; the page never
    interprets them.
@@ -241,6 +244,11 @@ run` is the full check. `lib/` is generated: edit `src/`, never `lib/`.
   `tests/isolation.test.ts`).
 - Fifteen shipped libraries, pinned and checked, loaded lazily and offline
   (`tests/libs.test.ts`).
+- Scrolling over a widget, fixed 2026-11-17: input inside a frame never reaches
+  the page, so while the chat kept a reading anchor (after a turn jump or
+  loading earlier turns) it undid every scroll started over a widget. The frame
+  now names the reader's wheel, touch, and scrolling keys, and the page repeats
+  them on the frame element (`tests/client.test.tsx`, `docs/VERIFY.md` step 14).
 - The skill, rewritten: seven files, thirteen complete widgets, every one
   passing the check (`tests/skill.test.ts`).
 - Checked in headless Chrome on the built bundle (`docs/VERIFY.md`, recorded
