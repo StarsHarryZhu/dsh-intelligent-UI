@@ -1,4 +1,4 @@
-/** Bundled client modules (26):
+/** Bundled client modules (27):
  *   client/bridge.js
  *   client/card-node.js
  *   client/chunks.js
@@ -10,6 +10,7 @@
  *   client/libraries.js
  *   client/locales.js
  *   client/node-view.js
+ *   client/placement.js
  *   client/presence.js
  *   client/read.js
  *   client/styles.css

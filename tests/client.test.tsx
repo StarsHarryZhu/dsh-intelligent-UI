@@ -14,6 +14,7 @@
 
 import * as React from 'react'
 import * as JsxRuntime from 'react/jsx-runtime'
+import * as ReactDom from 'react-dom'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EXAMPLE } from '../src/host/model-brief.ts'
@@ -76,6 +77,7 @@ function loadClient(lazy?: (request: string) => Promise<unknown>): Loaded {
   const hostRequire = (request: string): unknown => {
     if (request === 'react') return React
     if (request === 'react/jsx-runtime') return JsxRuntime
+    if (request === 'react-dom') return ReactDom
     throw new Error(`unexpected require: ${request}`)
   }
   if (lazy !== undefined) (hostRequire as { async?: unknown }).async = (request: string) => { chunks.push(request); return lazy(request) }
@@ -1076,5 +1078,65 @@ describe('shipped libraries', () => {
     expect(warn).toHaveBeenCalledTimes(1)
     expect(await loader([TABLE[0]?.example as string])).toEqual([{ url: TABLE[0]?.example, kind: 'script', text: 'ok' }])
     expect(await createLibraryLoader(undefined, TABLE)([TABLE[0]?.example as string])).toEqual([])
+  })
+})
+
+describe('a widget placed in the answer', () => {
+  /** A chat laid out the way the host lays it out: the card's row, then the answer's row with a code block. */
+  function inChat(CardNode: Component, meta: unknown, named: string) {
+    return render(
+      <div data-slot="conversation.chat.flow">
+        <div data-chat-turn="1" data-testid="card-row">
+          <CardNode node={settledNode('call-1', meta)} {...kit()} />
+        </div>
+        <div data-chat-turn="1" data-testid="answer">
+          <p>Lead-in</p>
+          <div className="md-code-block"><div data-code-block-content=""><pre><code>{named}</code></pre></div></div>
+          <p>After</p>
+        </div>
+      </div>,
+    )
+  }
+
+  it('draws the widget right after the block that names it, and leaves its own place empty', async () => {
+    const { CardNode } = loadClient()
+    inChat(CardNode, await settle(EXAMPLE), 'call-1')
+    const row = screen.getByTestId('card-row')
+    expect(row.childElementCount).toBe(0)
+    const answer = screen.getByTestId('answer')
+    const block = answer.querySelector('.md-code-block') as HTMLElement
+    expect(block.hasAttribute('data-dsh-iui-placed')).toBe(true)
+    const slot = block.nextElementSibling as HTMLElement
+    expect(slot.className).toBe('dsh-iui-placed')
+    expect(slot.nextElementSibling?.textContent).toBe('After')
+    expect(slot.querySelectorAll('iframe')).toHaveLength(1)
+    expect(slot.querySelector('[data-dsh-intelligent-ui="reply"]')?.hasAttribute('data-placed')).toBe(true)
+  })
+
+  it('stays where the call was when the answer names another card, with no marker left behind', async () => {
+    const { CardNode } = loadClient()
+    inChat(CardNode, await settle(EXAMPLE), 'call-2')
+    const row = screen.getByTestId('card-row')
+    expect(row.querySelectorAll('iframe')).toHaveLength(1)
+    expect(row.querySelector('[data-dsh-intelligent-ui="probe"]')).toBeNull()
+    expect(screen.getByTestId('answer').querySelector('.dsh-iui-placed')).toBeNull()
+  })
+
+  it('takes its container back when it unmounts', async () => {
+    const { CardNode } = loadClient()
+    const view = inChat(CardNode, await settle(EXAMPLE), 'call-1')
+    view.rerender(
+      <div data-slot="conversation.chat.flow">
+        <div data-chat-turn="1" data-testid="card-row" />
+        <div data-chat-turn="1" data-testid="answer">
+          <p>Lead-in</p>
+          <div className="md-code-block"><div data-code-block-content=""><pre><code>call-1</code></pre></div></div>
+          <p>After</p>
+        </div>
+      </div>,
+    )
+    const answer = screen.getByTestId('answer')
+    expect(answer.querySelector('.dsh-iui-placed')).toBeNull()
+    expect(answer.querySelector('[data-dsh-iui-placed]')).toBeNull()
   })
 })

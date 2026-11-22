@@ -50,10 +50,11 @@ carried over. A `revises` without a card id's shape (`CARD_ID_PATTERN`), or
 naming the call itself, is ignored with a note; a valid one is persisted as
 `meta.revises`. Whether that card exists is the browser's to find out.
 
-**A widget stands where it is called, and the model is told so.** The
-description asks the model to write the lead-in before the call and to continue
-after the result, and every successful result repeats it on its second line
-(`PLACEMENT_NOTE`).
+**A widget stands where it is called, or where the answer names it, and the
+model is told so.** The description's Placement paragraph says both; every
+successful result says it again on its second line (`PLACEMENT_NOTE`) and then
+gives the ```widget block holding that card's id (`placementBlock`), ready to
+copy into the answer.
 
 **The model sees a summary, never its source back.** `output.render` projects
 the result into text: lines and scripts, the shipped libraries and fetched
@@ -107,6 +108,9 @@ through the registry's own `assertSupportedJsonSchema` in the tests.
 
 - The rewrite of 2026-11-17: the DIL compiler gave way to `check.ts`; metadata
   moved to API version 2 and carries the checked source.
+- 2026-11-22: the description's Placement paragraph and each result's
+  ```widget block with the card id let the model stand a widget inside its
+  answer (`tests/tool.test.ts`); the description stays under 4000 characters.
 - Syntax errors in classic scripts, modules, and inline handlers come back with
   their source lines; blocked addresses, shipped libraries, and sandbox habits
   are reported (`tests/check.test.ts`).

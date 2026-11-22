@@ -4,7 +4,9 @@
 
 The browser half. `index.ts` registers the plugin's contributions;
 `card-node.ts` places each widget in the reply, as its own Chat node where the
-model called the tool, and `node-view.tsx` draws it there; `toolview.tsx` draws
+model called the tool, and `node-view.tsx` draws it there, or, through a
+portal, wherever the answer names it in a ```widget block that `placement.ts`
+finds; `toolview.tsx` draws
 the `ui_render` row among the process rows; `turn-data.ts` collects a turn's
 cards from events the host already records. `widget.tsx` is the widget itself:
 a sandboxed frame whose document `document.ts` writes once and which is then fed
@@ -86,6 +88,18 @@ with the frame focused), at most once every `SEND_INTERVAL_MS`; otherwise the
 widget gets a notice that it was stopped. A frame that fires `load` a second time
 has left its document, and is removed with a note.
 
+**A widget the answer names stands there.** The model may write a ```widget
+block whose only line is a card id; `placement.ts` finds it among the host's
+code blocks, in the card's turn and after its row, marks it so the stylesheet
+hides it, and adds one container after it, which `node-view.tsx` draws into
+through `createPortal`; the card's own place is then empty, so the chat leaves
+no gap. Only `placement.ts` reads or adds to the host's markup, and it never
+removes or edits a host node. Each change of block gets a fresh container: the
+widget remounts rather than having its frame moved, which would reload it under
+the second-`load` rule. Before the card knows its row it renders only a hidden
+marker, and the first report arrives in the same layout pass, so a reloaded
+answer draws the widget once, already in place.
+
 **The reader's scrolling over a frame reaches the chat.** Input events inside a
 frame never reach the page, but a frame that cannot scroll passes the scroll on
 to the chat, which tells the reader's scrolling from its own by the wheel,
@@ -154,6 +168,8 @@ forbidden.
   reply, and the streamed-argument reader.
 - `node-view.tsx` — the renderer of a widget in the reply: preview, settled
   widget, the replaced fold, and the earlier-version text.
+- `placement.ts` — finding the answer's ```widget block for a card and
+  adding the container it stands in.
 - `presence.ts` — the record of reply copies on the page that tool rows defer to.
 - `toolview.tsx` — the `ui_render` row: its status, why a widget failed the
   check, and, where no reply copy exists, the widget itself.
@@ -186,6 +202,8 @@ forbidden.
   changes all pass through checked messages (`tests/client.test.tsx`,
   `tests/bridge.test.ts`, `tests/runtime.test.ts`, `tests/isolation.test.ts`).
 - Cards drawn by the DIL builds show the text version they carried.
+- A widget stands where the answer writes a ```widget block naming it
+  (`tests/placement.test.ts`, `tests/client.test.tsx`).
 - The reader's wheel, touch, and scrolling keys inside a frame are repeated to
   the chat, which no longer pulls back a scroll started over a widget while it
   keeps a reading anchor (`tests/client.test.tsx`; headless Chrome in

@@ -77,6 +77,8 @@ need the build first: run `node build.js` before the suite.
   streaming, sending and links, scrolling over a frame, kept values, revisions,
   the tool row, cards from before the rewrite, Turn data, cards in the reply,
   theme, and libraries.
+- `placement.test.ts` — finding the answer's ```widget block for a card on a
+  page laid out like the host's chat, and adding and taking back its container.
 - `math.test.ts` — the quadrature rule's constants, integrals, derivatives and
   corners, limits, roots, and special functions.
 - `skill.test.ts` — the bundled skill: its layout, size, and frontmatter; every
@@ -98,6 +100,8 @@ need the build first: run `node build.js` before the suite.
   added the scan, check, libs, bridge, and runtime specs.
 - Every spec runs without the network; the browser and runtime specs run the
   built bundle.
+- 2026-11-22: `placement.test.ts`, and the isolation rules that keep the host's
+  markup read and added to from one file only.
 
 **Not done.**
 

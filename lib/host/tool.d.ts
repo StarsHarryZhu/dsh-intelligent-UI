@@ -71,7 +71,14 @@ export type UIRenderValue = UIRenderSuccess | UIRenderFailure;
  */
 export declare function createUIRenderTool(): ToolDefinition;
 /** Where the widget stands, told with every widget so the model goes on writing after it. */
-export declare const PLACEMENT_NOTE = "It stands in your reply here, where you called ui_render; continue your answer below it.";
+export declare const PLACEMENT_NOTE = "It stands in your reply here, where you called ui_render. To put it inside your answer instead, write this block alone on its lines where it belongs; the widget moves there and the block is hidden:";
+/**
+ * The block that places a widget in the answer: a fence of the `widget`
+ * language whose only line is the card id. The browser half finds it there.
+ * @param card - the card id.
+ * @returns the block's three lines.
+ */
+export declare function placementBlock(card: string): string;
 /** Render the tool result for the model: what the reader sees, or the problems to fix. */
 export declare function renderForModel(value: unknown): string;
 /**

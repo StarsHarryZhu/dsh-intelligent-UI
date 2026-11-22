@@ -81,6 +81,8 @@ them on every platform.
   both themes with no runtime error and the network refused; their figures (the
   savings total, the loan payment, the integral and its error) were checked
   against closed forms.
+- 2026-11-22: “Where it stands and what to say” teaches the ```widget block
+  that places a widget inside the answer.
 
 **Not done.**
 

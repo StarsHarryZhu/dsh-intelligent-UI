@@ -4,7 +4,7 @@ import { assertSupportedJsonSchema, validateJsonSchemaValue } from '@deepseek-ai
 import type { JsonSchemaNode } from '@deepseek-ai/dsh-tools'
 import { describe, expect, it } from 'vitest'
 import { EXAMPLE, REPAIR_HINT, UI_TOOL_DESCRIPTION } from '../src/host/model-brief.ts'
-import { buildPresentationMeta, createUIRenderTool, PLACEMENT_NOTE, renderForModel, UI_TOOL_NAME } from '../src/host/tool.ts'
+import { buildPresentationMeta, createUIRenderTool, PLACEMENT_NOTE, placementBlock, renderForModel, UI_TOOL_NAME } from '../src/host/tool.ts'
 import { checkWidget } from '../src/host/check.ts'
 import { API_VERSION } from '../src/widget/identity.ts'
 import { LIBRARIES } from '../src/widget/libs.ts'
@@ -91,6 +91,7 @@ describe('what the model is told', () => {
     for (const library of LIBRARIES) expect(UI_TOOL_DESCRIPTION, library.id).toContain(library.title)
     expect(UI_TOOL_DESCRIPTION).toContain(LIBRARIES[0]?.example)
     expect(UI_TOOL_DESCRIPTION).toContain('revises')
+    expect(UI_TOOL_DESCRIPTION).toMatch(/Placement: [^\n]*```widget, the card id from the result, ```/u)
   })
 
   it('ships an example that passes its own check without a single problem', () => {
@@ -118,6 +119,9 @@ describe('a call that is shown', () => {
     const told = renderForModel(value)
     expect(told.split('\n')[0]).toBe(`The widget is shown: ${EXAMPLE.split('\n').length} line(s), 1 script(s).`)
     expect(told.split('\n')[1]).toBe(PLACEMENT_NOTE)
+    // The block that moves this widget into the answer, ready to copy.
+    expect(told.split('\n').slice(2, 5)).toEqual(['```widget', 'call-7', '```'])
+    expect(placementBlock('call-7')).toBe('```widget\ncall-7\n```')
     expect(told).toContain('Card id: call-7')
     expect(told).toContain('revises=call-7')
     expect(told).toContain('Controls kept across reloads: seats (range).')

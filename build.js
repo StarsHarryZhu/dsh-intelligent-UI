@@ -12,8 +12,9 @@
  *    runtime inlined as string modules.
  * 5. Wrap every browser module in its own function inside one module-loader
  *    factory, `window.__ModuleLoader__.load({ id, factory })`, which is the only
- *    form the page's module system registers. `react` and `react/jsx-runtime`
- *    are the only requests that leave the bundle; any other is a build error.
+ *    form the page's module system registers. `react`, `react/jsx-runtime`, and
+ *    `react-dom` (for `createPortal` alone) are the only requests that leave the
+ *    bundle; any other is a build error.
  *    The wrapper's `require.async` reaches the host's lazy loader for this
  *    package's `client.lib-*.js` files and nothing else.
  * 6. Write each shipped library, read from `vendor/cache/` and checked against
@@ -48,7 +49,7 @@ const PACKAGE_NAME = PACKAGE.name
 const ENTRY = 'client/index.js'
 
 /** Requests the page's module table answers. Everything else must be bundled. */
-const EXTERNALS = ['react', 'react/jsx-runtime']
+const EXTERNALS = ['react', 'react/jsx-runtime', 'react-dom']
 
 /** Files inlined as string modules: module id → source file. */
 const TEXT_FILES = {
@@ -375,6 +376,7 @@ async function selfCheck(source, chunks) {
     requested.push(request)
     if (request === 'react') return react.react
     if (request === 'react/jsx-runtime') return react.jsx
+    if (request === 'react-dom') return react.dom
     throw new Error(`unexpected require: ${request}`)
   }
   // The host's lazy loader: run the file, which registers a chunk factory, and materialize it.
@@ -438,10 +440,10 @@ async function selfCheck(source, chunks) {
 function loadReact() {
   const require = createRequire(join(ROOT, 'package.json'))
   try {
-    return { react: require('react'), jsx: require('react/jsx-runtime') }
+    return { react: require('react'), jsx: require('react/jsx-runtime'), dom: require('react-dom') }
   } catch {
     const unavailable = () => { throw new Error('React is not linked; run node scripts/link-dev.mjs') }
-    return { react: { Component: class {}, Fragment: 'fragment', useState: unavailable }, jsx: { jsx: unavailable, jsxs: unavailable, Fragment: 'fragment' } }
+    return { react: { Component: class {}, Fragment: 'fragment', useState: unavailable }, jsx: { jsx: unavailable, jsxs: unavailable, Fragment: 'fragment' }, dom: { createPortal: unavailable } }
   }
 }
 

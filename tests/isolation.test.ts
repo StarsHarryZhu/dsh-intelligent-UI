@@ -83,7 +83,8 @@ describe('only the published plugin contract is used', () => {
           }
           continue
         }
-        if (layer === 'client') expect(['react', 'react/jsx-runtime'], `${file.path} imports ${specifier}`).toContain(specifier)
+        if (layer === 'client' && specifier === 'react-dom') expect(file.path, 'react-dom is for the reply card\'s portal only').toBe(join('src', 'client', 'node-view.tsx'))
+        else if (layer === 'client') expect(['react', 'react/jsx-runtime'], `${file.path} imports ${specifier}`).toContain(specifier)
         else if (layer === 'widget' || layer === 'frame') throw new Error(`${file.path} imports ${specifier}; this layer imports nothing from outside the plugin`)
         else if (specifier.startsWith('node:')) expect(builtins[file.path] ?? [], `${file.path} imports ${specifier}`).toContain(specifier)
         else expect(['@deepseek-ai/dsh-tools'], `${file.path} imports ${specifier}`).toContain(specifier)
@@ -91,10 +92,15 @@ describe('only the published plugin contract is used', () => {
     }
   })
 
+  it('takes nothing from react-dom but createPortal', () => {
+    const view = code(readFileSync(join(ROOT, 'src', 'client', 'node-view.tsx'), 'utf8'))
+    expect([...view.matchAll(/import\s*\{([^}]*)\}\s*from\s*'react-dom'/gu)].map(match => (match[1] as string).trim())).toEqual(['createPortal'])
+  })
+
   it('ships a browser bundle that requests nothing beyond React and its own lazy library files', () => {
     const bundle = clientBundle()
     const requests = new Set([...bundle.matchAll(/\brequire\("([^"]+)"\)/gu)].map(match => match[1] as string))
-    expect([...requests].filter(request => !request.startsWith('.')).sort()).toEqual(['react', 'react/jsx-runtime'])
+    expect([...requests].filter(request => !request.startsWith('.')).sort()).toEqual(['react', 'react-dom', 'react/jsx-runtime'])
     expect(bundle.startsWith(`/* ${PLUGIN_ID} `)).toBe(true)
     expect(bundle).toContain(`id: "${PLUGIN_ID}"`)
     // The one lazy request the wrapper passes on names a library file of this plugin.
@@ -207,6 +213,19 @@ describe('the page never holds a widget\'s markup or code', () => {
     expect(users(page, /document\.(?:head|createElement)\b|\.append(?:Child)?\s*\(/u)).toEqual([join('src', 'client', 'index.ts')])
   })
 
+  it('reads the host\'s own markup, and adds to it, from one file only', () => {
+    const placement = join('src', 'client', 'placement.ts')
+    // The host's hooks: a code block, its body, a row's turn, and the chat's root.
+    expect(users(page, /md-code-block|data-code-block-content|data-chat-turn|conversation\.chat\.flow/u)).toEqual([placement])
+    expect(users(page, /\.(?:after|before|insertBefore|replaceWith|replaceChildren|prepend)\s*\(|\.(?:removeChild|removeAttribute)\s*\(|ownerDocument\.createElement/u)).toEqual([placement])
+    const text = code(readFileSync(join(ROOT, placement), 'utf8'))
+    // It adds one container after a block and marks the block, and removes only what it added.
+    expect([...text.matchAll(/\.(after|before|insertBefore|replaceWith|replaceChildren|prepend|removeChild|setAttribute|removeAttribute|remove)\s*\(/gu)].map(match => match[1]).sort())
+      .toEqual(['after', 'remove', 'removeAttribute', 'setAttribute', 'setAttribute'])
+    expect(text).toMatch(/claim\.slot\?\.remove\(\)/u)
+    expect(text).toMatch(/claim\.block\.removeAttribute\(PLACED_MARK\)/u)
+  })
+
   it('draws exactly one kind of frame, sandboxed, with no address and no extra powers', () => {
     expect(FRAME_SANDBOX).toBe('allow-scripts allow-forms')
     expect(users(page, /<iframe\b/u)).toEqual([join('src', 'client', 'widget.tsx')])
@@ -285,7 +304,8 @@ describe('the stylesheet stays inside the plugin\'s own elements', () => {
   it('scopes every selector under a dsh-iui class', () => {
     const list = selectors()
     expect(list.length).toBeGreaterThan(15)
-    for (const selector of list) expect(selector, selector).toMatch(/\.dsh-iui-/u)
+    // The one rule outside the prefix hides a host code block this plugin marked with its own attribute.
+    for (const selector of list) expect(selector, selector).toMatch(/\.dsh-iui-|^\.md-code-block\[data-dsh-iui-placed\]$/u)
   })
 
   it('names its keyframes under the same prefix', () => {

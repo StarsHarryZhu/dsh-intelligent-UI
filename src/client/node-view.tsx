@@ -10,15 +10,19 @@
  * never reloads between those stages. A widget that a later card of the same
  * turn revises is left out, read from the turn's own data, so a widget the
  * model redrew in the same answer never shows; one revised in a later turn
- * folds to a line.
+ * folds to a line. A widget the answer names in a ```widget block stands
+ * there instead, drawn through a portal into the container `placement.ts` puts
+ * after that block; its own place is then left empty.
  * @module dsh-intelligent-ui/client/node-view
  */
 
-import { useCallback, useEffect, useMemo, useSyncExternalStore, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { TURN_DATA_KEY } from '../widget/identity.ts'
 import { readArguments } from './card-node.ts'
 import type { ChatNodeProps, TurnLike } from './host.ts'
 import { translator } from './locales.ts'
+import { rowOf, watchPlacement } from './placement.ts'
 import { asArray, asRecord, readCardId, readMeta } from './read.ts'
 import { Contained, LegacyCard, revisionOf, Widget, type WidgetEnv, type WidgetStage } from './widget.tsx'
 
@@ -65,6 +69,8 @@ function CardNodeBody(props: ChatNodeProps & { env: WidgetEnv }): ReactNode {
   const shown = callId !== undefined && drawable && !redrawn
   // While this copy is on the page, the call's tool row stays a status line.
   useEffect(() => (shown ? env.presence.enter(memoryKey) : undefined), [env.presence, shown, memoryKey])
+  const revises = live ? readCardId(read.revises) : meta?.kind === 'widget' ? meta.revises : undefined
+  const placement = usePlacement(shown && legacy === undefined && callId !== undefined ? [callId, ...(revises === undefined ? [] : [revises])] : [])
   if (!shown) return null
   if (legacy !== undefined) {
     return (
@@ -73,10 +79,10 @@ function CardNodeBody(props: ChatNodeProps & { env: WidgetEnv }): ReactNode {
       </div>
     )
   }
-  const revises = live ? readCardId(read.revises) : meta?.kind === 'widget' ? meta.revises : undefined
   const stage: WidgetStage = phase === 'preparing' ? 'streaming' : phase === 'start' ? 'complete' : 'ready'
-  return (
-    <div className="dsh-iui-reply" data-dsh-intelligent-ui="reply" data-state={live ? 'running' : 'ready'}>
+  if (placement.probe !== null) return placement.probe
+  const reply = (
+    <div className="dsh-iui-reply" data-dsh-intelligent-ui="reply" data-state={live ? 'running' : 'ready'} data-placed={placement.slot === null ? undefined : ''}>
       <Widget
         env={env}
         source={source ?? ''}
@@ -89,6 +95,43 @@ function CardNodeBody(props: ChatNodeProps & { env: WidgetEnv }): ReactNode {
       />
     </div>
   )
+  return placement.slot === null ? reply : createPortal(reply, placement.slot)
+}
+
+/** Where a card draws: in place, in a container inside the answer, or nowhere yet. */
+interface Placement {
+  /** While the card's row is not known yet, the only thing to render: an empty marker that finds it. */
+  probe: ReactNode | null
+  /** The container in the answer to draw into, or null to draw in place. */
+  slot: HTMLElement | null
+}
+
+/**
+ * Follow the ```widget block of the answer that names this card. The first
+ * render puts only a hidden marker in place, which finds the card's chat row;
+ * the first report of where to draw arrives in the same layout pass, so the
+ * widget is drawn once, already where it belongs.
+ * @param ids - the card's own id, then the id it replaces; empty for a card that cannot move.
+ */
+function usePlacement(ids: readonly string[]): Placement {
+  const marker = useRef<HTMLSpanElement>(null)
+  const [row, setRow] = useState<Element | null | undefined>(undefined)
+  const [found, setFound] = useState<{ slot: HTMLElement | null } | undefined>(undefined)
+  const key = ids.join('\n')
+  useLayoutEffect(() => {
+    if (row === undefined && marker.current !== null) setRow(rowOf(marker.current))
+  })
+  useLayoutEffect(() => {
+    if (row === undefined || row === null || key === '') return undefined
+    // The last report stays until the next one, which the new watch makes at once,
+    // so a change of ids never takes the widget down in between.
+    return watchPlacement({ ids: key.split('\n'), row, place: (slot) => { setFound({ slot }) } })
+  }, [row, key])
+  const waiting = key !== '' && (row === undefined || (row !== null && found === undefined))
+  return {
+    probe: waiting ? <span ref={marker} hidden data-dsh-intelligent-ui="probe" /> : null,
+    slot: found?.slot ?? null,
+  }
 }
 
 /**

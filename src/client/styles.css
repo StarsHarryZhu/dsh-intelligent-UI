@@ -2,7 +2,8 @@
  * dsh-intelligent-ui page styles: the frame a widget runs in, its tool row,
  * and its notes. The widget itself is styled inside its frame, by the frame's
  * own stylesheet; nothing here reaches into it.
- * Every selector is scoped under a .dsh-iui- class and every colour, radius and
+ * Every selector is scoped under a .dsh-iui- class, except the one rule that
+ * hides a host code block this plugin marked data-dsh-iui-placed, and every colour, radius and
  * font comes from a host theme token, so light and dark themes, the reader's
  * font-size setting and future palette changes all apply without a rebuild.
  * Layout spacing stays on the 4px grid.
@@ -12,6 +13,9 @@
 .dsh-iui-reply { display: flex; flex-direction: column; min-width: 0; margin: 4px 0; }
 .dsh-iui-widget { display: flex; flex-direction: column; gap: 4px; min-width: 0; width: 100%; }
 .dsh-iui-frame-holder { min-width: 0; width: 100%; }
+/* A widget the answer names in a ```widget block stands right after the block, which is not shown. */
+.md-code-block[data-dsh-iui-placed] { display: none !important; }
+.dsh-iui-placed { display: block; min-width: 0; width: 100%; }
 /* The frame is transparent: the widget sits on the reply's own background. */
 .dsh-iui-frame { display: block; width: 100%; border: 0; background: transparent; overflow: hidden; }
 

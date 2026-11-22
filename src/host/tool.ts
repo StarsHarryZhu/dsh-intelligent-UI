@@ -187,7 +187,17 @@ function readCallId(exec: unknown): string | undefined {
 }
 
 /** Where the widget stands, told with every widget so the model goes on writing after it. */
-export const PLACEMENT_NOTE = 'It stands in your reply here, where you called ui_render; continue your answer below it.'
+export const PLACEMENT_NOTE = 'It stands in your reply here, where you called ui_render. To put it inside your answer instead, write this block alone on its lines where it belongs; the widget moves there and the block is hidden:'
+
+/**
+ * The block that places a widget in the answer: a fence of the `widget`
+ * language whose only line is the card id. The browser half finds it there.
+ * @param card - the card id.
+ * @returns the block's three lines.
+ */
+export function placementBlock(card: string): string {
+  return ['```widget', card, '```'].join('\n')
+}
 
 /** One problem line, written as an instruction the model can act on. */
 function formatProblem(problem: ReportedProblem): string {
@@ -209,7 +219,7 @@ export function renderForModel(value: unknown): string {
   const notes = record.notes ?? []
   return [
     `The widget is shown: ${String(record.lines ?? 0)} line(s), ${String(record.scripts ?? 0)} script(s).`,
-    PLACEMENT_NOTE,
+    typeof record.card === 'string' ? `${PLACEMENT_NOTE}\n${placementBlock(record.card)}` : 'It stands in your reply here, where you called ui_render; continue your answer below it.',
     typeof record.card === 'string' ? `Card id: ${record.card} (to redraw or change this widget, call ui_render with revises=${record.card}; the reader then sees only the new one)` : '',
     typeof record.revises === 'string' ? `It replaces card ${record.revises}, which now folds away; the reader's saved values carry over.` : '',
     (record.shipped ?? []).length > 0 ? `Shipped libraries, loaded offline: ${(record.shipped ?? []).join(', ')}.` : '',

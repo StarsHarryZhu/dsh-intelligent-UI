@@ -61,6 +61,16 @@ Pass:
 - When the turn finishes, its process folds and the widget stays between the text written before the call and the text after it.
 - Moving a slider redraws the chart and the total at once, with no request in the network panel and no new turn. The total at $300 and 5% reads about $249,678.
 
+Then, in a new session, send:
+
+> Explain the three MIPS instruction formats, R, I, and J. Give each format an interactive widget that lets me pick an instruction and see its fields, and put each widget inside your answer right after the paragraph about that format.
+
+Pass:
+
+- Each widget stands inside the final answer, right after the paragraph about its format, where the answer wrote a ```widget block with its card id; the blocks themselves are not shown, and nothing is left where the calls were.
+- The browser console shows no React error. Reloading the page and reopening the session show the widgets in the same places, with what was set in them.
+- With the plugin disabled (step 16), each place shows a code block holding the card id.
+
 ## 5. Shipped libraries load from the plugin
 
 With the network panel open, reload the page and scroll to the widget of step 4.
@@ -217,6 +227,7 @@ Pass: the linker creates directory junctions without asking for administrator ri
 
 # Recorded runs
 
+- 2026-11-22, live on the macOS desktop app (0.2.2-rc.3, DeepSeek-V4.1-Flash at Max), `link:` to this checkout, a new standard-mode session, the second prompt of step 4. The model loaded the skill, called `ui_render` seven times (three widgets and four redraws with `revises`), then wrote the answer with three ```widget blocks, each right after the paragraph on its format and each naming the latest card. In the window, all three widgets stood inside the answer at their blocks, the blocks were not shown, the seven card rows at the calls were empty (0 px, no gap), and each frame loaded with its own height (311–344 px) when scrolled near. Cards of earlier answers in another session, which have no blocks, still stood at their calls. Not yet run: the reload, the prompt without a placement request, the screenshot, and the plugin switched off.
 - 2026-11-17, live on the macOS desktop app (0.2.2-rc.1), the plugin installed by `link:` from this checkout, in the standard view. A model wrote a compound-interest widget with three sliders, a Chart.js line chart, a `dsh.state` pin button, and a `data-prompt` button; the host check passed, the result named the shipped Chart.js copy, the widget drew in the reply, and the prompt button sent its text as the reader's next message (step 6). The sliders and the pin button were not separately reported; steps 4, 5, and 7 to 13 have no live pass.
 - 2026-11-17, the built bundle in headless Chrome (playwright-core with the system Chrome), on a static page that loads the host's built stylesheets and draws each widget through the plugin's registered card node renderer, after each source passed the built tool; no running harness and no model. Steps 4 to 13 have **not** run live yet; this run covered their mechanics.
   - Every complete widget in the skill (thirteen) ran with no runtime error in the light theme and, with stand-in values for the host's dark tokens, in the dark theme, with every request outside the page refused. The dark run found the frame painting an opaque background (fixed: the frame element's `color-scheme` follows the theme) and Mermaid's edge labels on black boxes (fixed in `diagrams.md`).
@@ -227,4 +238,4 @@ Pass: the linker creates directory junctions without asking for administrator ri
 
 # Not verified
 
-Steps 4, 5, and 7 to 14 have no full live pass: streaming, the form, runtime errors, reload, themes, and `revises` were exercised only in headless Chrome, and no model has used `revises` live. The web UI and the Windows desktop app have not loaded this build, and W4 has never passed. Whether a widget that loops forever freezes only its frame or the whole page has not been tried in the web UI or either desktop app.
+Steps 5 and 7 to 14 have no full live pass, and step 4's first prompt has none: streaming, the form, runtime errors, reload, and themes were exercised only in headless Chrome. Step 4's second prompt passed live on 2026-11-22, including four `revises` redraws. The web UI and the Windows desktop app have not loaded this build, and W4 has never passed. Whether a widget that loops forever freezes only its frame or the whole page has not been tried in the web UI or either desktop app.

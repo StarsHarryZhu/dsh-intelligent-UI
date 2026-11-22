@@ -44,7 +44,8 @@ DeepSeek Harness checkout: no change to `packages/`, `apps/`, `docs/`, or any
 tracked file, no pnpm workspace membership, no tsconfig aggregate entry.
 `git -C deepseek-harness status --porcelain` stays empty. The plugin reaches the
 host only through the published plugin contract: services on its context, slot
-registrations, the module table's `react`, and the module loader's lazy files.
+registrations, the module table's `react` and `react-dom`, and the module
+loader's lazy files.
 
 **Zero new session data.** No new session event type, ever, and no direct writes
 to a session log. A widget's message is an ordinary user message sent through the
@@ -63,6 +64,17 @@ data-only Conversation Definition of kind `dsh-intelligent-ui`; one dictionary
 namespace; and one `<style data-plugin="dsh-intelligent-ui">`. No store, no
 settings namespace, no replacement of a shipped cell, no agent-loop change, no
 assistant renderer.
+
+**The answer's text is read, never rewritten.** To stand a widget inside the
+answer, the browser half reads three hooks the host renders: a code block's
+`.md-code-block` root and `[data-code-block-content]` body, and each chat row's
+`data-chat-turn`. On a ```widget block whose only line is a card id, in that
+card's turn and after its row, it sets one attribute (`data-dsh-iui-placed`,
+which its stylesheet hides) and adds one container right after the block, and
+takes both back when the card or the block goes. It never removes, moves, or
+edits a host node. All of it lives in `src/client/placement.ts`
+(`tests/isolation.test.ts`). Where a hook is missing, the block stays an
+ordinary code block and the widget stays where it was called.
 
 **The security boundary.** The model's code runs only inside a widget frame, and
 the page treats the frame as hostile. `tests/isolation.test.ts` enforces each
@@ -99,8 +111,9 @@ Widening any of these is a security change: argue it here first.
 scripts with `node:vm`'s `new Script`, which parses without executing, and is
 the only file that imports `node:vm`.
 
-**The browser half imports nothing from the harness.** Only `react` and
-`react/jsx-runtime` leave the bundle, plus `require.async` of this package's own
+**The browser half imports nothing from the harness.** Only `react`,
+`react/jsx-runtime`, and `react-dom` (its `createPortal`, in the reply card
+only) leave the bundle, plus `require.async` of this package's own
 `client.lib-*.js` files; the build fails on any other request. Host components
 are matched by copying their look into this plugin's own stylesheets, never by
 requiring a harness client package.
@@ -249,6 +262,11 @@ run` is the full check. `lib/` is generated: edit `src/`, never `lib/`.
   loading earlier turns) it undid every scroll started over a widget. The frame
   now names the reader's wheel, touch, and scrolling keys, and the page repeats
   them on the frame element (`tests/client.test.tsx`, `docs/VERIFY.md` step 14).
+- Widgets inside the answer, 2026-11-22: models tend to call every tool first
+  and write the answer last, so widgets gathered above the text. A widget now
+  stands wherever the answer writes a ```widget block holding its card id; the
+  result hands the model that block (`tests/placement.test.ts`,
+  `tests/client.test.tsx`, `docs/VERIFY.md` step 4).
 - The skill, rewritten: seven files, thirteen complete widgets, every one
   passing the check (`tests/skill.test.ts`).
 - Checked in headless Chrome on the built bundle (`docs/VERIFY.md`, recorded
@@ -258,16 +276,20 @@ run` is the full check. `lib/` is generated: edit `src/`, never `lib/`.
   compound-interest widget, the check passed, the widget drew in the reply with
   its shipped Chart.js copy loaded offline, and its `data-prompt` button sent
   the next message as an ordinary user turn.
+- A live run on the macOS desktop app, 2026-11-22 (0.2.2-rc.3): an answer wrote
+  three widgets, each in a ```widget block after the paragraph about it, and
+  redrew four of them with `revises`; each widget stood at its block, the blocks
+  were hidden, and the calls left no row of height (`docs/VERIFY.md` step 4).
 - Unchanged from before: the pluggability and packaging invariants
   (`tests/isolation.test.ts`, `tests/manifest.test.ts`), and the harness
   checkout is unchanged.
 
 **Not done.**
 
-- **The rest of the live checklist.** Steps 4 to 13 of `docs/VERIFY.md` have at
-  most one live pass each: streaming, the form, runtime errors, reload, themes,
-  and `revises` still need a full run, and the description and skill need tuning
-  from it.
+- **The rest of the live checklist.** Steps 5 to 13 of `docs/VERIFY.md` have at
+  most one live pass each, and step 4's first prompt has none: streaming, the
+  form, runtime errors, reload, and themes still need a full run, and the
+  description and skill need tuning from it.
 - **The web UI and the Windows desktop app** have not loaded this build; macOS
   has, by `link:` to the checkout.
 - **Native components, image search, entity cards, and attachments**, which

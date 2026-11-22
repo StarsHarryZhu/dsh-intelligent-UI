@@ -8,7 +8,7 @@ Interactive widgets in DeepSeek Harness chats, the way Claude and ChatGPT draw t
 |---|---|
 | Requires | DeepSeek Harness **>= 0.2.1-rc.1** (below 0.3.0) |
 | Platforms | Web UI, macOS desktop app, and Windows desktop app — one bundle, because both desktop apps load the same web client |
-| Verified | This engine: the unit suite, headless Chrome on the built bundle, and a live run on the macOS desktop app — a model-written widget drew, its shipped Chart.js loaded offline, and its button sent the next message. Web UI and Windows live runs are pending (`docs/VERIFY.md`) |
+| Verified | This engine: the unit suite, headless Chrome on the built bundle, and two live runs on the macOS desktop app — a model-written widget drew with its shipped Chart.js offline and its button sent the next message; later, three widgets stood inside the answer at their blocks and four redraws replaced earlier cards. Web UI and Windows live runs are pending (`docs/VERIFY.md`) |
 | Install | Settings → Plugins → Add plugin → `https://github.com/StarsHarryZhu/dsh-intelligent-UI` (needs `git` on `PATH`), then restart the harness and reload the page |
 
 ## What it draws
@@ -46,7 +46,7 @@ A flowchart laid out by Mermaid, in the chat's colours.
 ## How it works
 
 - The plugin registers one tool, `ui_render`, and one skill, `dsh-intelligent-ui`. The skill teaches the model when a widget beats prose, how to design one, which library fits, and how to fix one that failed; the Plugin Manager lists it as its own part of the plugin.
-- A widget stands in the reply where the model drew it, between the text before it and the text after it, and builds up there while the model writes it. Its scripts run once it is complete.
+- A widget stands in the reply where the model drew it, between the text before it and the text after it, and builds up there while the model writes it. Its scripts run once it is complete. The model can also stand it anywhere inside its answer by writing a small ```widget block with the widget's id there; the widget moves into that spot and the block is not shown.
 - Before a widget is shown, every script is checked for syntax errors — compiled, never run — so the model fixes a mistake in the same turn. If a widget fails while running, a button under it sends the error to the model, which redraws it.
 - What you set in a widget — its controls and whatever it chose to remember — is kept in this browser, so a reload or a restart shows it as you left it. Asked to change a widget, the model draws a new version that starts from your settings, and the old one folds away.
 - Bare HTML already looks like the host: buttons, sliders, inputs, tables, and code take the chat's theme, and widgets get its colours as CSS variables, with a palette for diagrams and charts.

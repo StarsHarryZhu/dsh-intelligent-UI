@@ -33,9 +33,26 @@ A widget never replaces the explanation; it carries the part the reader explores
 
 ## Where it stands and what to say
 
-The widget stands in your reply where you call the tool. Write the sentence that
-leads into it first, in the same message; after the result, continue below it
-with a sentence or two on what it shows and what to try. Do not restate its
+A widget stands in your reply where you call the tool. To put it at a chosen
+place in your answer instead, call the tool first, then write the answer and,
+where the widget belongs, a block that holds only the card id from the result:
+
+````
+The R format has three register fields:
+
+```widget
+call_00_Xy12
+```
+
+Next, the I format …
+````
+
+The widget moves there and the block is not shown. Use one block per widget;
+an answer with several parts can call every widget first and then place each
+under its own paragraph. Without a block, write the sentence that leads into the
+widget before the call, and continue after the result.
+
+Around a widget, say what it shows and what to try; do not restate its
 contents. You never see the widget: the result reports its text before scripts
 run, its controls, and any problem. Quote a figure only if your code computes it
 the way you describe.
