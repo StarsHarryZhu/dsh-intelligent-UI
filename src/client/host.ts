@@ -32,21 +32,6 @@ export interface ToolBlockLike {
   meta?: unknown
 }
 
-/** The session input actions every session-scope slot component receives. */
-export interface InputActionsLike {
-  setDraft?(text: string): void
-  submit?(): void
-}
-
-/** The fields of the session input state this plugin reads. */
-export interface InputStateLike {
-  draft?: string
-  phase?: string
-}
-
-/** A selector hook over one snapshot. */
-export type SelectorHook<T> = <S>(selector: (state: T) => S, equal?: (a: S, b: S) => boolean) => S
-
 /** The host's per-row disclosure hook: collapsed by default, reset when its turn folds. */
 export interface DisclosureLike {
   expanded: boolean
@@ -60,8 +45,6 @@ export type Translate = (key: string, params?: Record<string, unknown>) => strin
 /** Standard props every session-scope slot component receives. */
 export interface SessionKit {
   sessionId?: string
-  inputActions?: InputActionsLike
-  useInput?: SelectorHook<InputStateLike | undefined>
   t?: Translate
 }
 
@@ -115,6 +98,20 @@ export interface SlotsLike {
 /** The locale service. */
 export interface LocaleLike {
   register(namespace: string, dictionaries: Record<string, Record<string, string>>): () => void
+}
+
+/**
+ * The sessions service, reduced to borrowing one session's scope. A session's
+ * scope holds its `conversation` service, whose `send` prompts that session
+ * with one text message, queued behind a running turn, without its composer.
+ */
+export interface SessionsLike {
+  scope(id: string): { get?(name: string): unknown } | undefined
+}
+
+/** A session's conversation service, reduced to sending one message. */
+export interface ConversationSendLike {
+  send(text: string): Promise<void>
 }
 
 /** The conversation assembly service, reduced to its Definition registry. */

@@ -46,6 +46,8 @@ interface Loaded {
   dictionaries: string[]
   /** Lazy files the bundle asked the host for. */
   chunks: string[]
+  /** The conversation service of `session-1`, the only session the fake host has. */
+  conversation: { send: ReturnType<typeof vi.fn<(text: string) => Promise<void>>> }
   dispose(): void
 }
 
@@ -86,6 +88,7 @@ function loadClient(lazy?: (request: string) => Promise<unknown>): Loaded {
   const disposers: Array<() => void> = []
   const definitions: Array<Record<string, any>> = []
   const dictionaries: string[] = []
+  const conversation = { send: vi.fn(async (_text: string) => undefined) }
   const services: Record<string, unknown> = {
     slots: {
       inject: (_name: string, callback: () => unknown) => { const dispose = callback(); if (typeof dispose === 'function') disposers.push(dispose as () => void) },
@@ -97,6 +100,7 @@ function loadClient(lazy?: (request: string) => Promise<unknown>): Loaded {
     },
     locale: { register: (namespace: string) => { dictionaries.push(namespace); return () => { dictionaries.splice(dictionaries.indexOf(namespace), 1) } } },
     uiConversation: { events: { register: (definition: Record<string, any>) => { definitions.push(definition); return () => { definitions.splice(definitions.indexOf(definition), 1) } } } },
+    sessions: { scope: (id: string) => (id === 'session-1' ? { get: (name: string) => (name === 'conversation' ? conversation : undefined) } : undefined) },
   }
   const ctx = {
     get: (name: string) => services[name],
@@ -116,6 +120,7 @@ function loadClient(lazy?: (request: string) => Promise<unknown>): Loaded {
     definitions,
     dictionaries,
     chunks,
+    conversation,
     dispose: () => { for (const dispose of disposers.reverse()) dispose() },
   }
 }
@@ -137,7 +142,7 @@ function useHostDisclosure(): { expanded: boolean; setExpanded(open: boolean): v
   return { expanded, setExpanded, toggle: () => { setExpanded(open => !open) } }
 }
 
-/** A session kit: input actions and a static input state. */
+/** A session kit: the session id, and the composer props the host passes, with a draft in it. */
 function kit(draft = '') {
   const inputActions = { setDraft: vi.fn(), submit: vi.fn() }
   const useInput = <S,>(selector: (state: { draft: string; phase: string }) => S): S => selector({ draft, phase: 'plain' })
@@ -430,7 +435,7 @@ describe('what a frame asks is checked by the page', () => {
   })
 
   it('listens only to its own frame, and only to this protocol', async () => {
-    const { frame, session } = await drawn()
+    const { frame, client } = await drawn()
     clickInside(frame.iframe)
     const other = document.createElement('iframe')
     document.body.append(other)
@@ -441,7 +446,7 @@ describe('what a frame asks is checked by the page', () => {
     act(() => { window.dispatchEvent(new MessageEvent('message', { data: { channel: 'another', t: 'send', text: 'wrong channel' }, source: frame.iframe.contentWindow })) })
     act(() => { window.dispatchEvent(new MessageEvent('message', { data: { t: 'send', text: 'no channel' }, source: frame.iframe.contentWindow })) })
     other.remove()
-    expect(session.inputActions.setDraft).not.toHaveBeenCalled()
+    expect(client.conversation.send).not.toHaveBeenCalled()
     expect(frame.iframe.style.height).not.toBe('999px')
   })
 
@@ -467,34 +472,33 @@ describe('what a frame asks is checked by the page', () => {
   })
 
   it('sends a message only after a click inside the frame', async () => {
-    const { frame, session } = await drawn()
+    const { frame, client } = await drawn()
     frame.say({ t: 'send', text: 'Sent by a timer' })
-    expect(session.inputActions.setDraft).not.toHaveBeenCalled()
+    expect(client.conversation.send).not.toHaveBeenCalled()
     expect(screen.getByText('The widget tried to send a message without your click, so it was stopped.')).toBeTruthy()
     clickInside(frame.iframe)
     frame.say({ t: 'send', text: '  Compare this with the annual plan ' })
-    expect(session.inputActions.setDraft).toHaveBeenCalledExactlyOnceWith('Compare this with the annual plan')
-    expect(session.inputActions.submit).toHaveBeenCalledTimes(1)
+    expect(client.conversation.send).toHaveBeenCalledExactlyOnceWith('Compare this with the annual plan')
     expect(screen.queryByText(/without your click/u)).toBeNull()
   })
 
   it('requires the browser\'s own record of the click where the browser keeps one', async () => {
-    const { frame, session } = await drawn()
+    const { frame, client } = await drawn()
     const activation = { isActive: false }
     vi.stubGlobal('navigator', Object.assign(Object.create(navigator), { userActivation: activation }))
     clickInside(frame.iframe)
     frame.say({ t: 'send', text: 'Focused, but nobody clicked' })
-    expect(session.inputActions.setDraft).not.toHaveBeenCalled()
+    expect(client.conversation.send).not.toHaveBeenCalled()
     activation.isActive = true
     frame.say({ t: 'send', text: 'Clicked' })
-    expect(session.inputActions.setDraft).toHaveBeenCalledExactlyOnceWith('Clicked')
+    expect(client.conversation.send).toHaveBeenCalledExactlyOnceWith('Clicked')
   })
 
   it('sends one message per click, however many the frame posts', async () => {
-    const { frame, session } = await drawn()
+    const { frame, client } = await drawn()
     clickInside(frame.iframe)
     for (let index = 0; index < 5; index += 1) frame.say({ t: 'send', text: `Message ${index}` })
-    expect(session.inputActions.setDraft).toHaveBeenCalledExactlyOnceWith('Message 0')
+    expect(client.conversation.send).toHaveBeenCalledExactlyOnceWith('Message 0')
   })
 
   it('opens a link in a new tab without an opener, only after a click', async () => {
@@ -510,28 +514,44 @@ describe('what a frame asks is checked by the page', () => {
     expect(open).toHaveBeenCalledExactlyOnceWith('https://example.org/paper', '_blank', 'noopener,noreferrer')
   })
 
-  it('never overwrites what the reader is typing', async () => {
-    const { frame, session } = await drawn('half a thought')
-    const writeText = vi.fn(async () => undefined)
-    vi.stubGlobal('navigator', Object.assign(Object.create(navigator), { clipboard: { writeText } }))
+  it('sends past what the reader is typing, and leaves the composer alone', async () => {
+    const { frame, client, session } = await drawn('half a thought')
     clickInside(frame.iframe)
     frame.say({ t: 'send', text: 'Compare this with the annual plan' })
+    expect(client.conversation.send).toHaveBeenCalledExactlyOnceWith('Compare this with the annual plan')
     expect(session.inputActions.setDraft).not.toHaveBeenCalled()
-    expect(writeText).toHaveBeenCalledExactlyOnceWith('Compare this with the annual plan')
-    expect(screen.getByText('The composer has unsent text, so this was copied to the clipboard instead')).toBeTruthy()
+    expect(session.inputActions.submit).not.toHaveBeenCalled()
+    expect(screen.queryByText(/clipboard/u)).toBeNull()
   })
 
-  it('shows the text to copy by hand when the clipboard refuses', async () => {
-    const { frame } = await drawn('half a thought')
+  it('copies the message when the host refuses it', async () => {
+    const { frame, client } = await drawn()
+    client.conversation.send.mockRejectedValueOnce(new Error('session/busy'))
+    const writeText = vi.fn(async () => undefined)
+    vi.stubGlobal('navigator', Object.assign(Object.create(navigator), { clipboard: { writeText } }))
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    clickInside(frame.iframe)
+    frame.say({ t: 'send', text: 'Compare this with the annual plan' })
+    await waitFor(() => { expect(screen.getByText('The message could not be sent, so it was copied to the clipboard')).toBeTruthy() })
+    expect(writeText).toHaveBeenCalledExactlyOnceWith('Compare this with the annual plan')
+  })
+
+  it('copies the message where no session can take it, and shows it when the clipboard refuses', async () => {
+    const client = loadClient()
+    const view = render(<client.CardNode node={settledNode('call-1', await settle(EXAMPLE))} {...kit()} sessionId="session-gone" />)
+    const frame = frameIn(view.container)
+    await frame.ran()
     vi.stubGlobal('navigator', Object.assign(Object.create(navigator), { clipboard: { writeText: async () => { throw new Error('denied') } } }))
     clickInside(frame.iframe)
     frame.say({ t: 'send', text: 'Compare this with the annual plan' })
+    expect(client.conversation.send).not.toHaveBeenCalled()
+    expect(screen.getByText('Sending is unavailable here, so this was copied to the clipboard')).toBeTruthy()
     await waitFor(() => { expect(screen.getByText('The clipboard is unavailable; copy this by hand:')).toBeTruthy() })
     expect(screen.getByText('Compare this with the annual plan')).toBeTruthy()
   })
 
   it('shows a widget\'s errors and offers to send them to the model', async () => {
-    const { frame, session, view } = await drawn()
+    const { frame, client, view } = await drawn()
     frame.say({ t: 'error', message: 'Uncaught ReferenceError: total is not defined (line 9)' })
     frame.say({ t: 'error', message: 'Uncaught ReferenceError: total is not defined (line 9)' })
     frame.say({ t: 'error', message: 'Could not load https://cdn.jsdelivr.net/npm/nothing@1/x.js' })
@@ -540,11 +560,11 @@ describe('what a frame asks is checked by the page', () => {
     for (let index = 0; index < 9; index += 1) frame.say({ t: 'error', message: `Another error ${index}` })
     expect(box.querySelectorAll('li')).toHaveLength(5)
     act(() => { fireEvent.click(screen.getByRole('button', { name: 'Ask to fix' })) })
-    const sent = session.inputActions.setDraft.mock.calls[0]?.[0] as string
+    expect(client.conversation.send).toHaveBeenCalledTimes(1)
+    const sent = client.conversation.send.mock.calls[0]?.[0] as string
     expect(sent).toContain('card call-1')
     expect(sent).toContain('- Uncaught ReferenceError: total is not defined (line 9)')
     expect(sent).toContain('revises=call-1')
-    expect(session.inputActions.submit).toHaveBeenCalledTimes(1)
   })
 
   it('uses the host translator when the namespace is registered', async () => {

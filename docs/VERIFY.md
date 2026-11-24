@@ -83,7 +83,7 @@ Send:
 
 > Estimate the monthly payment on a $300,000 mortgage with sliders for the amount and the rate and a choice of term, and add a button that asks whether a shorter loan is better.
 
-Pass: with the composer empty, the button sends its question as an ordinary user message, and the model answers it. With text typed in the composer first, the press leaves that draft untouched and the widget says the question was copied instead (or shows it to copy, where the page refuses the clipboard).
+Pass: the button sends its question as an ordinary user message, and the model answers it. Type some text in the composer first and press the button again: the question is still sent, and the draft stays in the composer exactly as typed. Pressed while a turn is running, the question waits in the queue and goes out when the turn ends.
 
 ## 7. A form sends several answers at once
 
@@ -187,7 +187,7 @@ Pass: while the turn runs, the step group is collapsed and the widget still grow
 
 Run steps 5 to 14 and step 16 in the app.
 
-Pass: as written for the web. The desktop app grants the clipboard, so in step 6 the widget says the question was copied, and pasting shows it.
+Pass: as written for the web.
 
 # Part 3 — Windows only
 

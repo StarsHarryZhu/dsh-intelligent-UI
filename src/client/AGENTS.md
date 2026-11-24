@@ -27,7 +27,8 @@ each widget stores, in this browser's local storage.
 page entry has none. React comes from `require('react')`; nothing is read from a
 parameter. Each contribution is registered in its own `try`/`catch`, and the only
 required services are `slots` and `locale`; `uiConversation` is waited for with
-`ctx.inject`, so its absence never blocks the page's boot.
+`ctx.inject`, so its absence never blocks the page's boot. `sessions` is read
+with `ctx.get` only when a widget sends a message.
 
 **Registration is injected, not assumed.** `slots.inject(slot, …)` waits for the
 slot's declaration and removes the contribution when the slot collapses.
@@ -110,10 +111,13 @@ scrolls nothing, at most once per `SCROLL_INTERVAL_MS` for each kind, a key only
 while the frame has the focus. A widget that forges these can only make the chat
 believe the reader scrolled.
 
-**Messages go through the composer.** A widget's message calls
-`inputActions.setDraft` and `submit` only when the composer is empty and idle;
-otherwise the text is copied and the widget says so, and where the page refuses
-the clipboard it shows the text to copy by hand.
+**Messages bypass the composer.** A widget's message goes to
+`sessions.scope(sessionId).get('conversation').send(text)`, the host's own way
+for a panel to prompt a session: one text message, queued behind a running
+turn. The composer, and whatever the reader has typed there, is never read or
+written. Where no session can take the message, or the host refuses it, the
+text is copied and the widget says so; where the page refuses the clipboard, it
+shows the text to copy by hand.
 
 **Runtime errors go back to the model on request.** Errors the frame reports
 are listed under the widget with a button that sends them, with the card id, as
@@ -183,7 +187,7 @@ forbidden.
 - `chunks.ts` — the host's lazy loader, as the bundle wrapper hands it over.
 - `read.ts` — defensive reading of persisted meta and slot props.
 - `edits.ts` — what each widget keeps, written through to local storage.
-- `clipboard.ts` — the page clipboard, where a message goes when the composer cannot take it.
+- `clipboard.ts` — the page clipboard, where a message goes when the session cannot take it.
 - `locales.ts` — the chrome's Chinese and English copy and the translator.
 - `host.ts` — structural types for the host props and services this half reads.
 - `styles.css` — the chrome's stylesheet, inlined by the build.
@@ -202,6 +206,9 @@ forbidden.
   changes all pass through checked messages (`tests/client.test.tsx`,
   `tests/bridge.test.ts`, `tests/runtime.test.ts`, `tests/isolation.test.ts`).
 - Cards drawn by the DIL builds show the text version they carried.
+- A widget's message goes straight to the session, so it sends while the reader
+  has a draft in the composer, which it leaves untouched
+  (`tests/client.test.tsx`).
 - A widget stands where the answer writes a ```widget block naming it
   (`tests/placement.test.ts`, `tests/client.test.tsx`).
 - The reader's wheel, touch, and scrolling keys inside a frame are repeated to

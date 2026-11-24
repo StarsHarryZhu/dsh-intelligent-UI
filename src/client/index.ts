@@ -24,7 +24,7 @@ import { framePolicy } from '../widget/policy.ts'
 import { cardNodeDefinition } from './card-node.ts'
 import { loadChunk } from './chunks.ts'
 import { createEditsStore } from './edits.ts'
-import type { ClientContextLike, LocaleLike, SlotsLike, UiConversationLike } from './host.ts'
+import type { ClientContextLike, ConversationSendLike, LocaleLike, SessionsLike, SlotsLike, UiConversationLike } from './host.ts'
 import { createLibraryLoader } from './libraries.ts'
 import { en, zh } from './locales.ts'
 import { createCardNodeView } from './node-view.tsx'
@@ -32,11 +32,14 @@ import { createPresence } from './presence.ts'
 import css from './styles.css'
 import { createToolView } from './toolview.tsx'
 import { turnDataDefinition } from './turn-data.ts'
-import type { WidgetEnv } from './widget.tsx'
+import type { MessageSender, WidgetEnv } from './widget.tsx'
 
 export const name = PLUGIN_ID
 
-/** Required services. `uiConversation` is optional and waited for separately. */
+/**
+ * Required services. `uiConversation` is optional and waited for separately;
+ * `sessions` is read when a widget sends a message.
+ */
 export const inject = ['slots', 'locale']
 
 /**
@@ -55,6 +58,7 @@ export function apply(ctx: ClientContextLike): void {
     presence: createPresence(),
     parts: { runtime: frameRuntime, css: frameCss, policy: framePolicy() },
     loadLibraries: createLibraryLoader(loadChunk),
+    sendMessage: sessionSender(ctx),
   }
   const ToolView = createToolView(env)
   const CardNodeView = createCardNodeView(env)
@@ -102,6 +106,23 @@ export function apply(ctx: ClientContextLike): void {
       })
     })
   })
+}
+
+/**
+ * Send a widget's message through the session's own conversation service, the
+ * way the host's panels prompt a session: one text message, queued behind a
+ * running turn, with the composer and its draft left alone.
+ * @param ctx - the plugin's client context.
+ * @returns the sender every widget uses.
+ */
+function sessionSender(ctx: ClientContextLike): MessageSender {
+  return (sessionId, text) => {
+    if (sessionId === undefined || sessionId === '') return undefined
+    const sessions = ctx.get?.('sessions') as SessionsLike | undefined
+    const conversation = sessions?.scope(sessionId)?.get?.('conversation') as Partial<ConversationSendLike> | undefined
+    if (typeof conversation?.send !== 'function') return undefined
+    return conversation.send(text)
+  }
 }
 
 /** Run one contribution, logging instead of throwing. */

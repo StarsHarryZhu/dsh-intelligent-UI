@@ -1,7 +1,7 @@
 /**
  * The page clipboard, where the page allows it.
  *
- * Where a widget's message goes when the composer cannot take it: the reader
+ * Where a widget's message goes when the session cannot take it: the reader
  * then has it to paste.
  * @module dsh-intelligent-ui/client/clipboard
  */

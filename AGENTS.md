@@ -49,7 +49,7 @@ loader's lazy files.
 
 **Zero new session data.** No new session event type, ever, and no direct writes
 to a session log. A widget's message is an ordinary user message sent through the
-session's own composer. Whatever reaches the model is reconstructable from
+session's own conversation service, past the composer. Whatever reaches the model is reconstructable from
 events the host already defines, which is what makes "uninstall the plugin and
 every session still opens" true.
 
@@ -267,6 +267,10 @@ run` is the full check. `lib/` is generated: edit `src/`, never `lib/`.
   stands wherever the answer writes a ```widget block holding its card id; the
   result hands the model that block (`tests/placement.test.ts`,
   `tests/client.test.tsx`, `docs/VERIFY.md` step 4).
+- Messages past a draft, 2026-11-24: a widget's message used to go through the
+  composer, so with a draft there it was only copied. It now goes to the
+  session's conversation service, which prompts the session directly, and the
+  draft stays as it was (`tests/client.test.tsx`, `docs/VERIFY.md` step 6).
 - The skill, rewritten: seven files, thirteen complete widgets, every one
   passing the check (`tests/skill.test.ts`).
 - Checked in headless Chrome on the built bundle (`docs/VERIFY.md`, recorded

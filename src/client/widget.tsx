@@ -20,7 +20,7 @@ import { readFrameMessage, type FrameAction } from './bridge.ts'
 import { copyText } from './clipboard.ts'
 import { frameDocument, type FrameParts } from './document.ts'
 import type { CardMemory, EditsStore } from './edits.ts'
-import type { InputStateLike, SessionKit } from './host.ts'
+import type { SessionKit } from './host.ts'
 import type { LibraryLoader } from './libraries.ts'
 import { translator, type CopyKey } from './locales.ts'
 import type { Presence } from './presence.ts'
@@ -36,7 +36,18 @@ export interface WidgetEnv {
   parts: FrameParts
   /** Loads the shipped libraries a widget names. */
   loadLibraries: LibraryLoader
+  /** Sends the reader's message into a session, from {@link MessageSender}. */
+  sendMessage: MessageSender
 }
+
+/**
+ * Send one message into a session as the reader's, leaving its composer and
+ * whatever the reader is typing there alone.
+ * @param sessionId - the session the widget stands in.
+ * @param text - the message.
+ * @returns the send, which rejects when the host refuses it; undefined when no session here can take a message.
+ */
+export type MessageSender = (sessionId: string | undefined, text: string) => Promise<void> | undefined
 
 /** How far a widget's source has come. */
 export type WidgetStage = 'streaming' | 'complete' | 'ready'
@@ -119,7 +130,7 @@ export function Widget(props: WidgetProps): ReactNode {
   const [unfolded, setUnfolded] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [notice, setNotice] = useState<{ key: CopyKey; text?: string } | undefined>(undefined)
-  const send = useSender(kit, setNotice)
+  const send = useSender(env.sendMessage, kit.sessionId, setNotice)
   const update = useCallback((change: (current: CardMemory) => CardMemory, keep = true) => {
     store.set(memoryKey, change(store.get(memoryKey) ?? base), keep)
   }, [store, memoryKey, base])
@@ -437,41 +448,38 @@ function clickedInside(frame: HTMLIFrameElement | null): boolean {
 }
 
 /**
- * Send a widget's message through the session's composer, as if the reader had
- * typed it; where the composer cannot take it, copy it for the reader.
+ * Send a widget's message straight into its session, as the reader's next
+ * message; where the session cannot take it, copy it for the reader.
  */
-function useSender(kit: SessionKit, setNotice: (notice: { key: CopyKey; text?: string } | undefined) => void): (text: string) => void {
-  const composerReady = useComposerReady(kit)
+function useSender(
+  sendMessage: MessageSender,
+  sessionId: string | undefined,
+  setNotice: (notice: { key: CopyKey; text?: string } | undefined) => void,
+): (text: string) => void {
   return (text) => {
-    const actions = kit.inputActions
-    if (typeof actions?.setDraft === 'function' && typeof actions.submit === 'function' && composerReady) {
-      try {
-        actions.setDraft(text)
-        actions.submit()
-        setNotice(undefined)
-        return
-      } catch (error) {
-        console.error('dsh-intelligent-ui: sending a widget message failed', error)
-      }
+    const copy = (key: CopyKey): void => {
+      setNotice({ key })
+      // The clipboard answers asynchronously and may refuse; then the note shows the text to copy by hand.
+      void copyText(text).then((copied) => {
+        if (!copied) setNotice({ key: 'send.copyFailed', text })
+      })
     }
-    setNotice({ key: typeof actions?.setDraft === 'function' ? 'send.copied' : 'send.unavailable' })
-    // The clipboard answers asynchronously and may refuse; then the note shows the text to copy by hand.
-    void copyText(text).then((copied) => {
-      if (!copied) setNotice({ key: 'send.copyFailed', text })
+    let sending: Promise<void> | undefined
+    try {
+      sending = sendMessage(sessionId, text)
+    } catch (error) {
+      console.error('dsh-intelligent-ui: sending a widget message failed', error)
+    }
+    if (sending === undefined) {
+      copy('send.unavailable')
+      return
+    }
+    setNotice(undefined)
+    sending.catch((error: unknown) => {
+      console.error('dsh-intelligent-ui: the host refused a widget message', error)
+      copy('send.failed')
     })
   }
-}
-
-/** Whether the composer can take a message right now: empty, and not mid-submission. */
-function useComposerReady(kit: SessionKit): boolean {
-  const useInput = kit.useInput ?? useNoInput
-  return useInput((state: InputStateLike | undefined) => state === undefined
-    || ((state.draft ?? '').trim() === '' && (state.phase === undefined || state.phase === 'plain')))
-}
-
-/** Stand-in for a host without the input seat. */
-function useNoInput<S>(selector: (state: InputStateLike | undefined) => S): S {
-  return selector(undefined)
 }
 
 /** The line a replaced widget folds to: what happened, and a toggle for the old one. */

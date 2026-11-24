@@ -38,7 +38,7 @@ It takes the second branch, as one engine, and keeps what the plugin had built o
 | Streaming | The node shows the widget while its arguments stream: the page posts each prefix to the frame, which morphs it into the body with every handler stripped and no script run, keeping unchanged elements so it does not flicker. When the result lands, the frame runs the scripts in document order, as a page load would. The frame is one element throughout and never reloads. |
 | Native look | The page reads the chat's theme tokens and sends them into the frame as short variables; a base stylesheet styles bare buttons, inputs, sliders, selects, tables, and code like the host's, and adds a few classes, nine colour ramps, and six series colours, in both themes. |
 | Libraries | Fifteen libraries ship with the plugin, pinned by version and digest. A widget names them by their usual CDN address; when the address names a shipped library and major version, the frame loads the shipped copy, so it works offline. Anything else loads from the allowlisted CDNs. |
-| Clicks continue the conversation | `sendPrompt(text)`, a button with `data-prompt`, or a form with `data-send` sends the reader's next message through the session's own composer, as an ordinary user message. |
+| Clicks continue the conversation | `sendPrompt(text)`, a button with `data-prompt`, or a form with `data-send` sends the reader's next message into the session as an ordinary user message, through the host's own conversation service, leaving the composer and any draft in it alone. |
 
 ### The security boundary
 

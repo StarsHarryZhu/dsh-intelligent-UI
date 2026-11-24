@@ -50,7 +50,7 @@ A flowchart laid out by Mermaid, in the chat's colours.
 - Before a widget is shown, every script is checked for syntax errors — compiled, never run — so the model fixes a mistake in the same turn. If a widget fails while running, a button under it sends the error to the model, which redraws it.
 - What you set in a widget — its controls and whatever it chose to remember — is kept in this browser, so a reload or a restart shows it as you left it. Asked to change a widget, the model draws a new version that starts from your settings, and the old one folds away.
 - Bare HTML already looks like the host: buttons, sliders, inputs, tables, and code take the chat's theme, and widgets get its colours as CSS variables, with a palette for diagrams and charts.
-- A button with `data-prompt`, a form with `data-send`, or `sendPrompt()` in a script sends your next message through the chat's own composer, only when you clicked.
+- A button with `data-prompt`, a form with `data-send`, or `sendPrompt()` in a script sends your next message to the chat, only when you clicked; whatever you are typing in the input box stays as it is.
 - Uninstalling leaves every session opening as before; earlier calls show as ordinary tool rows.
 
 ## Libraries
