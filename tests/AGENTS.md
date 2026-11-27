@@ -71,7 +71,8 @@ need the build first: run `node build.js` before the suite.
 - `bridge.test.ts` — every message a frame may send, checked and bounded, and
   the frame's document.
 - `runtime.test.ts` — the frame runtime in jsdom: streaming without running,
-  activation order, kept values, forms and markers, theme, scroll inputs, and
+  activation order, kept values, forms and markers, room kept for what
+  changes (with a stand-in layout), held sliders, theme, scroll inputs, and
   messages.
 - `client.test.tsx` — the browser half through its real registration: the frame,
   streaming, sending and links, scrolling over a frame, kept values, revisions,

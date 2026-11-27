@@ -1,6 +1,6 @@
 {
   "name": "dsh-intelligent-ui",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Interactive widgets for DeepSeek Harness chats, as Claude and ChatGPT draw them: the model writes HTML, SVG, CSS, and JavaScript that runs in a sandboxed frame in the reply, styled like the host, with fifteen common libraries shipped for offline use and every control responding in the browser without another model call.",
   "keywords": [
     "dsh-plugin",

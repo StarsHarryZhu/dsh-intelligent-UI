@@ -267,6 +267,13 @@ run` is the full check. `lib/` is generated: edit `src/`, never `lib/`.
   stands wherever the answer writes a ```widget block holding its card id; the
   result hands the model that block (`tests/placement.test.ts`,
   `tests/client.test.tsx`, `docs/VERIFY.md` step 4).
+- A layout that holds still, 2026-11-26: a number, sentence, or note redrawn as
+  a slider moved shifted everything after it, the slider included, so the value
+  ran away from the pointer and the frame changed height. Once a widget has run,
+  the frame walks its controls through their values and keeps the largest size
+  each changing element reached; after the reader's first touch nothing shrinks;
+  a dragged slider also holds its own size and place until release
+  (`tests/runtime.test.ts`; headless Chrome in `docs/VERIFY.md`).
 - Messages past a draft, 2026-11-24: a widget's message used to go through the
   composer, so with a draft there it was only copied. It now goes to the
   session's conversation service, which prompts the session directly, and the

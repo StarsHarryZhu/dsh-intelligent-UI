@@ -208,11 +208,14 @@ describe('what a widget keeps', () => {
 <select id="plan"><option value="a">A</option><option value="b">B</option></select><textarea id="note"></textarea><span id="out"></span>
 <script>
 window.atStart = [seats.value, agree.checked, plan.value, note.value]
-window.heard = 0
-seats.addEventListener('input', () => { window.heard += 1; out.textContent = seats.value })
+window.heard = []
+seats.addEventListener('input', () => { window.heard.push(seats.value); out.textContent = seats.value })
 </script>`, { controls: { seats: '20', agree: true, plan: 'b', note: 'hello', gone: 'x', out: 'not a control' } })
     expect(frame.window.atStart).toEqual(['20', true, 'b', 'hello'])
-    expect(frame.window.heard).toBe(1)
+    // The replay tells the scripts first; the walk that measures the widget ends on the same value.
+    expect(frame.window.heard[0]).toBe('20')
+    expect(frame.window.heard.at(-1)).toBe('20')
+    expect((frame.document.getElementById('seats') as HTMLInputElement).value).toBe('20')
     expect(frame.document.getElementById('out')?.textContent).toBe('20')
   })
 
@@ -293,6 +296,146 @@ describe('what a widget may ask of the page', () => {
     frame.document.getElementById('f')?.dispatchEvent(new frame.window.Event('submit', { bubbles: true, cancelable: true }))
     expect(frame.window.handled).toBe(true)
     expect(frame.sent('send')).toEqual([])
+  })
+})
+
+describe('room for what changes', () => {
+  /**
+   * Open a frame with a stand-in layout, since jsdom has none: an element is 8
+   * pixels per character of its text wide and 20 pixels per visible paragraph
+   * (and one line) tall, never below its inline `min-width` and `min-height`;
+   * a hidden element has no box.
+   */
+  async function laidOut(html: string, extra: Record<string, unknown> = {}): Promise<Frame> {
+    const frame = openFrame()
+    await frame.settle()
+    const { Element: FrameElement } = frame.window
+    const box = (element: Element) => {
+      if (element.closest('[hidden]') !== null) return { width: 0, height: 0 }
+      const style = (element as HTMLElement).style
+      const text = element.textContent ?? ''
+      const lines = 1 + element.querySelectorAll('p:not([hidden])').length
+      return {
+        width: Math.max(text.length * 8, Number.parseFloat(style?.minWidth ?? '') || 0),
+        height: Math.max(lines * 20, Number.parseFloat(style?.minHeight ?? '') || 0),
+      }
+    }
+    FrameElement.prototype.getBoundingClientRect = function getBoundingClientRect(this: Element) {
+      const { width, height } = box(this)
+      return { left: 0, top: 0, width, height, right: width, bottom: height, x: 0, y: 0, toJSON: () => ({}) } as DOMRect
+    }
+    FrameElement.prototype.getClientRects = function getClientRects(this: Element) {
+      return [this.getBoundingClientRect()] as unknown as DOMRectList
+    }
+    frame.post({ t: 'render', html, final: true, ...extra })
+    await frame.settle()
+    return frame
+  }
+
+  it('holds a number at the widest it gets as its slider moves, and puts the slider back', async () => {
+    const frame = await laidOut(`<div style="display:flex"><input id="s" type="range" min="0" max="1000" value="5"><output id="o"></output></div>
+<script>const show = () => { o.textContent = '$' + Number(s.value).toLocaleString('en-US') }
+s.addEventListener('input', show); show()</script>`)
+    const output = frame.document.getElementById('o') as HTMLElement
+    expect(output.textContent).toBe('$5')
+    expect((frame.document.getElementById('s') as HTMLInputElement).value).toBe('5')
+    // '$1,000' is six characters: 48 pixels, held now, while the number reads '$5'.
+    expect(output.style.getPropertyValue('min-width')).toBe('48px')
+    expect(output.style.getPropertyValue('display')).toBe('inline-block')
+    expect(output.style.getPropertyPriority('min-width')).toBe('important')
+  })
+
+  it('keeps the height a note takes at some values, and leaves what never changes alone', async () => {
+    const frame = await laidOut(`<div id="card"><input id="rate" type="range" min="0" max="20" value="5"><p id="warn" hidden>That rate is high.</p></div><p id="still">Fixed</p>
+<script>rate.addEventListener('input', () => { warn.hidden = Number(rate.value) <= 15 })</script>`)
+    expect(frame.document.getElementById('warn')?.hidden).toBe(true)
+    expect(frame.document.getElementById('card')?.style.getPropertyValue('min-height')).toBe('40px')
+    expect(frame.document.getElementById('still')?.getAttribute('style')).toBeNull()
+  })
+
+  it('walks choices and boxes too, and sends nothing the widget keeps while it walks', async () => {
+    const frame = await laidOut(`<select id="plan"><option>Free</option><option>Enterprise plan</option></select><input id="yearly" type="checkbox"><span id="price"></span>
+<script>const show = () => { price.textContent = (plan.selectedIndex ? 'Contact us' : '$0') + (yearly.checked ? ' a year' : ''); dsh.state.set(price.textContent) }
+plan.addEventListener('change', show); yearly.addEventListener('change', show); show()</script>`)
+    const price = frame.document.getElementById('price') as HTMLElement
+    expect(price.textContent).toBe('$0')
+    // 'Contact us' is the widest the walk saw: each control is walked alone, from where the reader left the others.
+    expect(price.style.getPropertyValue('min-width')).toBe('80px')
+    expect(frame.sent('state').map(message => message.value)).toEqual(['$0'])
+    expect(frame.window.dsh.state.get()).toBe('$0')
+  })
+
+  it('never lets an element shrink below what it has shown, once its content changes', async () => {
+    const frame = await laidOut('<input id="t"> <span id="echo"></span><script>t.addEventListener("input", () => { echo.textContent = t.value })</script>')
+    const typed = frame.document.getElementById('t') as HTMLInputElement
+    const echo = frame.document.getElementById('echo') as HTMLElement
+    for (const value of ['hello world', 'hi']) {
+      typed.value = value
+      typed.dispatchEvent(new frame.window.Event('input', { bubbles: true }))
+      await Promise.resolve()
+    }
+    expect(echo.textContent).toBe('hi')
+    expect(echo.style.getPropertyValue('min-width')).toBe('88px')
+  })
+})
+
+describe('a slider the reader drags', () => {
+  /** Lay a slider out by hand: jsdom has no layout, so its box is where the test says, moved by its `translate`. */
+  function laidOut(frame: Frame, id: string, box: { left: number; top: number; width: number; height: number }) {
+    const slider = frame.document.getElementById(id) as HTMLInputElement
+    slider.getBoundingClientRect = () => {
+      const [x = 0, y = 0] = (slider.style.getPropertyValue('translate') || '0 0').split(' ').map(part => Number.parseFloat(part) || 0)
+      const left = box.left + x
+      const top = box.top + y
+      return { left, top, width: box.width, height: box.height, right: left + box.width, bottom: top + box.height, x: left, y: top, toJSON: () => ({}) } as DOMRect
+    }
+    return slider
+  }
+  const press = (frame: Frame, target: EventTarget, type: string): void => {
+    target.dispatchEvent(new frame.window.MouseEvent(type, { bubbles: true, button: 0 }))
+  }
+
+  it('keeps its size and its place while the text before it changes, and rejoins the layout on release', async () => {
+    const frame = await run('<div style="display:flex"><span id="v">9</span><input id="s" type="range" style="flex:1;width:180px" min="0" max="100" value="9"></div>')
+    const box = { left: 30, top: 10, width: 180, height: 16 }
+    const slider = laidOut(frame, 's', box)
+    press(frame, slider, 'pointerdown')
+    expect(slider.style.getPropertyValue('width')).toBe('180px')
+    expect(slider.style.getPropertyValue('flex')).toBe('0 0 auto')
+    // The number before it grows, which would push the slider right by 12 pixels.
+    box.left = 42
+    slider.value = '10'
+    slider.dispatchEvent(new frame.window.Event('input', { bubbles: true }))
+    expect(slider.style.getPropertyValue('translate')).toBe('-12px 0')
+    expect(slider.getBoundingClientRect().left).toBe(30)
+    await frame.settle()
+    expect(slider.style.getPropertyValue('translate')).toBe('-12px 0')
+    press(frame, slider, 'pointerup')
+    expect(slider.style.getPropertyValue('translate')).toBe('')
+    expect(slider.style.getPropertyValue('width')).toBe('180px')
+    expect(slider.style.getPropertyPriority('width')).toBe('')
+    expect(slider.style.getPropertyValue('flex')).toBe('1 1 0%')
+    expect(slider.style.getPropertyValue('min-width')).toBe('')
+  })
+
+  it('holds a tall slider along its height, and leaves other drags and other controls alone', async () => {
+    const frame = await run('<input id="tall" type="range" style="writing-mode:vertical-lr"><input id="text" value="x"><input id="off" type="range" disabled>')
+    const box = { left: 0, top: 50, width: 16, height: 160 }
+    const tall = laidOut(frame, 'tall', box)
+    press(frame, tall, 'pointerdown')
+    box.top = 70
+    tall.dispatchEvent(new frame.window.Event('input', { bubbles: true }))
+    expect(tall.style.getPropertyValue('translate')).toBe('0 -20px')
+    // Focus leaving another element is not the drag ending.
+    frame.document.getElementById('text')?.dispatchEvent(new frame.window.FocusEvent('blur'))
+    expect(tall.style.getPropertyValue('translate')).toBe('0 -20px')
+    frame.window.dispatchEvent(new frame.window.FocusEvent('blur'))
+    expect(tall.style.getPropertyValue('translate')).toBe('')
+    for (const id of ['text', 'off']) {
+      const element = frame.document.getElementById(id) as HTMLElement
+      press(frame, element, 'pointerdown')
+      expect(element.getAttribute('style')).toBeNull()
+    }
   })
 })
 

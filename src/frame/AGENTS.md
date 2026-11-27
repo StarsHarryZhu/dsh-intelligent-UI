@@ -12,7 +12,8 @@ and runs the scripts in document order, the way a page load would. It gives the
 widget its helpers — `sendPrompt`, `openLink`, `dsh.state`, `dsh.math`,
 `dsh.theme` and the `dsh:theme` event — and the two markers that need no script,
 `data-prompt` on a button and `data-send` on a form. It reports the frame's
-height and the widget's errors. `base.css` makes bare HTML look like the host
+height and the widget's errors. `reserve.ts` keeps room for what the widget
+changes, so its layout holds still. `base.css` makes bare HTML look like the host
 and gives the model a small vocabulary of variables and classes; `math.ts` is
 the numeric library behind `dsh.math`.
 
@@ -55,6 +56,35 @@ id unless `data-keep="false"` is on it or around it; passwords, files, hidden
 fields, and buttons never are. `dsh.state.set` refuses a value that is not JSON
 or is over `LIMITS.maxStateChars`.
 
+**Room is kept for what changes.** Once the widget has run, `reserve.ts` walks
+every enabled control through its values — a slider or bounded number in 21
+steps, each option of a select, each radio of a group, each box both ways, then
+all sliders at their ends together — firing `input` and `change` as the reader
+would, within `WALK_BUDGET_MS`, and puts each back. Meanwhile the runtime posts
+no kept values or state and restores `dsh.state` (`quiet`). Every element a
+change touched, and those around it up to the body, is measured at each step;
+one whose size varied keeps its largest as an inline `!important` `min-height`,
+and `min-width` where its content sets its width (inline boxes, table cells,
+floats, grid items, row-flex items that do not grow). A short inline element
+becomes an inline block so that it can; one whose text wraps keeps only its
+height through its container. The walk is synchronous, so nothing is painted
+between its steps. After the reader's first touch (a pointer, a key, or a value)
+the widget is measured afresh, and from then on a content change never shrinks
+an element below the largest size it has shown; changes before that touch are
+the widget's first render and are left alone. A change of the frame's width
+gives every room back and measures again, after any drag. Sliders themselves
+are never resized; the drag code holds them.
+
+**A dragged slider holds still.** From a primary `pointerdown` on an enabled
+range input until `pointerup`, `pointercancel`, or the frame's own `blur`, the
+slider keeps the width, height, and place along its longer side that it had when
+the drag began: the runtime sets those inline as `!important` with
+`flex: 0 0 auto`, and moves it back with the `translate` property after each
+`input` and each frame. Otherwise text or a chart redrawn beside it moves it
+under the pointer, the browser reads the pointer against the new place, and the
+value jumps. On release the slider's own inline values come back exactly.
+`base.css` gives `<output>` tabular digits for the same reason.
+
 **A form sends what the reader filled in.** `formMessage` walks `form.elements`
 in document order: each named, enabled field gives its trimmed value, a checked
 box or radio its value or its label, a select its chosen options; submit,
@@ -80,8 +110,10 @@ could be computed rather than show a wrong one.
 - `AGENTS.md` — this file: what runs inside a frame and what it may assume.
 - `main.ts` — the entry: starts the runtime in the frame's window.
 - `runtime.ts` — the runtime: messages, streaming morph, script activation,
-  shipped libraries, helpers, kept values, forms, height, the reader's scroll
-  inputs, and errors.
+  shipped libraries, helpers, kept values, forms, held sliders, height, the
+  reader's scroll inputs, and errors.
+- `reserve.ts` — room kept for what changes: the walk through the controls'
+  values, the sizes reserved, and the hold against shrinking.
 - `base.css` — the frame's base stylesheet: theme variables, styled elements,
   classes, colour ramps, and series colours.
 - `math.ts` — special functions and the calculus routines behind `dsh.math`:
@@ -96,7 +128,8 @@ could be computed rather than show a wrong one.
   engine, keeping its integrator, limits, and root finder and gaining a
   derivative that refuses corners (`tests/math.test.ts`).
 - Streaming, activation order, external script order, kept values, forms, both
-  markers, theme changes, scroll inputs, and error reporting are tested in jsdom
+  markers, held sliders, room kept for what changes, theme changes, scroll
+  inputs, and error reporting are tested in jsdom
   (`tests/runtime.test.ts`), and every widget the skill teaches ran with no
   error in headless Chrome in both themes (`docs/VERIFY.md`, Part 1).
 

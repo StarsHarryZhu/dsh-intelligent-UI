@@ -11,7 +11,8 @@
  * then fires `DOMContentLoaded` and `load`.
  *
  * It also gives the widget its helpers — `sendPrompt`, `openLink`, `dsh.state`,
- * `dsh.math` — and reports the frame's height and the widget's errors. It runs
+ * `dsh.math` — keeps room for what the widget changes so its layout holds
+ * still (`reserve.ts`), and reports the frame's height and the widget's errors. It runs
  * in the same frame as the widget's code, so it guards nothing from that code:
  * the page checks every message it receives.
  * @module dsh-intelligent-ui/frame/runtime
@@ -21,6 +22,7 @@ import { LIMITS } from '../widget/policy.ts'
 import { CHANNEL, type FromFrame, type Json, SCROLL_INTERVAL_MS, SCROLL_KEYS, type ScrollInput, type ShippedText, type Unmarked } from '../widget/messages.ts'
 import { scriptBlocks } from '../widget/scan.ts'
 import * as math from './math.ts'
+import { createReserver } from './reserve.ts'
 
 /** A message to the page, without its channel mark. */
 type Outgoing = Unmarked<FromFrame>
@@ -53,7 +55,10 @@ export interface Runtime {
 export function boot(win: FrameWindow): Runtime {
   const doc = win.document
   const parent = win.parent
+  // While the reserver walks the controls through their values, nothing the widget keeps goes out.
+  let quiet = false
   const post = (message: Outgoing): void => {
+    if (quiet && (message.t === 'state' || message.t === 'controls')) return
     try {
       parent.postMessage({ channel: CHANNEL, ...message }, '*')
     } catch {
@@ -167,6 +172,7 @@ export function boot(win: FrameWindow): Runtime {
   }, true)
   let controlsQueued = false
   const keep = (event: Event): void => {
+    if (quiet) return
     const element = event.target
     if (!isControl(element) || element.id === '' || !keepable(element)) return
     const value = controlValue(element)
@@ -187,6 +193,87 @@ export function boot(win: FrameWindow): Runtime {
   }
   doc.addEventListener('input', keep, true)
   doc.addEventListener('change', keep, true)
+
+  // --- a slider holds still while it is dragged -----------------------------
+  // A widget redraws what stands around a slider as its value moves: a number
+  // beside it, a chart above it. When that moves or resizes the slider, the
+  // browser reads the pointer against the new place, the value jumps, the text
+  // changes again, and the thumb runs from the pointer. So while a pointer drags
+  // a slider, it keeps the size it had and its place along its axis; it rejoins
+  // the layout when the pointer lets go.
+  let held: Held | undefined
+  const reserver = createReserver(win, doc, {
+    quietly: (run) => {
+      const before = saved
+      quiet = true
+      try {
+        run()
+      } finally {
+        quiet = false
+        saved = before
+      }
+    },
+    dragging: () => held !== undefined,
+  })
+  const repin = (): void => {
+    if (held === undefined) return
+    const { element, axis } = held
+    if (!element.isConnected) {
+      letGo()
+      return
+    }
+    const rect = element.getBoundingClientRect()
+    const natural = (axis === 'x' ? rect.left : rect.top) - held.shift
+    const shift = Math.round((held.start - natural) * 100) / 100
+    if (shift === held.shift) return
+    held.shift = shift
+    element.style.setProperty('translate', axis === 'x' ? `${shift}px 0` : `0 ${shift}px`, 'important')
+  }
+  const follow = (): void => {
+    if (held === undefined) return
+    repin()
+    held.frame = win.requestAnimationFrame(follow)
+  }
+  const letGo = (): void => {
+    if (held === undefined) return
+    const { element, saved, frame } = held
+    held = undefined
+    win.cancelAnimationFrame(frame)
+    for (const [name, [value, priority]] of saved) {
+      if (value === '') element.style.removeProperty(name)
+      else element.style.setProperty(name, value, priority)
+    }
+  }
+  win.addEventListener('pointerdown', (event) => {
+    letGo()
+    const target = event.target
+    if (!(target instanceof HTMLInputElement) || target.type !== 'range' || target.disabled || event.button > 0) return
+    const rect = target.getBoundingClientRect()
+    const axis = rect.height > rect.width ? 'y' : 'x'
+    const computed = win.getComputedStyle(target)
+    const fixed: Record<string, string> = {
+      width: computed.width,
+      'min-width': computed.width,
+      'max-width': computed.width,
+      height: computed.height,
+      'min-height': computed.height,
+      'max-height': computed.height,
+      flex: '0 0 auto',
+      translate: 'none',
+    }
+    const saved = new Map<string, [string, string]>()
+    for (const [name, value] of Object.entries(fixed)) {
+      saved.set(name, [target.style.getPropertyValue(name), target.style.getPropertyPriority(name)])
+      target.style.setProperty(name, value, 'important')
+    }
+    held = { element: target, axis, start: axis === 'x' ? rect.left : rect.top, shift: 0, saved, frame: 0 }
+    follow()
+  }, true)
+  // The widget's own handlers have run by the time the input reaches the window.
+  win.addEventListener('input', () => { repin() })
+  for (const type of ['pointerup', 'pointercancel']) win.addEventListener(type, () => { letGo() }, true)
+  // The frame itself losing the focus ends a drag; an element inside losing it does not.
+  win.addEventListener('blur', (event) => { if (event.target === win) letGo() })
 
   // --- the reader's scrolling ----------------------------------------------
   // The page never sees input inside the frame, so it would take a scroll the
@@ -282,6 +369,7 @@ export function boot(win: FrameWindow): Runtime {
     setReadyState(doc, 'complete')
     win.dispatchEvent(new Event('load'))
     replay()
+    reserver.start()
     post({ t: 'ran' })
     scheduleHeight()
   }
@@ -324,6 +412,20 @@ export function boot(win: FrameWindow): Runtime {
     receive(event.data)
   })
   return { receive }
+}
+
+/** A slider the reader is dragging, held at the size and place it had when the drag began. */
+interface Held {
+  element: HTMLInputElement
+  /** The axis the slider runs along: its longer side. */
+  axis: 'x' | 'y'
+  /** Where the slider began along its axis, in the frame's viewport. */
+  start: number
+  /** How far it is moved back along its axis now. */
+  shift: number
+  /** The slider's own inline values of the properties held, to put back. */
+  saved: Map<string, [string, string]>
+  frame: number
 }
 
 /** Whether a control's value is kept: it has an id, a kept type, and no `data-keep="false"` on it or around it. */
