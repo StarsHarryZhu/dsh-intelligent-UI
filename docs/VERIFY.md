@@ -71,6 +71,7 @@ Pass:
 - Each widget stands inside the final answer, right after the paragraph about its format, where the answer wrote a ```widget block with its card id; the blocks themselves are not shown, and nothing is left where the calls were.
 - The browser console shows no React error. Reloading the page and reopening the session show the widgets in the same places, with what was set in them.
 - With the plugin disabled (step 16), each place shows a code block holding the card id.
+- No code block in the session shows a bare card id, even where the model wrote one for a widget it did not draw. A later answer that writes an earlier widget's block shows that widget there.
 
 ## 5. Shipped libraries load from the plugin
 

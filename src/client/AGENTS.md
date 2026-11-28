@@ -90,9 +90,10 @@ widget gets a notice that it was stopped. A frame that fires `load` a second tim
 has left its document, and is removed with a note.
 
 **A widget the answer names stands there.** The model may write a ```widget
-block whose only line is a card id; `placement.ts` finds it among the host's
-code blocks, in the card's turn and after its row, marks it so the stylesheet
-hides it, and adds one container after it, which `node-view.tsx` draws into
+block whose only line is a card id; `placement.ts` reads the host's code blocks
+outside the reader's messages and injected context, lets `planPlacement` decide which block each
+card takes and which blocks to hide, marks those so the stylesheet hides them,
+and adds one container after a block a card takes, which `node-view.tsx` draws into
 through `createPortal`; the card's own place is then empty, so the chat leaves
 no gap. Only `placement.ts` reads or adds to the host's markup, and it never
 removes or edits a host node. Each change of block gets a fresh container: the
@@ -172,8 +173,8 @@ forbidden.
   reply, and the streamed-argument reader.
 - `node-view.tsx` — the renderer of a widget in the reply: preview, settled
   widget, the replaced fold, and the earlier-version text.
-- `placement.ts` — finding the answer's ```widget block for a card and
-  adding the container it stands in.
+- `placement.ts` — reading the answer's ```widget blocks for the cards on the
+  page, hiding them, and adding the container a card stands in.
 - `presence.ts` — the record of reply copies on the page that tool rows defer to.
 - `toolview.tsx` — the `ui_render` row: its status, why a widget failed the
   check, and, where no reply copy exists, the widget itself.
@@ -211,6 +212,9 @@ forbidden.
   (`tests/client.test.tsx`).
 - A widget stands where the answer writes a ```widget block naming it
   (`tests/placement.test.ts`, `tests/client.test.tsx`).
+- A block with a miscopied id takes the card of its turn no block named; a
+  later answer that names an earlier widget takes it; a block for a widget that
+  was never drawn is hidden (`tests/placement.test.ts`, 2026-11-27).
 - The reader's wheel, touch, and scrolling keys inside a frame are repeated to
   the chat, which no longer pulls back a scroll started over a widget while it
   keeps a reading anchor (`tests/client.test.tsx`; headless Chrome in

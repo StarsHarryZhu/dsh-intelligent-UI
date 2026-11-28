@@ -215,15 +215,15 @@ describe('the page never holds a widget\'s markup or code', () => {
 
   it('reads the host\'s own markup, and adds to it, from one file only', () => {
     const placement = join('src', 'client', 'placement.ts')
-    // The host's hooks: a code block, its body, a row's turn, and the chat's root.
-    expect(users(page, /md-code-block|data-code-block-content|data-chat-turn|conversation\.chat\.flow/u)).toEqual([placement])
+    // The host's hooks: a code block, its body, a row's turn and kind, and the chat's root.
+    expect(users(page, /md-code-block|data-code-block-content|data-chat-turn|data-chat-flow-kind|conversation\.chat\.flow/u)).toEqual([placement])
     expect(users(page, /\.(?:after|before|insertBefore|replaceWith|replaceChildren|prepend)\s*\(|\.(?:removeChild|removeAttribute)\s*\(|ownerDocument\.createElement/u)).toEqual([placement])
     const text = code(readFileSync(join(ROOT, placement), 'utf8'))
-    // It adds one container after a block and marks the block, and removes only what it added.
+    // It adds one container after a block and marks blocks, and removes only what it added.
     expect([...text.matchAll(/\.(after|before|insertBefore|replaceWith|replaceChildren|prepend|removeChild|setAttribute|removeAttribute|remove)\s*\(/gu)].map(match => match[1]).sort())
       .toEqual(['after', 'remove', 'removeAttribute', 'setAttribute', 'setAttribute'])
     expect(text).toMatch(/claim\.slot\?\.remove\(\)/u)
-    expect(text).toMatch(/claim\.block\.removeAttribute\(PLACED_MARK\)/u)
+    expect(text).toMatch(/block\.removeAttribute\(PLACED_MARK\)/u)
   })
 
   it('draws exactly one kind of frame, sandboxed, with no address and no extra powers', () => {

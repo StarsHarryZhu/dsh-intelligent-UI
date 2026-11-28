@@ -66,15 +66,22 @@ settings namespace, no replacement of a shipped cell, no agent-loop change, no
 assistant renderer.
 
 **The answer's text is read, never rewritten.** To stand a widget inside the
-answer, the browser half reads three hooks the host renders: a code block's
-`.md-code-block` root and `[data-code-block-content]` body, and each chat row's
-`data-chat-turn`. On a ```widget block whose only line is a card id, in that
-card's turn and after its row, it sets one attribute (`data-dsh-iui-placed`,
-which its stylesheet hides) and adds one container right after the block, and
-takes both back when the card or the block goes. It never removes, moves, or
-edits a host node. All of it lives in `src/client/placement.ts`
-(`tests/isolation.test.ts`). Where a hook is missing, the block stays an
-ordinary code block and the widget stays where it was called.
+answer, the browser half reads four hooks the host renders: a code block's
+`.md-code-block` root and `[data-code-block-content]` body, each chat row's
+`data-chat-turn`, and the `data-chat-flow-kind` (`user`, `steering`,
+`context`, `turn-trigger`) of messages the model did not write, whose blocks it
+never reads. Which block a card takes, and which blocks are
+hidden, `planPlacement` (`src/widget/blocks.ts`) decides from the blocks and the
+cards alone: a block naming a card, or the card it replaced, in that card's turn
+or a later one; otherwise a block that looks like a card id takes a card of its
+turn that no block named; a block that names a card or looks like a card id is
+hidden even when no card fills it. On such a block the browser half sets one
+attribute (`data-dsh-iui-placed`, which its stylesheet hides), adds one
+container right after a block a card stands in, and takes both back when the
+card or the block goes. It never removes, moves, or edits a host node. All of
+it lives in `src/client/placement.ts` (`tests/isolation.test.ts`). Where a hook
+is missing, the block stays an ordinary code block and the widget stays where it
+was called.
 
 **The security boundary.** The model's code runs only inside a widget frame, and
 the page treats the frame as hostile. `tests/isolation.test.ts` enforces each
@@ -267,6 +274,14 @@ run` is the full check. `lib/` is generated: edit `src/`, never `lib/`.
   stands wherever the answer writes a ```widget block holding its card id; the
   result hands the model that block (`tests/placement.test.ts`,
   `tests/client.test.tsx`, `docs/VERIFY.md` step 4).
+- Blocks the model got wrong, 2026-11-27: in the CSE220 and AMS310 sessions,
+  14 of 131 blocks showed the reader a bare card id. Nine named a widget the
+  model never drew, four showed an earlier answer's widget again, and one
+  miscopied an id. Now the first kind is hidden, the second moves the widget
+  to the newer answer, the third takes the card of its turn that no block
+  named, and the description, each result, and the skill say a block never
+  draws a widget (`tests/blocks.test.ts`, `tests/placement.test.ts`; the two
+  sessions replayed through `planPlacement` leave no card id in view).
 - A layout that holds still, 2026-11-26: a number, sentence, or note redrawn as
   a slider moved shifted everything after it, the slider included, so the value
   ran away from the pointer and the frame changed height. Once a widget has run,

@@ -83,6 +83,8 @@ them on every platform.
   against closed forms.
 - 2026-11-22: “Where it stands and what to say” teaches the ```widget block
   that places a widget inside the answer.
+- 2026-11-27: the same section says a block never draws a widget, and that a
+  later answer shows an earlier widget again with its block.
 
 **Not done.**
 

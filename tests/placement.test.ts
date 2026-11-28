@@ -7,7 +7,7 @@
  */
 
 import { afterEach, describe, expect, it } from 'vitest'
-import { CODE_BODY, namedCard, PLACED_MARK, SLOT_CLASS, watchPlacement } from '../src/client/placement.ts'
+import { CODE_BODY, PLACED_MARK, SLOT_CLASS, watchPlacement } from '../src/client/placement.ts'
 
 /** A row of the chat, in one turn, holding the given markup. */
 function row(turn: number, inner = ''): HTMLElement {
@@ -47,33 +47,61 @@ function watch(ids: string[], card: Element): { reports: Array<HTMLElement | nul
 
 afterEach(() => { document.body.replaceChildren() })
 
-describe('the block that names a card', () => {
-  it('holds the card id alone, or after the word widget or card', () => {
-    expect(namedCard('call_00_CCdWYgPeMlPa8yIE8wic2444\n')).toBe('call_00_CCdWYgPeMlPa8yIE8wic2444')
-    expect(namedCard('  widget call-7 ')).toBe('call-7')
-    expect(namedCard('Card: call-7')).toBe('call-7')
-    for (const text of ['', '   ', 'call-7 and more', 'let x = 1', 'a/b', 'x'.repeat(201)]) expect(namedCard(text), text).toBeUndefined()
-  })
-})
-
 describe('a card placed in the answer', () => {
-  it('stands after the first block of its turn, after itself, that names it', () => {
-    const card = row(2)
+  it('stands at the first block of its turn that names it, and every block naming it is hidden', () => {
     const before = row(2, block('call-7'))
-    const other = row(3, block('call-7'))
+    const card = row(2)
     const answer = row(2, `<p>Lead-in</p>${block('call-7')}<p>After</p>${block('call-7')}`)
-    chat(before, card, answer, other)
+    chat(before, card, answer)
     const { reports } = watch(['call-7'], card)
-    const [first, second] = Array.from(answer.querySelectorAll('.md-code-block'))
     expect(reports).toHaveLength(1)
     const slot = reports[0] as HTMLElement
     expect(slot.className).toBe(SLOT_CLASS)
-    expect(slot.previousElementSibling).toBe(first)
-    expect(first?.hasAttribute(PLACED_MARK)).toBe(true)
-    expect(second?.hasAttribute(PLACED_MARK)).toBe(false)
-    expect(before.querySelector(`[${PLACED_MARK}]`)).toBeNull()
-    expect(other.querySelector(`[${PLACED_MARK}]`)).toBeNull()
+    // A block written before the call counts too: the answer put it there.
+    expect(slot.previousElementSibling).toBe(before.querySelector('.md-code-block'))
+    for (const named of [before, answer].flatMap(element => Array.from(element.querySelectorAll('.md-code-block')))) expect(named.hasAttribute(PLACED_MARK)).toBe(true)
     expect(slot.hasAttribute('data-text-interaction-exclude')).toBe(true)
+  })
+
+  it('moves to a later answer that names it again, but never reads the reader\'s own messages', () => {
+    const card = row(2)
+    const answer = row(2, block('call-7'))
+    const asked = row(3, block('call-7'))
+    asked.setAttribute('data-chat-flow-kind', 'user')
+    const again = row(3, `<p>The same widget again:</p>${block('call-7')}`)
+    chat(card, answer, asked, again)
+    const { reports } = watch(['call-7'], card)
+    expect(reports.at(-1)?.previousElementSibling).toBe(again.querySelector('.md-code-block'))
+    expect(answer.querySelector('.md-code-block')?.hasAttribute(PLACED_MARK)).toBe(true)
+    expect(asked.querySelector('.md-code-block')?.hasAttribute(PLACED_MARK)).toBe(false)
+  })
+
+  it('takes a miscopied id, and hides a block for a widget that was never drawn', () => {
+    const first = row(4)
+    const second = row(4)
+    const answer = row(4, `${block('call_00_one')}<p>Then</p>${block('call_00_twX')}<p>And</p>${block('call_00_never')}<p>Code</p>${block('ls')}`)
+    chat(first, second, answer)
+    const one = watch(['call_00_one'], first)
+    const two = watch(['call_00_two'], second)
+    const [own, miscopied, never, code] = Array.from(answer.querySelectorAll('.md-code-block'))
+    expect(one.reports.at(-1)?.previousElementSibling).toBe(own)
+    expect(two.reports.at(-1)?.previousElementSibling).toBe(miscopied)
+    expect(never?.hasAttribute(PLACED_MARK)).toBe(true)
+    expect(never?.nextElementSibling?.classList.contains(SLOT_CLASS)).toBe(false)
+    expect(code?.hasAttribute(PLACED_MARK)).toBe(false)
+  })
+
+  it('fills an empty block with a card of its turn drawn after it', () => {
+    const placed = row(5)
+    const answer = row(5, `${block('call_00_main')}<p>Now try it:</p>${block('call_00_q8mK2cVn')}`)
+    const root = chat(placed, answer)
+    watch(['call_00_main'], placed)
+    const empty = answer.querySelectorAll('.md-code-block')[1] as Element
+    expect(empty.hasAttribute(PLACED_MARK)).toBe(true)
+    const late = row(5)
+    root.append(late)
+    const { reports } = watch(['call_00_quiz'], late)
+    expect(reports.at(-1)?.previousElementSibling).toBe(empty)
   })
 
   it('reports in place at once when no block names it, and moves once the block is written', async () => {
@@ -110,9 +138,9 @@ describe('a card placed in the answer', () => {
     expect(again.isConnected).toBe(true)
   })
 
-  it('takes back its container and its mark when the card leaves', () => {
+  it('takes back its container and every mark when the card leaves', () => {
     const card = row(1)
-    const answer = row(1, block('call-1'))
+    const answer = row(1, `${block('call-1')}${block('call-never')}`)
     const root = chat(card, answer)
     const untouched = answer.innerHTML
     const { stop } = watch(['call-1'], card)

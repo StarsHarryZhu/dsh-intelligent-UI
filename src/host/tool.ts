@@ -187,7 +187,7 @@ function readCallId(exec: unknown): string | undefined {
 }
 
 /** Where the widget stands, told with every widget so the model goes on writing after it. */
-export const PLACEMENT_NOTE = 'It stands in your reply here, where you called ui_render. To put it inside your answer instead, write this block alone on its lines where it belongs; the widget moves there and the block is hidden:'
+export const PLACEMENT_NOTE = 'It stands in your reply here, where you called ui_render. To put it inside your answer instead, write this block alone on its lines where it belongs; the widget moves there and the block is hidden. A block never draws a widget: copy this one exactly, and write one only for a widget a ui_render result gave you an id for:'
 
 /**
  * The block that places a widget in the answer: a fence of the `widget`

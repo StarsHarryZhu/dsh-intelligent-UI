@@ -1,4 +1,4 @@
-/** Bundled client modules (27):
+/** Bundled client modules (28):
  *   client/bridge.js
  *   client/card-node.js
  *   client/chunks.js
@@ -20,6 +20,7 @@
  *   client/widget.js
  *   frame/base.css
  *   frame/main.runtime
+ *   widget/blocks.js
  *   widget/identity.js
  *   widget/libs.js
  *   widget/messages.js

@@ -78,8 +78,11 @@ need the build first: run `node build.js` before the suite.
   streaming, sending and links, scrolling over a frame, kept values, revisions,
   the tool row, cards from before the rewrite, Turn data, cards in the reply,
   theme, and libraries.
-- `placement.test.ts` — finding the answer's ```widget block for a card on a
-  page laid out like the host's chat, and adding and taking back its container.
+- `blocks.test.ts` — which ```widget block each card takes, on plain lists
+  built from what real sessions wrote.
+- `placement.test.ts` — the answer's ```widget blocks on a page laid out like
+  the host's chat: which ones are hidden, and adding and taking back the
+  container a card stands in.
 - `math.test.ts` — the quadrature rule's constants, integrals, derivatives and
   corners, limits, roots, and special functions.
 - `skill.test.ts` — the bundled skill: its layout, size, and frontmatter; every
@@ -103,6 +106,8 @@ need the build first: run `node build.js` before the suite.
   built bundle.
 - 2026-11-22: `placement.test.ts`, and the isolation rules that keep the host's
   markup read and added to from one file only.
+- 2026-11-27: `blocks.test.ts`, with the miscopied, repeated, and never-drawn
+  blocks found in the CSE220 and AMS310 sessions.
 
 **Not done.**
 

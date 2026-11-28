@@ -52,6 +52,11 @@ an answer with several parts can call every widget first and then place each
 under its own paragraph. Without a block, write the sentence that leads into the
 widget before the call, and continue after the result.
 
+A block only moves a widget you have drawn; it never draws one. Copy the id
+from the result, and never write a block for a widget you mean to draw later
+or in another message: call the tool for it first. To show a widget from an
+earlier answer again, write its block in the new answer; it moves there.
+
 Around a widget, say what it shows and what to try; do not restate its
 contents. You never see the widget: the result reports its text before scripts
 run, its controls, and any problem. Quote a figure only if your code computes it

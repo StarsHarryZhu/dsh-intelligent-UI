@@ -4,8 +4,9 @@
 
 What every part of the plugin shares about a widget: the plugin's names, what a
 widget frame may reach and how large anything may be, the messages between a
-frame and the page, the table of libraries the plugin ships, and a reader of
-HTML that needs no DOM. The host half reads these to check a widget and to tell
+frame and the page, the table of libraries the plugin ships, a reader of
+HTML that needs no DOM, and the rules that stand a card in the answer's
+```widget blocks. The host half reads these to check a widget and to tell
 the model what it drew; the browser half reads them to write the frame's
 document, to check every message a frame sends, and to clean a source while it
 streams; the frame runtime reads them to speak the same protocol.
@@ -43,6 +44,12 @@ with `latest`, matches), and a path rule; each library's files and pins live in
 file the manifest ships and every manifest library has a table entry with the
 same title. An address the table does not answer loads from its code host.
 
+**Placement is decided from lists.** `blocks.ts` reads a block's card id and
+decides, from the blocks (name and turn, in the answer's order) and the cards
+(ids and turn, in the order they were drawn), which block each card takes and
+which blocks the reader should not see. It reads no page and no log; the
+browser half feeds it what the page shows.
+
 **The protocol is closed.** `messages.ts` lists every message each way; both
 sides mark them with `CHANNEL`, and the page reads what a frame sends only
 through `client/bridge.ts`.
@@ -67,6 +74,8 @@ independent of it.
   doctype, and document tags removed.
 - `scan.ts` — the DOM-free reader: pieces, script blocks, inline handlers,
   addresses, module imports, control ids, prompt texts, and visible text.
+- `blocks.ts` — the card id a ```widget block names, and which block each card
+  stands in.
 
 ## 4. Progress
 
@@ -77,6 +86,9 @@ independent of it.
   from `lang/`, and the numeric routines moved to `src/frame/math.ts`.
 - Fifteen shipped libraries, each matched from cdnjs, jsDelivr, unpkg, and,
   where it has a module build, esm.sh (`tests/libs.test.ts`).
+- Placement rules, 2026-11-27, moved out of `client/placement.ts` and widened:
+  an earlier answer's widget shown again, a miscopied id, a block written
+  before its call, and a block for a widget never drawn (`tests/blocks.test.ts`).
 - The reader handles unfinished tags, raw-text elements, entities, and import
   maps, and finds bare module imports through the widget's import map
   (`tests/scan.test.ts`).

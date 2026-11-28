@@ -54,7 +54,8 @@ naming the call itself, is ignored with a note; a valid one is persisted as
 model is told so.** The description's Placement paragraph says both; every
 successful result says it again on its second line (`PLACEMENT_NOTE`) and then
 gives the ```widget block holding that card's id (`placementBlock`), ready to
-copy into the answer.
+copy into the answer. Both say a block never draws a widget, because a model
+that has written many blocks starts writing them for widgets it never drew.
 
 **The model sees a summary, never its source back.** `output.render` projects
 the result into text: lines and scripts, the shipped libraries and fetched
@@ -111,6 +112,9 @@ through the registry's own `assertSupportedJsonSchema` in the tests.
 - 2026-11-22: the description's Placement paragraph and each result's
   ```widget block with the card id let the model stand a widget inside its
   answer (`tests/tool.test.ts`); the description stays under 4000 characters.
+- 2026-11-27: the Placement paragraph and `PLACEMENT_NOTE` add that a block
+  never draws a widget; the revision sentence and the opening paragraph were
+  cut to keep the description at 3988 characters.
 - Syntax errors in classic scripts, modules, and inline handlers come back with
   their source lines; blocked addresses, shipped libraries, and sandbox habits
   are reported (`tests/check.test.ts`).
